@@ -171,20 +171,19 @@ ncycle = source_chunks
 #    print(sdir)
 
 if options.hysplit == 'defaults':
-   from monet.util.sverify.shysplit import default_setup
-   from monet.util.sverify.shysplit import default_control
+   from monet.util.svhy import default_setup
+   from monet.util.svhy import default_control
    default_setup('SETUP.0', options.tdir)
    default_control('CONTROL.0', options.tdir, run_duration, d1)
 
 if options.hysplit == 'runlist':
-   from monet.util.sverify.shysplit import create_runlist
-   #from monet.util.sverify.shysplit import runhandler
+   from monet.util.svhy import create_runlist
    runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
    #runhandler(runlist, 5, options.tdir)
 
 rfignum=1
 if options.cems:
-    from monet.util.sverify.semissions import SEmissions
+    from monet.util.svcems import SEmissions
     ef = SEmissions([d1,d2], area, state)
     ef.find()
     ef.print_source_summary(options.tdir)
@@ -198,7 +197,7 @@ if options.cems:
         plt.show()
 
 if options.obs:
-    from monet.util.sverify.sobs import SObs
+    from monet.util.svobs import SObs
     obs = SObs([d1,d2], area, state)
     obs.fignum=rfignum
     obs.find(pload=True, tdir=options.tdir)

@@ -57,6 +57,10 @@ TODO what kinds of statistics?
 
 EPA method code 60  = EQSA-0486-060
 
+##ethresh attribute in Semissions class controls 
+##when an emitimes file is written (none written if 
+##emissions for that source don't exceed threshold)
+
 """
 
 
@@ -82,21 +86,34 @@ def create_map(fignum):
 
 parser = OptionParser()
 
-parser.add_option('-a', type="string", dest="area", default="ND",\
+parser.add_option('-a', type="string", dest="state", default="ND",\
                   help='two letter state code (ND)')
-parser.add_option('--cems', action="store_true", dest="cems", default=False,\
-                  help='Find and plot SO2 emissions')
+parser.add_option('-b', type="string", dest="bounds", default=None,\
+                  help='bounding box for data lat:lon:lat:lon \
+                  First pair describes lower left corner. \
+                  Second pair describes upper right corner.')
 parser.add_option('-d', type="string", dest="drange", \
                   default="2106:1:1:2016:2:1", \
                   help='daterange in form YYYY:M:D:YYYY:M:D')
-parser.add_option('--hdir', type="string", dest="hdir", default="", \
+parser.add_option('-y', type="string", dest="hdir", default="", \
                   help='directory path for hysplit')
 parser.add_option('-o', type="string", dest="tdir", default="./", \
                   help='directory path for outputs')
+parser.add_option('-q', action="store_true", dest="quiet", default=False, \
+                  help='do not show graphs.')
+
+parser.add_option('--cems', action="store_true", dest="cems", default=False,\
+                  help='Find and plot SO2 emissions')
 parser.add_option('--obs', action="store_true", dest="obs", default=False, \
                    help='Find and plot SO2 observations')
-parser.add_option('-y', type="string", dest="hysplit", default=None, \
-                   help='default')
+parser.add_option('--def', action="store_true", dest="defaults", default=False, \
+                   help='write a default CONTROL and SETP file to the top\
+                         directory')
+parser.add_option('--run', action="store_true", dest="create_runs", default=False, \
+                   help='Use CONTROL and SETUP in top level directory to \
+                         write CONTROL and SETUP files in subdirectories which\
+                         will call EMITIMES files. Also create bash run script\
+                         in top level directory.')
 
 ##-----##
 #parser.add_option('--run', action="store_true", dest="runh", default=False)
@@ -124,12 +141,26 @@ try:
 except:
     print('daterange is not correct ' + temp)
 
-if options.area.lower().strip() == 'nd':
-    area = [-105.0, -97.0, 44.5, 49.5]
-    state=['nd']
-else:
-    area = None
-    state=[options.area.strip()]
+if options.bounds:
+   temp=options.bounds.split(':')
+   latll=float(temp[0])
+   lonll=float(temp[1])
+   latur=float(temp[2])
+   lonur=float(temp[3])
+   area = (latll, lonll, latur, lonur)
+
+states=[]
+if options.state:
+   temp=options.state.split(':')
+   for tt in temp: 
+       states.append(tt.lower())
+ 
+if options.bounds.lower().strip() == 'nd':
+    area = [44.5,-105.0, 49.5, -97.0]
+    states=['nd']
+#else:
+#    area = None
+#    state=[options.area.strip()]
 
 #sv = SO2Verify([d1,d2], area, state)
 
@@ -170,13 +201,13 @@ ncycle = source_chunks
 #for sdir in mkdir:
 #    print(sdir)
 
-if options.hysplit == 'defaults':
+if options.defaults:
    from monet.util.svhy import default_setup
    from monet.util.svhy import default_control
    default_setup('SETUP.0', options.tdir)
    default_control('CONTROL.0', options.tdir, run_duration, d1)
 
-if options.hysplit == 'runlist':
+if options.create_runs:
    from monet.util.svhy import create_runlist
    runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
    #runhandler(runlist, 5, options.tdir)
@@ -184,31 +215,35 @@ if options.hysplit == 'runlist':
 rfignum=1
 if options.cems:
     from monet.util.svcems import SEmissions
-    ef = SEmissions([d1,d2], area, state)
+    ef = SEmissions([d1,d2], area, states, tdir=options.tdir)
     ef.find()
     ef.print_source_summary(options.tdir)
-    ef.plot()
+    ef.plot(save=True)
     ef.create_emitimes(ef.d1, schunks=source_chunks, tdir=options.tdir)
     rfignum = ef.fignum 
     if not options.obs:
         mapfig = plt.figure(rfignum)
         axmap = create_map(rfignum)
         ef.map(axmap)
-        plt.show()
-
+        plt.savefig(options.tdir + 'map.jpg')
+        if not options.quiet:
+            plt.show()
+        
 if options.obs:
     from monet.util.svobs import SObs
-    obs = SObs([d1,d2], area, state)
+    obs = SObs([d1,d2], area, states, tdir=options.tdir)
     obs.fignum=rfignum
     obs.find(pload=True, tdir=options.tdir)
     obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir) 
-    obs.plot()
+    obs.plot(save=True)
     fignum = obs.fignum 
     axmap = create_map(fignum)
     obs.map(axmap)
     if options.cems:
        ef.map(axmap)
-    plt.show()
+    plt.savefig(options.tdir + 'map.jpg')
+    if not options.quiet:
+       plt.show()
 
 
 ##------------------------------------------------------##

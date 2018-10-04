@@ -43,10 +43,13 @@ class SObs(object):
        read_csv (reads from csv file)
     """
 
-    def __init__(self, dates, area, states=['nd']):
+    def __init__(self, dates, area, states=['nd'], tdir='./'):
         """
         self.sources: pandas dataframe
             sources are created from a CEMSEmissions class object in the get_sources method.
+        area is a tuple or list of four floats
+
+        TODO - currently state codes are not used.
         """
         ##dates to consider.
         self.d1 = dates[0]
@@ -55,14 +58,11 @@ class SObs(object):
         self.states=states
 
         #area to consider
+        self.tdir=tdir
         self.area = area
         self.pfile = './' + 'obs' + self.d1.strftime("%Y%m%d.") + self.d2.strftime("%Y%m%d.") + 'pkl'
         self.csvfile =  'obs' + self.d1.strftime("%Y%m%d.") + \
                         self.d2.strftime("%Y%m%d.") + 'csv'
-
-        self.metdir = '/pub/archives/wrf27km/'
-        self.hdir = '/n-home/alicec/Ahysplit/trunk/exec/'
-        self.tdir = '/pub/Scratch/alicec/SO2/'
 
         self.tmap = None
         self.fignum = 1
@@ -90,28 +90,30 @@ class SObs(object):
         #     df = df[df[svar] == siteid]
         #     val = df['obs']
 
-    def plot(self):
+    def plot(self, save=True):
         """plot time series of observations"""
         sra = self.obs['siteid'].unique()
         print('PLOT OBS')
         print(sra)
         sns.set()
         dist = []
-        ptrue=True
         for sid in sra:
             ts = get_tseries(self.obs, sid, var='obs', svar='siteid', convert=True)
             ms = get_tseries(self.obs, sid, var='mdl', svar='siteid')
             dist.extend(ts.tolist())
-            if ptrue:
-                fig = plt.figure(self.fignum)
-                #nickname = nickmapping(sid)
-                ax = fig.add_subplot(1,1,1)
-                #plt.title(str(sid) + '  (' + str(nickname) + ')' )
-                plt.title(str(sid))
-                ax.set_xlim(self.d1, self.d2)
-                ts.plot()
-                ms.plot()
-                self.fignum +=1
+            fig = plt.figure(self.fignum)
+            #nickname = nickmapping(sid)
+            ax = fig.add_subplot(1,1,1)
+            #plt.title(str(sid) + '  (' + str(nickname) + ')' )
+            plt.title(str(sid))
+            ax.set_xlim(self.d1, self.d2)
+            ts.plot()
+            ms.plot()
+            if save:
+               figname = self.tdir + '/so2.' + str(sid) + '.jpg'
+               plt.savefig(figname)
+            self.fignum +=1
+           
         #sns.distplot(dist, kde=False)
         #plt.show()           
         #sns.distplot(np.array(dist)/2.6178, kde=False, hist_kws={'log':True})
@@ -165,7 +167,7 @@ class SObs(object):
             ##TO DO - something happens when converting units of mdl column.
             #self.obs = epa_util.convert_epa_unit(self.obs, obscolumn='mdl', unit='UG/M3')
         area = self.area
-        if area: self.obs = obs_util.latlonfilter(self.obs, (area[2], area[0]), (area[3], area[1]))
+        if area: self.obs = obs_util.latlonfilter(self.obs, (area[0], area[1]), (area[2], area[3]))
         rt = datetime.timedelta(hours=72)
         self.obs = obs_util.timefilter(self.obs, [self.d1, self.d2+rt])
         siteidlist= np.array(self.siteidlist)

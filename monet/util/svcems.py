@@ -31,10 +31,19 @@ class SEmissions(object):
        plot - plots time series of emissions
        map  - plots locations of power plants on map
     """
-    def __init__(self, dates, area, states=['nd']):
+    def __init__(self, dates, area, states=['nd'], tdir='./'):
         """
         self.sources: pandas dataframe
             sources are created from a CEMSEmissions class object in the get_sources method.
+
+        area: list or tuple of four floats
+             (lat, lon, lat, lon) describing lower left and upper right corner
+              of area to consider. Note that the user is responsible for
+              requestiong all states that may lie within this area. 
+        states: list of strings
+              list of two letter state abbreviations. Data for all states listed
+              will be downloaded and then stations outside of the area requested
+              will be pruned.
         """
         ##dates to consider.
         self.d1 = dates[0]
@@ -43,11 +52,15 @@ class SEmissions(object):
         #area to consider
         self.area = area
         self.pfile = './' + 'obs' + self.d1.strftime("%Y%m%d.") + self.d2.strftime("%Y%m%d.") + 'pkl'
-        self.tdir = '/pub/Scratch/alicec/SO2/'
+        self.tdir = tdir
         self.fignum = 1
         ##self.sources is a DataFrame returned by the CEMS class.
         self.cems= cems_mod.CEMS()
         self.sources = pd.DataFrame()
+        self.ethresh = 100 #lbs emittimes only created if max emission over
+                           #this.
+    
+
 
     def find(self, testcase=False, byunit=False, verbose=False):
         """find emissions using the CEMSEmissions class
@@ -66,7 +79,8 @@ class SEmissions(object):
             self.cems.add_data([self.d1, self.d2], states=self.states,
                                 download=True, verbose=True)
         if area:
-            self.cems.df = obs_util.latlonfilter(self.cems.df, (area[2], area[0]), (area[3], area[1]))
+            self.cems.df = obs_util.latlonfilter(self.cems.df, (area[0], area[1]), (area[2], area[3]))
+
         self.ehash = self.cems.create_location_dictionary()
         
         self.stackhash = cems_mod.get_stack_dict(cems_mod.read_stack_height(), orispl=self.ehash.keys())
@@ -80,6 +94,13 @@ class SEmissions(object):
         ##columns are (orisp, unit_id) or just (orisp)
         data1 = self.cems.cemspivot(('so2_lbs'), daterange=[self.d1, self.d2],
                 verbose=True, unitid=byunit)
+        badoris=[]
+        for oris in data1.columns:
+            keep= self.check_oris(data1[oris], oris)
+            if not keep: badoris.append(oris)
+        self.badoris=badoris
+        data1.drop(badoris, inplace=True, axis=1)
+
         #print('done with pivot----------------')
         #print(self.ehash)
        
@@ -90,6 +111,8 @@ class SEmissions(object):
         for oris in self.ehash.keys():
             sublist = []
             print('----------------')
+            print(namehash[oris])
+            print('ORISPL ' + str(oris))
             try:
                 #data = data1[loc].sum(axis=1)
                 data = data1[oris]
@@ -101,26 +124,29 @@ class SEmissions(object):
             sublist.append(namehash[oris])
             sublist.append(self.ehash[oris][0])  #latlon tuple
             sublist.append(self.ehash[oris][1])  #latlon tuple
-            sublist.append(int(qmean*0.453592)) #mean emission (kg)
-            sublist.append(int(qmax*0.453592))  #max emission (kg)
-            #slist['latlon'] =  self.ehash[oris]    #latlon tuple
-            #slist['Mean (kg)'] = qmean*0.453592 #mean emission (kg)
-            #slist['Max (kg)'] = qmax*0.453592  #max emission (kg)
-            #slist['Stack'] = self.stackhash[oris]  #max emission (kg)
-            print(namehash[oris])
-            print('ORISPL ' + str(oris))
             print(self.ehash[oris])
             if not np.isnan(qmean):
                 self.meanhash[oris] = qmean * 0.453592
+                sublist.append(int(qmean*0.453592)) #mean emission (kg)
             else: 
-                self.meanhash[oris] = 0
+                self.meanhash[oris] = -99
+                sublist.append(-99) #mean emission (kg)
+            if not np.isnan(qmax):
+                sublist.append(int(qmax*0.453592))  #max emission (kg)
+            else:  
+                sublist.append(-99)  #max emission (kg)
+
             print('Mean emission (lbs)', qmean)
             print('Maximum emission (lbs)', qmax)
             print('Stack id, Stack height (meters)')
             rstr=''
-            for val in self.stackhash[oris]:
-                rstr += str(val[0]) + ' = ' + str(int(val[1]*0.3048)) + ', '
-                print(str(val[0]) + ',    ' + str(int(val[1]*0.3048)))
+            if oris in self.stackhash.keys():
+                for val in self.stackhash[oris]:
+                    rstr += str(val[0]) + ' = ' + str(int(val[1]*0.3048)) + ', '
+                    print(str(val[0]) + ',    ' + str(int(val[1]*0.3048)))
+            else: 
+                print('unknown stack height')
+                rstr += '-99'
             sublist.append(rstr)
             slist.append(sublist)
         self.sumdf = pd.DataFrame(slist, columns=columns)
@@ -144,6 +170,20 @@ class SEmissions(object):
         mult = 1.055e9 / 3600.0  
         sources = sources * mult  #convert from mmbtu to watts
         return sources
+
+    def check_oris(self, series, oris):
+        print(oris , 'CHECK COLUMN---------------------------')
+        nanum = series.isna().sum()
+        series.dropna(inplace=True)
+        maxval = np.max(series)
+        print('Number of Nans', nanum)
+        print('Max value', maxval)
+        rval=False
+        if maxval > self.ethresh:
+           rval = True
+        else:
+           print( 'DROPPING')
+        return rval
  
     def get_sources(self, stype='so2_lbs'):
         """ 
@@ -163,9 +203,14 @@ class SEmissions(object):
         stackhash = cems_mod.get_stack_dict(cems_mod.read_stack_height(), orispl=self.ehash.keys())
         ##This block replaces ORISP code with (lat, lon) tuple as headers
         cnew = []
+        sources.drop(self.badoris, inplace=True, axis=1)
         columns=list(sources.columns.values)
         for oris in columns:
-            sid, ht = zip(*stackhash[oris])
+            if oris in stackhash.keys():
+                sid, ht = zip(*stackhash[oris])
+            else:
+                sid=-99
+                ht = -99
             ##puts the maximum stack height associated with that orispl code.
             newcolumn = (ehash[oris][0], ehash[oris][1], np.max(ht), oris)
             cnew.append(newcolumn)
@@ -250,20 +295,28 @@ class SEmissions(object):
                            break
             efile.write_new(ename)
   
-    def plot(self):
+    def plot(self, save=True):
         """plot time series of emissions"""
         if self.cems.df.empty: self.find()
         sns.set()
         namehash = self.cems.create_name_dictionary()
         data1 = self.cems.cemspivot(('so2_lbs'), daterange=[self.d1, self.d2],
                 verbose=False, unitid=False)
-        for loc in self.ehash:
+        print(self.ehash)
+        print('*****************')
+        print(data1.columns)
+        print('*****************')
+        for loc in data1.keys():
+            print(loc)
             fig = plt.figure(self.fignum)
             ax = fig.add_subplot(1,1,1)
             data = data1[loc] * 0.453592
             ax.plot(data, '--b.')   
             plt.ylabel('SO2 mass kg')
             plt.title(str(loc) + ' ' + namehash[loc])
+            if save: 
+               figname = self.tdir + '/cems.' + str(loc) + '.jpg'
+               plt.savefig(figname)
             self.fignum+=1
 
     def map(self, ax):
@@ -278,9 +331,12 @@ class SEmissions(object):
             #plt.text(lon, lat, (str(loc) + ' ' + str(self.meanhash[loc])), fontsize=12, color='red')
             pstr = str(loc) + ' \n' + str(int(self.meanhash[loc])) + 'kg'
             if self.meanhash[loc] > 1:
-                ax.text(lon, lat, pstr, fontsize=12, color='red')
-                ax.plot(lon, lat,  'ko')
-
+                if loc not in self.badoris:
+                    ax.text(lon, lat, pstr, fontsize=12, color='red')
+                    ax.plot(lon, lat,  'ko')
+                else:
+                    ax.text(lon, lat, str(loc), fontsize=8, color='k')
+                    ax.plot(lon, lat,  'k.')
     #def testsources(self):
     #    if self.sources.empty: self.get_sources()
     #    sgenerator = source_generator(self.sources)

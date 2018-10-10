@@ -5,6 +5,7 @@ import time
 import os
 from os import path, chdir
 from subprocess import call
+import pandas as pd
 #from arlhysplit.process import is_process_running
 #from arlhysplit.process import ProcessList
 from monet.util.hcontrol import HycsControl
@@ -226,7 +227,80 @@ def default_control(name, tdirpath, runtime, sdate):
     control.write()
     print('WROTE ' + tdirpath + name)
 
+
+
+
 def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks, 
+                   bg=True):
+    """
+    read the base control file in tdirpath CONTROL.0
+    read the base SETUP.0 file in tdirpath
+    walk through all subdirectories in tdirpath.
+    For each file with  EMIT as part of the filename
+        1. read the file and get number of records in each cycle.
+        2. take the suffix from the file
+    return list of RunDescriptor objects
+    tdirpath: str
+              top level directory for output.
+    tdirpath: str
+              directory for hysplit executable
+    sdate : datetime object
+    edate : datetime object
+    timechunks : integer
+            run duration.
+    """
+    from os import walk
+    from monet.util import emitimes 
+    #from arlhysplit.runh import getmetfiles
+    from monet.util.svdir import date2dir
+
+    dstart = sdate
+    dend = edate
+    ##determines meteorological files to use.
+
+    runlist = []
+    hysplitdir = hdirpath + '/exec/'
+
+    iii=0
+    for (dirpath, dirnames, filenames) in walk(tdirpath):
+        #print(dirpath, dirnames, filenames)
+        for fl in filenames:
+            if iii==0: firstdirpath = dirpath
+
+            if 'EMIT' in fl: 
+                #print(dirpath, dirnames, filenames)
+                #print(fl)   
+                et = emitimes.EmiTimes(filename=dirpath+'/' + fl) 
+                et.read_file()
+                #print('NRECS', nrecs)
+                #sys.exit()
+                sdate = et.cycle_list[0].sdate
+                if sdate < dstart or sdate > dend: 
+                   continue
+                suffix = fl[4:8]
+                wdir=dirpath
+                if dirpath == firstdirpath:
+                    parinit =(None, None, None)
+                else:
+                    pdate = sdate - datetime.timedelta(hours=timechunks)
+                    pdir = date2dir(tdirpath, pdate, dhour=timechunks)
+                    parinitA = 'PARDUMP.' + suffix
+                    parinitB = 'PARINIT.' + suffix
+                    parinit = (pdir, parinitA, parinitB)
+                run = RunDescriptor(wdir, suffix, hysplitdir,\
+                      'hycs_std', parinit) 
+                wr='a'
+                if iii==0: wr='w'
+                #with open(tdirpath + '/' +  scr, wr) as fid:
+                # fid.write(run.script())
+                # fid.write('\n\n')
+                runlist.append(run)
+                iii+=1
+    return runlist
+
+
+
+def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, 
                    bg=True):
     """
     read the base control file in tdirpath CONTROL.0
@@ -270,7 +344,6 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks,
     mdir='/pub/archives/wrf27km/' 
 
     runlist = []
-    scr = 'run.sh'
     hysplitdir = hdirpath + '/exec/'
     landusedir = hdirpath + '/bdyfiles/'
 
@@ -296,7 +369,6 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks,
                 #print('NRECS', nrecs)
                 #sys.exit()
                 sdate = et.cycle_list[0].sdate
-
                 ##if sdate not within range given,
                 ##then skip the rest of the loop.
                 if sdate < dstart or sdate > dend: 
@@ -361,38 +433,109 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks,
                 # fid.write('\n\n')
                 runlist.append(run)
                 iii+=1
-    with open(tdirpath + '/' +  scr, 'w') as fid:
-        fid.write(create_script(runlist, tdirpath))
     return runlist
 
+def results(dfile, runlist):
+    from monet.util.datem import read_dataA
+    from monet.util.datem import frame2datem
+    import matplotlib.pyplot as plt
+    df = pd.DataFrame()
+    nnn=0
+    for run in runlist:
+        fname = run.directory + '/dataA.txt'
+        tempdf = read_dataA(fname)
+        if nnn==0:
+           df = tempdf.copy()
+        else:
+           df = pd.merge(df, tempdf, how='outer')
+        nnn+=1
+    df['duration'] = "0100"
+    df['altitude'] = 20
+    print(df[0:10])
+    frame2datem(dfile, df, cnames=['date','duration','lat', 'lon',
+                            'obs','model','sid','altitude'] )
+    for site in df['sid'].unique():
+        dfile2 = str(site) + '.' + dfile 
+        dftemp = df[df['sid']==site]
+        dftemp.set_index('date', inplace=True)
+        dftemp = dftemp.resample('H').asfreq()
+        dftemp['obs'].fillna(0, inplace=True)
+        dftemp['model'].fillna(0, inplace=True)
+        dftemp['duration'].fillna(method='bfill', inplace=True)
+        dftemp['lat'].fillna(method='bfill', inplace=True)
+        dftemp['lon'].fillna(method='bfill', inplace=True)
+        dftemp['sid'].fillna(method='bfill', inplace=True)
+        dftemp['altitude'].fillna(method='bfill', inplace=True)
+        dftemp.reset_index(inplace=True)
+        print(dftemp[0:10])
+        frame2datem(dfile2, dftemp, cnames=['date','duration','lat', 'lon',
+                            'obs','model','sid','altitude'] )
+         
+        dftemp.set_index('date', inplace=True)
+        obs= dftemp['obs']
+        model = dftemp['model']
+        plt.plot(obs,'--r')
+        plt.plot(model,'--k')
+        plt.title(str(site))
+        plt.show()
 
-def create_script(runlist, tdirpath):
+
+def statmainstr():
+    """returns string to create_script for
+       running conmerge, c2datem and statmain.
     """
+    csum = 'cdump.sum'
+    datem = 'datem.txt'
+    model = 'model.txt' 
+    rstr = 'ls cdump.???? > mergefile \n'
+    rstr += '$MDL/conmerge -imergefile -o' + csum + '\n'
+    rstr += '$MDL/c2datem -i' + csum + ' -m' + datem +  ' -o' + model + \
+            ' -xi -z1 -c$mult \n'
+    rstr += '$MDL/statmain -d' + datem + ' -r' + model + ' -o\n\n'
+    return rstr 
+
+
+def create_script(runlist, tdirpath, scriptname,write=True):
+    """
+    Creates bash script which will 
+    1. Copy pardump files for use as parinit files
+    2. run HYSPLIT
+    3. run conmerge merge cdump files from different power plants
+    4. run c2datem to extract concentrations at stations
+    5. run statmain to create file with concentrations and obs. 
     runlist : list of RunDescriptor objects
     tdirpath : string
                top directory path.
 
     """
+    scr = scriptname
     logfile= tdirpath + 'runlogfile.txt'
     iii=0
     prev_directory = 'None'
     rstr=''
+    rstr='MDL=' + runlist[0].hysplitdir + '\n'
+    rstr+= 'mult=1\n\n -------------------\n'
     for run in runlist:
         if run.directory != prev_directory: 
            if iii!=0:
               rstr += 'wait' + '\n\n'
               rstr += 'echo "Finished ' +  prev_directory + '"  >> ' + logfile
               rstr += '\n\n'
+              rstr += statmainstr()
+              rstr += '-----------------------------------------\n' 
            rstr += 'cd ' + run.directory  + '\n\n'
         ##add line to copy PARDUMP file from one directory to PARINIT file 
         ##in working directory
-        if run.parinitA:
+        if run.parinitA != 'None':
             rstr += 'cp ' + run.parinit_directory +  run.parinitA 
             rstr += ' ' + run.parinitB  + '\n'
-        rstr += run.hysplitdir +  run.hysplit_version + ' '  + run.suffix 
+        rstr += '${MDL}' +  run.hysplit_version + ' '  + run.suffix 
         rstr += ' & \n'
         prev_directory=run.directory
         iii+=1
+    if write:
+        with open(tdirpath + '/' +  scr, 'w') as fid:
+            fid.write(rstr)
     return rstr
 
 class RunDescriptor(object):

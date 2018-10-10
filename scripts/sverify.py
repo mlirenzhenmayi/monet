@@ -109,11 +109,13 @@ parser.add_option('--obs', action="store_true", dest="obs", default=False, \
 parser.add_option('--def', action="store_true", dest="defaults", default=False, \
                    help='write a default CONTROL and SETP file to the top\
                          directory')
-parser.add_option('--run', action="store_true", dest="create_runs", default=False, \
+parser.add_option('--run', type="string", dest="create_runs", default=None, \
                    help='Use CONTROL and SETUP in top level directory to \
                          write CONTROL and SETUP files in subdirectories which\
                          will call EMITIMES files. Also create bash run script\
                          in top level directory.')
+parser.add_option('--results', action="store_true", dest="results",
+                   default=False)
 
 ##-----##
 #parser.add_option('--run', action="store_true", dest="runh", default=False)
@@ -155,10 +157,10 @@ if options.state:
    for tt in temp: 
        states.append(tt.lower())
  
-if options.bounds.lower().strip() == 'nd':
-    area = [44.5,-105.0, 49.5, -97.0]
-    states=['nd']
-#else:
+#if options.bounds.lower().strip() == 'nd':
+#    area = [44.5,-105.0, 49.5, -97.0]
+#    states=['nd']
+##else:
 #    area = None
 #    state=[options.area.strip()]
 
@@ -208,9 +210,17 @@ if options.defaults:
    default_control('CONTROL.0', options.tdir, run_duration, d1)
 
 if options.create_runs:
-   from monet.util.svhy import create_runlist
-   runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
+   from monet.util.svhy import create_controls
+   from monet.util.svhy import create_script
+   runlist = create_controls(options.tdir, options.hdir, d1, d2, source_chunks)
+   create_script(runlist, options.tdir, options.create_runs, write=True)
    #runhandler(runlist, 5, options.tdir)
+
+if options.results:
+   from monet.util.svhy import create_runlist
+   from monet.util.svhy import results
+   runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
+   results('outfile.txt', runlist)   
 
 rfignum=1
 if options.cems:

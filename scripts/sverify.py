@@ -99,9 +99,11 @@ parser.add_option('-y', type="string", dest="hdir", default="", \
                   help='directory path for hysplit')
 parser.add_option('-o', type="string", dest="tdir", default="./", \
                   help='directory path for outputs')
-parser.add_option('-q', action="store_true", dest="quiet", default=False, \
-                  help='do not show graphs.')
-
+parser.add_option('-q', type="int", dest="quiet", default=0, \
+                  help='default 0 show all graphs. The graphs will pop up in\
+                        groups of 10, \
+                        1 only show maps, \
+                        2 show no graphs')
 parser.add_option('--cems', action="store_true", dest="cems", default=False,\
                   help='Find and plot SO2 emissions')
 parser.add_option('--obs', action="store_true", dest="obs", default=False, \
@@ -228,31 +230,41 @@ if options.cems:
     ef = SEmissions([d1,d2], area, states, tdir=options.tdir)
     ef.find()
     ef.print_source_summary(options.tdir)
-    ef.plot(save=True)
+    ef.plot(save=True, quite=options.quiet)
     ef.create_emitimes(ef.d1, schunks=source_chunks, tdir=options.tdir)
     rfignum = ef.fignum 
+    if options.quiet==1:
+       plt.close('all')
+       rfignum=1
     if not options.obs:
+        print('map fig number  ' + str(rfignum))
         mapfig = plt.figure(rfignum)
         axmap = create_map(rfignum)
         ef.map(axmap)
         plt.savefig(options.tdir + 'map.jpg')
-        if not options.quiet:
+        if options.quiet<2:
             plt.show()
         
+    
 if options.obs:
     from monet.util.svobs import SObs
     obs = SObs([d1,d2], area, states, tdir=options.tdir)
     obs.fignum=rfignum
     obs.find(pload=True, tdir=options.tdir)
     obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir) 
-    obs.plot(save=True)
+    obs.plot(save=True, quiet=options.quiet)
     fignum = obs.fignum 
+    if options.quiet==1:
+       plt.close('all')
+       fignum=1
     axmap = create_map(fignum)
     obs.map(axmap)
+    print('map fig number  ' + str(fignum))
     if options.cems:
        ef.map(axmap)
+    plt.sca(axmap)
     plt.savefig(options.tdir + 'map.jpg')
-    if not options.quiet:
+    if options.quiet<2:
        plt.show()
 
 

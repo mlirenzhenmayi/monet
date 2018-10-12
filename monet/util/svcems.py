@@ -295,7 +295,7 @@ class SEmissions(object):
                            break
             efile.write_new(ename)
   
-    def plot(self, save=True):
+    def plot(self, save=True, quite=True, maxfig=10):
         """plot time series of emissions"""
         if self.cems.df.empty: self.find()
         sns.set()
@@ -317,13 +317,19 @@ class SEmissions(object):
             if save: 
                figname = self.tdir + '/cems.' + str(loc) + '.jpg'
                plt.savefig(figname)
+            if self.fignum > maxfig:
+               if not quiet:
+                  plt.show()
+               plt.close('all')
+               self.fignum=0 
+            print('plotting cems figure ' + str(self.fignum))
             self.fignum+=1
 
     def map(self, ax):
         """plot location of emission sources"""
         if self.cems.df.empty: self.find()
         plt.sca(ax)
-        fig = plt.figure(self.fignum)
+        #fig = plt.figure(self.fignum)
         for loc in self.ehash:
             lat = self.ehash[loc][0]
             lon = self.ehash[loc][1]

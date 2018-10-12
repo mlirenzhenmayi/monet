@@ -90,7 +90,7 @@ class SObs(object):
         #     df = df[df[svar] == siteid]
         #     val = df['obs']
 
-    def plot(self, save=True):
+    def plot(self, save=True, quiet=True, maxfig=10):
         """plot time series of observations"""
         sra = self.obs['siteid'].unique()
         print('PLOT OBS')
@@ -112,6 +112,12 @@ class SObs(object):
             if save:
                figname = self.tdir + '/so2.' + str(sid) + '.jpg'
                plt.savefig(figname)
+            if self.fignum > maxfig:
+               if not quiet:
+                  plt.show()
+               plt.close('all')
+               self.fignum=0 
+            print('plotting obs figure ' + str(self.fignum))
             self.fignum +=1
            
         #sns.distplot(dist, kde=False)

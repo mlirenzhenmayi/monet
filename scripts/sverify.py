@@ -230,7 +230,7 @@ if options.cems:
     ef = SEmissions([d1,d2], area, states, tdir=options.tdir)
     ef.find()
     ef.print_source_summary(options.tdir)
-    ef.plot(save=True, quite=options.quiet)
+    ef.plot(save=True, quiet=options.quiet)
     ef.create_emitimes(ef.d1, schunks=source_chunks, tdir=options.tdir)
     rfignum = ef.fignum 
     if options.quiet==1:

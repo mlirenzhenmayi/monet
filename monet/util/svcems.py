@@ -295,7 +295,7 @@ class SEmissions(object):
                            break
             efile.write_new(ename)
   
-    def plot(self, save=True, quite=True, maxfig=10):
+    def plot(self, save=True, quiet=True, maxfig=10):
         """plot time series of emissions"""
         if self.cems.df.empty: self.find()
         sns.set()

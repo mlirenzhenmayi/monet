@@ -4,7 +4,13 @@ from __future__ import absolute_import, division, print_function
 from builtins import object
 import pandas as pd
 import xarray as xr
-import stratify
+
+
+def rename_latlon(ds):
+    if 'latitude' in ds.coords:
+        return ds.rename({'latitude': 'lat', 'longitude': 'lon'})
+    elif 'lat' in ds.coords:
+        return ds.rename({'lat': 'latitude', 'lon': 'longitude'})
 
 
 @xr.register_dataarray_accessor('monet')
@@ -44,18 +50,19 @@ class MONETAccessor(object):
             Description of returned object.
 
         """
-        result = stratify.interpolate(
-            levels, vertical.chunk(), self.obj.chunk(), axis=axis)
-        dims = self.obj.dims
-        out = xr.DataArray(result, dims=dims)
-        for i in dims:
-            if i != 'z':
-                out[i] = self.obj[i]
-        out.attrs = self.obj.attrs.copy()
-        if len(self.obj.coords) > 0:
-            for i in self.obj.coords:
-                out.coords[i] = self.obj.coords[i]
+        from .util.resample import resample_stratify
+        out = resample_stratify(self.obj, levels, vertical, axis=1)
         return out
+
+    def window(self, lat_min, lon_min, lat_max, lon_max):
+        obj2 = self.obj.copy()
+        obj2.coords['x'] = obj2.x.to_index()
+        obj2.coords['y'] = obj2.y.to_index()
+        con = (obj2.longitude >= lon_min) & (obj2.longitude <= lon_max) & (
+            obj2.latitude <= lat_max) & (obj2.latitude >= lat_min)
+        index = obj2.where(con, drop=True)
+        x, y = index.coords['x'], index.coords['y']
+        return self.obj.sel(x=x, y=y)
 
     def interp_constant_lat(self, lat=None, **kwargs):
         """Interpolates the data array to constant longitude.
@@ -71,19 +78,22 @@ class MONETAccessor(object):
                 DataArray of at constant longitude
 
             """
-        from .util.interp_util import constant_lat_swathdefition
-        from .util.resample import resample_dataset
-        from numpy import linspace
+        from .util.interp_util import constant_1d_xesmf
+        from .util.resample import resample_xesmf
+        from numpy import linspace, ones, asarray
         try:
             if lat is None:
                 raise RuntimeError
         except RuntimeError:
             print('Must enter lat value')
         longitude = linspace(self.obj.longitude.min(),
-                             self.obj.longitude.max(), len(self.obj.x))
-        target = constant_lat_swathdefition(longitude=longitude, latitude=lat)
-        output = resample_dataset(self.obj, target, **kwargs).squeeze()
-        return output
+                             self.obj.longitude.max(), len(self.obj.y))
+        latitude = ones(longitude.shape) * asarray(lat)
+        self.obj = rename_latlon(self.obj)
+
+        output = constant_1d_xesmf(latitude=latitude, longitude=longitude)
+        out = resample_xesmf(self.obj, output, **kwargs)
+        return rename_latlon(out)
 
     def interp_constant_lon(self, lon=None, **kwargs):
         """Interpolates the data array to constant longitude.
@@ -99,9 +109,9 @@ class MONETAccessor(object):
                 DataArray of at constant longitude
 
             """
-        from .util.interp_util import constant_lon_swathdefition
-        from .util.resample import resample_dataset
-        from numpy import linspace
+        from .util.interp_util import constant_1d_xesmf
+        from .util.resample import resample_xesmf
+        from numpy import linspace, ones
         try:
             if lon is None:
                 raise RuntimeError
@@ -109,12 +119,17 @@ class MONETAccessor(object):
             print('Must enter lon value')
         latitude = linspace(self.obj.latitude.min(), self.obj.latitude.max(),
                             len(self.obj.y))
-        target = constant_lon_swathdefition(longitude=lon, latitude=latitude)
-        output = resample_dataset(self.obj, target, **kwargs).squeeze()
-        return output
+        longitude = ones(latitude.shape) * lon
+        self.obj = rename_latlon(self.obj)
 
-    def nearest_latlon(self, lat=None, lon=None, **kwargs):
-        """Short summary.
+        output = constant_1d_xesmf(latitude=latitude, longitude=longitude)
+
+        out = resample_xesmf(self.obj, output, **kwargs)
+        return rename_latlon(out)
+
+    def nearest_latlon(self, lat=None, lon=None, cleanup=True, **kwargs):
+        """Uses xesmf to intepolate to a given latitude and longitude.  Note
+        that the conservative method is not available.
 
         Parameters
         ----------
@@ -131,16 +146,32 @@ class MONETAccessor(object):
             Description of returned object.
 
         """
-        from .util.interp_util import nearest_point_swathdefinition
-        from .util.resample import resample_dataset
+        from .util.interp_util import lonlat_to_xesmf
+        from .util.resample import resample_xesmf
         try:
             if lat is None or lon is None:
                 raise RuntimeError
         except RuntimeError:
             print('Must provide latitude and longitude')
-        target = nearest_point_swathdefinition(longitude=lon, latitude=lat)
-        output = resample_dataset(self.obj, target, **kwargs)
-        return output
+        kwargs = self._check_kwargs_and_set_defaults(**kwargs)
+        self.obj = rename_latlon(self.obj)
+        target = lonlat_to_xesmf(longitude=lon, latitude=lat)
+        output = resample_xesmf(self.obj, target, **kwargs)
+        if cleanup:
+            output = resample_xesmf(self.obj, target, cleanup=True, **kwargs)
+        return rename_latlon(output.squeeze())
+
+    @staticmethod
+    def _check_kwargs_and_set_defaults(**kwargs):
+        if 'reuse_weights' not in kwargs:
+            kwargs['reuse_weights'] = False
+        if 'method' not in kwargs:
+            kwargs['method'] = 'bilinear'
+        if 'periodic' not in kwargs:
+            kwargs['periodic'] = False
+        if 'filename' not in kwargs:
+            kwargs['filename'] = 'monet_xesmf_regrid_file.nc'
+        return kwargs
 
     def cartopy(self):
         """Short summary.
@@ -151,8 +182,8 @@ class MONETAccessor(object):
                 Returns a cartopy.crs.Projection for this dataset
 
         """
-
-        return self.obj.area.to_cartopy_crs()
+        from .grids import get_optimal_cartopy_proj
+        return get_optimal_cartopy_proj(self.lat, self.lon, self.proj4_srs)
 
     def quick_map(self, map_kwarg={}, **kwargs):
         """Short summary.
@@ -173,12 +204,11 @@ class MONETAccessor(object):
         from .plots.mapgen import draw_map
         from matplotlib.pyplot import tight_layout
         import cartopy.crs as ccrs
-
-        if self._check_swath_def(self.obj.area):
-            crs = ccrs.PlateCarree()
-        else:
-            crs = self.obj.monet.cartopy()
-        ax = draw_map(crs=crs)
+        import seaborn as sns
+        sns.set_context('talk', font_scale=.9)
+        if 'crs' not in map_kwarg:
+            map_kwarg['crs'] = ccrs.PlateCarree()
+        ax = draw_map(**map_kwarg)
         self.obj.plot(
             x='longitude',
             y='latitude',
@@ -188,6 +218,13 @@ class MONETAccessor(object):
         ax.outline_patch.set_alpha(0)
         tight_layout()
         return ax
+
+    # def _check_and_fix_coords(self):
+    #     if not self.obj.coords:
+    #         # get the lat lons from the swath or area def
+    #         lon, lat = self.obj.area.get_lonlats()
+    #         self.obj.coords['longitude'] = lon
+    #         self.obj.coords['latitude'] = lat
 
     def _check_swath_def(self, defin):
         """checks if it is a pyresample SwathDefinition or AreaDefinition.
@@ -230,18 +267,43 @@ class MONETAccessor(object):
 
         """
         from .util import resample
+        from .grids import get_generic_projection_from_proj4
         # check to see if grid is supplied
-        target = self.obj.area
+        target = get_generic_projection_from_proj4(
+            self.obj.latitude, self.object.longitude, self.obj.proj4_srs)
+        source_grid = get_generic_projection_from_proj4(
+            dataarray.latitude, dataarray.longitude, dataarray.proj4_srs)
         if grid is None:  # grid is assumed to be in da.area
-            out = resample.resample_dataset(dataarray.chunk(), target,
+            out = resample.resample_dataset(dataarray, source_grid, target,
                                             **kwargs)
         else:
-            dataarray.attrs['area'] = grid
-            out = resample.resample_dataset(dataarray.chunk(), target,
-                                            **kwargs)
+            out = resample.resample_dataset(dataarray, grid, target, **kwargs)
         return out
 
-    def combine(self, data, col=None, radius_of_influence=None):
+    def remap_xesmf(self, dataarray, method='bilinear', **kwargs):
+        """remaps from another grid to the current grid of self using xesmf
+
+        Parameters
+        ----------
+        daaarray : ndarray or xarray DataArray
+            Description of parameter `dset`.
+        radius_of_influence : float or integer
+            radius of influcence for pyresample in meters.
+
+        Returns
+        -------
+        xarray.DataArray
+            resampled object on current grid.
+
+        """
+        from .util import resample
+        # check to see if grid is supplied
+        target = self.obj
+        out = resample.resample_xesmf(
+            dataarray, target, method=method, **kwargs)
+        return out
+
+    def combine_point(self, data, col=None, **kwargs):
         """Short summary.
 
         Parameters
@@ -259,17 +321,14 @@ class MONETAccessor(object):
             Description of returned object.
 
         """
-        from .models.combinetool import combine_da_to_df
+        from .models.combinetool import combine_da_to_df_xesmf
         # point source data
         if isinstance(data, pd.DataFrame):
             try:
                 if col is None:
                     raise RuntimeError
-                return combine_da_to_df(
-                    self.obj,
-                    data,
-                    col=col,
-                    radius_of_influence=radius_of_influence)
+                return combine_da_to_df_xesmf(
+                    self.obj, data, col=col, **kwargs)
             except RuntimeError:
                 print('Must enter col ')
         elif isinstance(data, xr.Dataset) or isinstance(data, xr.DataArray):
@@ -325,6 +384,80 @@ class MONETAccessorDataset(object):
         except TypeError:
             print('data must be an xarray.DataArray or xarray.Dataset')
 
+    def remap_xesmf(self, data, **kwargs):
+        """Short summary.
+
+        Parameters
+        ----------
+        data : type
+            Description of parameter `data`.
+        **kwargs : type
+            Description of parameter `**kwargs`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
+        print(data)
+        # try:
+        if isinstance(data, xr.DataArray):
+            self._remap_xesmf_dataarray(data, **kwargs)
+        elif isinstance(data, xr.Dataset):
+            self._remap_xesmf_dataset(data, **kwargs)
+        else:
+            raise TypeError
+        # except TypeError:
+        #     print('data must be an xarray.DataArray or xarray.Dataset')
+
+    def _remap_xesmf_dataset(self,
+                             dset,
+                             filename='monet_xesmf_regrid_file.nc',
+                             **kwargs):
+
+        skip_keys = ['latitude', 'longitude', 'time', 'TFLAG']
+        vars = pd.Series(dset.variables)
+        loop_vars = vars.loc[~vars.isin(skip_keys)]
+        dataarray = dset[loop_vars[0]]
+        da = self._remap_xesmf_dataarray(
+            dataarray, self.obj, filename=filename, **kwargs)
+        if da.name in self.obj.variables:
+            da.name = da.name + '_y'
+        self.obj[da.name] = da
+        for i in loop_vars[1:]:
+            dataarray = dset[i]
+            self._remap_xesmf_dataarray(
+                dataarray, filename=filename, reuse_weights=True, **kwargs)
+
+    def _remap_xesmf_dataarray(self,
+                               dataarray,
+                               method='bilinear',
+                               filename='monet_xesmf_regrid_file.nc',
+                               **kwargs):
+        """Resample the DataArray to the dataset object.
+
+        Parameters
+        ----------
+        dataarray : type
+            Description of parameter `dataarray`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
+        from .util import resample
+        target = self.obj
+        out = resample.resample_xesmf(
+            dataarray, target, method=method, filename=filename, **kwargs)
+        print(out)
+        if out.name in self.obj.variables:
+            out.name = out.name + '_y'
+        self.obj[out.name] = out
+        return out
+
     def _remap_dataset(self, dset, grid=None, **kwargs):
         """Resample the entire dset (xarray.Dataset) to the current dataset object.
 
@@ -375,31 +508,17 @@ class MONETAccessorDataset(object):
 
         """
         from .util import resample
-        target = self.obj.area
         if grid is None:  # grid is assumed to be in da.area
-            out = resample.resample_dataset(dataarray.chunk(), target,
+            out = resample.resample_dataset(dataarray.chunk(), self.obj,
                                             **kwargs)
 
         else:
             dataarray.attrs['area'] = grid
-            out = resample.resample_dataset(dataarray.chunk(), target,
+            out = resample.resample_dataset(dataarray.chunk(), self.obj,
                                             **kwargs)
-        if out.name in self.obj.variables:
-            out.name = out.name + '_y'
-        self.obj[out.name] = out
+        return out
 
     def nearest_latlon(self, lat=None, lon=None, **kwargs):
-        vars = pd.Series(self.obj.variables)
-        skip_keys = ['latitude', 'longitude', 'time', 'TFLAG']
-        loop_vars = vars.loc[~vars.isin(skip_keys)]
-        orig = self.obj[loop_vars.iloc[0]].monet.nearest_latlon(
-            lat=lat, lon=lon, **kwargs)
-        dset = orig.to_dataset()
-        dset.attrs = self.obj.attrs.copy()
-        for i in loop_vars[1:].values:
-            dset[i] = self.obj[i].monet.nearest_latlon(
-                lat=lat, lon=lon, **kwargs)
-        return dset
         """Short summary.
 
         Parameters
@@ -417,6 +536,34 @@ class MONETAccessorDataset(object):
             Description of returned object.
 
         """
+        vars = pd.Series(self.obj.variables)
+        skip_keys = ['latitude', 'longitude', 'time', 'TFLAG']
+        loop_vars = vars.loc[~vars.isin(skip_keys)]
+        kwargs = self._check_kwargs_and_set_defaults(**kwargs)
+        kwargs['reuse_weights'] = True
+        orig = self.obj[loop_vars.iloc[0]].monet.nearest_latlon(
+            lat=lat, lon=lon, cleanup=False, **kwargs)
+        dset = orig.to_dataset()
+        dset.attrs = self.obj.attrs.copy()
+        for i in loop_vars[1:-1].values:
+            dset[i] = self.obj[i].monet.nearest_latlon(
+                lat=lat, lon=lon, cleanup=False, **kwargs)
+        i = loop_vars.values[-1]
+        dset[i] = self.obj[i].monet.nearest_latlon(
+            lat=lat, lon=lon, cleanup=True, **kwargs)
+        return dset
+
+    @staticmethod
+    def _check_kwargs_and_set_defaults(**kwargs):
+        if 'reuse_weights' not in kwargs:
+            kwargs['reuse_weights'] = False
+        if 'method' not in kwargs:
+            kwargs['method'] = 'bilinear'
+        if 'periodic' not in kwargs:
+            kwargs['periodic'] = False
+        if 'filename' not in kwargs:
+            kwargs['filename'] = 'monet_xesmf_regrid_file.nc'
+        return kwargs
 
     def interp_constant_lat(self, lat=None, **kwargs):
         """Short summary.
@@ -437,14 +584,18 @@ class MONETAccessorDataset(object):
         vars = pd.Series(self.obj.variables)
         skip_keys = ['latitude', 'longitude', 'time', 'TFLAG']
         loop_vars = vars.loc[~vars.isin(skip_keys)]
-
+        kwargs = self._check_kwargs_and_set_defaults(**kwargs)
+        kwargs['reuse_weights'] = True
         orig = self.obj[loop_vars.iloc[0]].monet.interp_constant_lat(
-            lat=lat, **kwargs)
+            lat=lat, cleanup=False, **kwargs)
 
         dset = orig.to_dataset()
         dset.attrs = self.obj.attrs.copy()
-        for i in loop_vars[1:].values:
-            dset[i] = self.obj[i].interp_constant_lat(lat=lat, **kwargs)
+        for i in loop_vars[1:-1].values:
+            dset[i] = self.obj[i].monet.interp_constant_lat(lat=lat, **kwargs)
+        i = loop_vars.values[-1]
+        dset[i] = self.obj[i].monet.interp_constant_lat(
+            lat=lat, cleanup=True, **kwargs)
         return dset
 
     def interp_constant_lon(self, lon=None, **kwargs):
@@ -466,11 +617,17 @@ class MONETAccessorDataset(object):
         vars = pd.Series(self.obj.variables)
         skip_keys = ['latitude', 'longitude', 'time', 'TFLAG']
         loop_vars = vars.loc[~vars.isin(skip_keys)]
-        orig = self.obj[loop_vars[0]].interp_constant_lon(lon=lon, **kwargs)
+        kwargs = self._check_kwargs_and_set_defaults(**kwargs)
+        kwargs['reuse_weights'] = True
+        orig = self.obj[loop_vars[0]].monet.interp_constant_lon(
+            lon=lon, **kwargs)
         dset = orig.to_dataset()
         dset.attrs = self.obj.attrs.copy()
-        for i in loop_vars[1:].values:
-            dset[i] = self.obj[i].interp_constant_lon(lon=lon, **kwargs)
+        for i in loop_vars[1:-1].values:
+            dset[i] = self.obj[i].monet.interp_constant_lon(lon=lon, **kwargs)
+        i = loop_vars.values[-1]
+        dset[i] = self.obj[i].monet.interp_constant_lon(
+            lon=lon, cleanup=True, **kwargs)
         return dset
 
     def stratify(self, levels, vertical, axis=1):
@@ -499,11 +656,17 @@ class MONETAccessorDataset(object):
             dset[i] = self.obj[i].stratify(levels, vertical, axis=axis)
         return dset
 
-    def cartopy(self):
-        """Returns a cartopy.crs.Projection for this dataset."""
-        return self.obj.area.to_cartopy_crs()
+    def window(self, lat_min, lon_min, lat_max, lon_max):
+        obj2 = self.obj.longitude.copy()
+        obj2.coords['x'] = obj2.x.to_index()
+        obj2.coords['y'] = obj2.y.to_index()
+        con = (obj2.longitude >= lon_min) & (obj2.longitude <= lon_max) & (
+            obj2.latitude <= lat_max) & (obj2.latitude >= lat_min)
+        index = obj2.where(con, drop=True)
+        x, y = index.coords['x'], index.coords['y']
+        return self.obj.sel(x=x, y=y)
 
-    def combine_to_df(self, df, mapping_table=None, radius_of_influence=None):
+    def combine_point(self, df, mapping_table=None, **kwargs):
         """Short summary.
 
         Parameters
@@ -521,16 +684,13 @@ class MONETAccessorDataset(object):
             Description of returned object.
 
         """
-        from .models.combinetool import combine_da_to_df
+        from .models.combinetool import combine_da_to_df_xesmf
         try:
             if ~isinstance(df, pd.DataFrame):
                 raise TypeError
         except TypeError:
             print('df must be of type pd.DataFrame')
         for i in mapping_table:
-            df = combine_da_to_df(
-                self.obj[mapping_table[i]],
-                df,
-                col=i,
-                radius=radius_of_influence)
+            df = combine_da_to_df_xesmf(
+                self.obj[mapping_table[i]], df, col=i, **kwargs)
         return df

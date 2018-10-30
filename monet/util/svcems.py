@@ -191,7 +191,9 @@ class SEmissions(object):
     def get_sources(self, stype='so2_lbs'):
         """ 
         Returns a dataframe with rows indexed by date.
-        column has info about lat, lon, stackheight, orisp code
+        column has info about lat, lon, 
+        stackheight in meters, 
+        orisp code
         values are
         if stype=='so2_lbs'  so2 emissions
         if stype='
@@ -211,6 +213,7 @@ class SEmissions(object):
         for oris in columns:
             if oris in stackhash.keys():
                 sid, ht = zip(*stackhash[oris])
+                ht = np.array(ht) * 0.3048  #convert to meters! 
             else:
                 sid=-99
                 ht = -99
@@ -266,7 +269,7 @@ class SEmissions(object):
             dfh = dfheat[hdr]
             
             oris = hdr[3]
-            height = hdr[2]
+            height = hdr[2] 
             lat = hdr[0]
             lon = hdr[1]
             ##hardwire 1 hr duraton of emissions.

@@ -168,7 +168,10 @@ class SEmissions(object):
     def get_heat(self):
         sources = self.get_sources(stype='heat_input (mmbtu)') 
         mult = 1.055e9 / 3600.0  
+        mult=0  ##the heat input from the CEMS files is not the correct value to
+                ##use.
         sources = sources * mult  #convert from mmbtu to watts
+          
         return sources
 
     def check_oris(self, series, oris):

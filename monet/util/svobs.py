@@ -17,6 +17,7 @@ import monet.obs.obs_util as obs_util
 from monet.util.svdir import date2dir
 #from arlhysplit.models.datem import mk_datem_pkl
 from monet.obs.epa_util import convert_epa_unit
+from monet.util import tools
 
 """
 """
@@ -93,10 +94,13 @@ class SObs(object):
     def plot(self, save=True, quiet=True, maxfig=10):
         """plot time series of observations"""
         sra = self.obs['siteid'].unique()
-        print('PLOT OBS')
+        print('PLOT OBSERVATION SITES')
         print(sra)
         sns.set()
         dist = []
+        if len(sra) > 20: 
+           if not quiet: print('Too many sites to pop up all plots')
+           quiet=True
         for sid in sra:
             ts = get_tseries(self.obs, sid, var='obs', svar='siteid', convert=True)
             ms = get_tseries(self.obs, sid, var='mdl', svar='siteid')
@@ -117,6 +121,7 @@ class SObs(object):
                   plt.show()
                plt.close('all')
                self.fignum=0 
+            #if quiet: plt.close('all') 
             print('plotting obs figure ' + str(self.fignum))
             self.fignum +=1
            
@@ -166,19 +171,29 @@ class SObs(object):
                aq.add_data([self.d1, self.d2], download=True)
             else:
                aq = aqs_mod.AQS()
-               aq.add_data([self.d1, self.d2], param=['SO2'], download=True)
+               aq.add_data([self.d1, self.d2], param=['SO2','WIND','TEMP','RHDP'], download=True)
             self.obs = aq.df.copy()
-            #print(aq.df['qualifier'].unique())
-            self.obs = convert_epa_unit(self.obs, obscolumn='obs', unit='UG/M3')
-            ##TO DO - something happens when converting units of mdl column.
-            #self.obs = epa_util.convert_epa_unit(self.obs, obscolumn='mdl', unit='UG/M3')
         area = self.area
         if area: self.obs = obs_util.latlonfilter(self.obs, (area[0], area[1]), (area[2], area[3]))
         rt = datetime.timedelta(hours=72)
         self.obs = obs_util.timefilter(self.obs, [self.d1, self.d2+rt])
+        ##save all the data here.
+        if not pload: 
+           if make_csv: self.save(tdir, self.csvfile)          
+           if make_pickle: self.create_pickle(tdir)          
+
+        ##now create a dataframe with met data.
+        #print(self.obs.columns.values)
+        met_obs = tools.long_to_wideB(self.obs)  #pivot table
+        met_obs.to_csv(tdir + 'met' + self.csvfile, header=True,
+                       float_format="%g")
+        ##now create a dataframe with data for each site.
+        obs_info = tools.get_info(self.obs)
+        obs_info.to_csv(tdir + 'info_' + self.csvfile, float_format="%g")
+
+        ##this would be used for filtering by a list of siteid's.
         siteidlist= np.array(self.siteidlist)
         if siteidlist.size: 
-            print('HERE -------------------')
             self.obs = self.obs[self.obs['siteid'].isin(siteidlist)]
             iii = 0
             sym =[['r.','bd'],['r.','c.']]
@@ -189,10 +204,11 @@ class SObs(object):
             #    plt.show()
         if verbose: obs_util.summarize(self.obs)   
         self.ohash = obs_util.get_lhash(self.obs, 'siteid')
-        if not pload: 
-           if make_csv: self.save(tdir, self.csvfile)          
-           if make_pickle: self.create_pickle(tdir)          
-        #self.obs.writecsv()
+
+        ##get rid of the meteorological variables in the file.
+        self.obs = self.obs[self.obs['variable'] == 'SO2']
+        ##convert units of SO2
+        self.obs = convert_epa_unit(self.obs, obscolumn='obs', unit='UG/M3')
 
     #def mkpkl(self):
     #    tdir = self.tdir + 'run' + str(self.rnum) + '/'

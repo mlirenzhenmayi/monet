@@ -75,6 +75,10 @@ def wsdir2uv(ws, wdir):
     return u, v
 
 def long_to_wide(df):
+    """
+    df: pandas dataframe
+    
+    """
     from pandas import Series, merge
     w = df.pivot_table(
         values='obs', index=['time', 'siteid'],
@@ -85,4 +89,23 @@ def long_to_wide(df):
         w[name + '_unit'] = group.units.unique()[0]
     #mergeon = hstack((index.values, df.variable.unique()))
     return merge(w, df, on=['siteid', 'time'])
+
+def long_to_wideB(df):
+    """
+    df: pandas dataframe
+    
+    """
+    from pandas import Series, merge
+    wpivot = df.pivot_table(
+        values='obs', index=['time', 'siteid', 'latitude','longitude'],
+        columns=['variable','units']).reset_index()
+    return wpivot
+
+def get_info(df):
+    rdf = df.drop(['obs','time','variable','units','time_local','Unnamed: 0'],axis=1)
+    rdf.drop_duplicates(inplace=True)
+    #print('HEADER------')
+    #print(rdf.columns.values)
+    return rdf  
+
 

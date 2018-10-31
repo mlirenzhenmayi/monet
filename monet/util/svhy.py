@@ -416,6 +416,12 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
                     #cg.centerlon = lon
                 control.write()
                 writelanduse(landusedir=landusedir , working_directory=wdir + '/')
+
+                with open(wdir + '/rundatem.sh', 'w') as fid:
+                     fid.write('MDL=' + hysplitdir + '\n')
+                     fid.write('mult=1e9 #emission in kg' + '\n')
+                     fid.write(statmainstr())
+
                 if dirpath == firstdirpath:
                     parinit =(None, None, None)
                 else:
@@ -444,16 +450,21 @@ def results(dfile, runlist):
     for run in runlist:
         fname = run.directory + '/dataA.txt'
         tempdf = read_dataA(fname)
-        if nnn==0:
+        if nnn==0 and not tempdf.empty:
            df = tempdf.copy()
-        else:
+           nnn+=1
+        elif not tempdf.empty:
            df = pd.merge(df, tempdf, how='outer')
-        nnn+=1
+        elif tempdf.empty:
+           print('-----------------------------')
+           print('WARNING: svhy.py results method empty dataframe')
+           print(fname)
+           print('-----------------------------')
     df['duration'] = "0100"
     df['altitude'] = 20
     print(df[0:10])
-    frame2datem(dfile, df, cnames=['date','duration','lat', 'lon',
-                            'obs','model','sid','altitude'] )
+    #frame2datem(dfile, df, cnames=['date','duration','lat', 'lon',
+    #                        'obs','model','sid','altitude'] )
     for site in df['sid'].unique():
         dfile2 = str(site) + '.' + dfile 
         dftemp = df[df['sid']==site]
@@ -467,9 +478,9 @@ def results(dfile, runlist):
         dftemp['sid'].fillna(method='bfill', inplace=True)
         dftemp['altitude'].fillna(method='bfill', inplace=True)
         dftemp.reset_index(inplace=True)
-        print(dftemp[0:10])
-        frame2datem(dfile2, dftemp, cnames=['date','duration','lat', 'lon',
-                            'obs','model','sid','altitude'] )
+        #print(dftemp[0:10])
+        #frame2datem(dfile2, dftemp, cnames=['date','duration','lat', 'lon',
+        #                    'obs','model','sid','altitude'] )
          
         dftemp.set_index('date', inplace=True)
         obs= dftemp['obs']
@@ -514,7 +525,8 @@ def create_script(runlist, tdirpath, scriptname,write=True):
     prev_directory = 'None'
     rstr=''
     rstr='MDL=' + runlist[0].hysplitdir + '\n'
-    rstr+= 'mult=1\n\n -------------------\n'
+    rstr+= 'mult=1e9 #emissions are in kg and measurements are in ug\n\n #-------------------\n'
+    dstr = rstr
     for run in runlist:
         if run.directory != prev_directory: 
            if iii!=0:
@@ -522,8 +534,10 @@ def create_script(runlist, tdirpath, scriptname,write=True):
               rstr += 'echo "Finished ' +  prev_directory + '"  >> ' + logfile
               rstr += '\n\n'
               rstr += statmainstr()
-              rstr += '-----------------------------------------\n' 
+              dstr += statmainstr()
+              rstr += '#-----------------------------------------\n' 
            rstr += 'cd ' + run.directory  + '\n\n'
+           dstr += 'cd ' + run.directory  + '\n\n'
         ##add line to copy PARDUMP file from one directory to PARINIT file 
         ##in working directory
         if run.parinitA != 'None':
@@ -533,9 +547,13 @@ def create_script(runlist, tdirpath, scriptname,write=True):
         rstr += ' & \n'
         prev_directory=run.directory
         iii+=1
+    rstr += statmainstr()
+    dstr += statmainstr()
     if write:
         with open(tdirpath + '/' +  scr, 'w') as fid:
             fid.write(rstr)
+        with open(tdirpath + '/datem_' +  scr, 'w') as fid:
+            fid.write(dstr)
     return rstr
 
 class RunDescriptor(object):

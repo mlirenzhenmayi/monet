@@ -77,7 +77,10 @@ def write_datem(df,
 
     units = df['units'].tolist()
     units = list(set(units))
-    sdate = datetime.datetime(2010, 1, 1, 0)
+    if drange:
+       sdate = drange[0]
+    else:
+       sdate = datetime.datetime(1900,1,1,2)
     if len(units) > 1:
         print('WARNING, more than one type of unit ', units)
     ustr = ''
@@ -106,7 +109,8 @@ def write_datem(df,
     for val in zip(t1, lat, lon, cval, sval):
         runstring += val[0].strftime('%Y  %m  %d  %H%M') + duration
         try:
-            runstring += str(val[1]) + ' ' + str(val[2]) + ' '
+            runstring += "{:.2f}".format(val[1]) + ' ' \
+                         "{:.2f}".format(val[2]) + ' '
         except RuntimeError:
             print('WARNING1', val[1])
             print(val[2])
@@ -194,6 +198,6 @@ def timefilter(df, daterange, inplace=True):
      inplace: boolean
                if TRUE then replaces self.df attribute
     """
-    df = df[df['time'] > daterange[0]]
-    df = df[df['time'] < daterange[1]]
+    df = df[df['time'] >= daterange[0]]
+    df = df[df['time'] <= daterange[1]]
     return df

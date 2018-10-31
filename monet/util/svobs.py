@@ -190,7 +190,7 @@ class SObs(object):
         ##now create a dataframe with data for each site.
         obs_info = tools.get_info(self.obs)
         obs_info.to_csv(tdir + 'info_' + self.csvfile, float_format="%g")
-
+        self.met = met_obs
         ##this would be used for filtering by a list of siteid's.
         siteidlist= np.array(self.siteidlist)
         if siteidlist.size: 
@@ -214,8 +214,21 @@ class SObs(object):
     #    tdir = self.tdir + 'run' + str(self.rnum) + '/'
     #    mk_datem_pkl(self.rnum, self.d1, self.d2, tdir)
 
+    def check(self):
+        for site in self.met['siteid'].unique():
+            df = self.met[self.met['siteid'] == site]
+            print(df.columns.values)
+            x = df[('WD','Degrees Compass')]
+            y = df[('SO2', 'ppb')]
+            plt.plot(x,y, 'k.')
+            plt.title(str(site))
+            plt.show()
+
+
     def obs2datem(self, edate, ochunks=(1000,1000), tdir='./'):
         """
+        ##https://aqsdr1.epa.gov/aqsweb/aqstmp/airdata/FileFormats.html
+        ##Time GMT is time of dat that sampling began.  
         edate: datetime object
         ochunks: tuple (integer, integer) 
                  Each represents hours
@@ -231,7 +244,7 @@ class SObs(object):
         oc = ochunks[0]
         while not done:
               d2 = d1 + datetime.timedelta(hours = oc-1)
-              d3 = d1 + datetime.timedelta(hours = oe)
+              d3 = d1 + datetime.timedelta(hours = oe-1)
               odir = date2dir(tdir, d1, dhour=oc, chkdir=True)
               dname = odir+'datem.txt'
               obs_util.write_datem(self.obs, sitename='siteid', drange=[d1,d3],\

@@ -504,9 +504,9 @@ class ControlLoc():
  
     def __str__(self):
         spc = " "
-        returnstr = "{:.2f}".format(self.latlon[0]) 
+        returnstr = "{:.4f}".format(self.latlon[0]) 
         returnstr += spc 
-        returnstr +=  "{:.2f}".format(self.latlon[1]) 
+        returnstr +=  "{:.4f}".format(self.latlon[1]) 
         returnstr += spc 
         returnstr +=  "{:.1f}".format(self.alt) 
         if self.rate:

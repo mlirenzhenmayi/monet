@@ -393,6 +393,9 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
                 control = HycsControl(fname='CONTROL.0', working_directory=tdirpath) 
                 control.read()
                 control.date = sdate
+                ##remove all the locations first and then add
+                ##locations that correspond to emittimes file.
+                control.remove_locations()
                 nlocs = control.nlocs
                 while nlocs != nrecs:
                      if nlocs < nrecs:
@@ -533,7 +536,7 @@ def create_script(runlist, tdirpath, scriptname,write=True):
               rstr += 'wait' + '\n\n'
               rstr += 'echo "Finished ' +  prev_directory + '"  >> ' + logfile
               rstr += '\n\n'
-              rstr += statmainstr()
+              #rstr += statmainstr()
               dstr += statmainstr()
               rstr += '#-----------------------------------------\n' 
            rstr += 'cd ' + run.directory  + '\n\n'

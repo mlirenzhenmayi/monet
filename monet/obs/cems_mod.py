@@ -27,10 +27,11 @@ def get_stack_dict(df, orispl=None):
     """
     stackhash = {}
     df = df[df['orispl_code'].isin(orispl)]
-    df = df[['orispl_code', 'stackid', 'stackht']]
+    #df = df[['orispl_code', 'boilerid', 'stackht','stackdiam']]
 
     def newc(x):
-        return (x['stackid'], x['stackht'])
+        return (x['boilerid'], x['stackht'], x['stackdiam'], x['stacktemp'],
+                x['stackvel'])
     for oris in df['orispl_code'].unique():
         dftemp = df[df['orispl_code'] == oris]
         dftemp['tuple'] = dftemp.apply(newc, axis=1)
@@ -116,8 +117,12 @@ def read_stack_height(verbose=False, testing=False):
         df2.columns = ['stackid', 'plantid', 'pointid', 'fips', 'boiler',
                        'stackht', 'stackdiam', 'orispl_code', 'plant']
     else:
-        df2 = df[[orispl, 'STKHGT', 'STKDIAM', 'STACKID']]
-        df2.columns = ['orispl_code', 'stackht', 'stackdiam', 'stackid']
+    ##May use stack diamter, temperature and velocity for plume rise.
+    ##match the oris_boiler_ID to unitid from the cems data.
+        df2 = df[[orispl, 'STACKID','ORIS_BOILER_ID',
+                 'STKHGT', 'STKDIAM', 'STKTEMP','STKVEL']]
+        df2.columns = ['orispl_code', 'stackid', 'boilerid',
+                       'stackht','stackdiam','stacktemp','stackvel']
     df2.drop_duplicates(inplace=True)
     df2 = df2[df2['orispl_code'] != -999]
     #df2 = max_stackht(df2)
@@ -350,11 +355,11 @@ class CEMS(object):
             stack_df = max_stackht(stack_df)
             temp = temp.merge(stack_df, left_on=['orispl_code'],
                               right_on=['orispl_code'], how='left')
-        if 'unit_id' in temp.columns.values and unitid:
-            if temp['unit_id'].unique():
-                if verbose:
-                    print('UNIT IDs ', temp['unit_id'].unique())
-            cols = ['orispl_code', 'unit_id']
+        if 'unitid' in temp.columns.values and unitid:
+            #if temp['unit_id'].unique():
+            #    if verbose:
+            #        print('UNIT IDs ', temp['unit_id'].unique())
+            cols = ['orispl_code', 'unitid']
             if stackht:
                 cols.append('stackht')
         else:
@@ -598,8 +603,8 @@ class CEMS(object):
                 how='left',
                 left_on=['orispl_code'],
                 right_on=['orispl_code'])
-            # print('---------z-----------')
-            # print(dfnew.columns.values)
+            print('---------z-----------')
+            print(dfnew.columns.values)
             # remove stations which do not have a time offset.
             dfnew.dropna(axis=0, subset=['time_offset'], inplace=True)
             if method == 1:

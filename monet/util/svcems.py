@@ -160,18 +160,32 @@ class SEmissions(object):
         #open(fname, "w").write(content)
         self.sumdf.to_csv(fname) 
 
-    def get_so2(self):
-        sources = self.get_sources(stype='so2_lbs') 
+    def get_so2(self, unit=False):
+        sources = self.get_sources(stype='so2_lbs', unit=unit) 
         sources = sources * 0.453592  #convert from lbs to kg.
         return sources
 
-    def get_heat(self):
-        sources = self.get_sources(stype='heat_input (mmbtu)') 
-        mult = 1.055e9 / 3600.0  
+    def get_heat(self, unit=False):
+        """
+        return dataframe with heat from the CEMS file
+        """
+        sources = self.get_sources(stype='heat_input (mmbtu)', unit=unit) 
+        mult = 1.055e9 / 3600.0  #mmbtu to watts
         mult=0  ##the heat input from the CEMS files is not the correct value to
                 ##use.
-        sources = sources * mult  #convert from mmbtu to watts
-          
+        sources = sources * mult
+        return sources
+
+    def get_stackvalues(self, unit=False):
+        """
+        return dataframe with string which has stack diamter, temperature
+        velocity  obtained from the ptinv file.
+        """
+        sources = self.get_sources(stype='stack values', unit=unit) 
+        #mult = 1.055e9 / 3600.0  #mmbtu to watts
+        #mult=0  ##the heat input from the CEMS files is not the correct value to
+                ##use.
+        #sources = sources * mult
         return sources
 
     def check_oris(self, series, oris):
@@ -188,7 +202,7 @@ class SEmissions(object):
            print( 'DROPPING')
         return rval
  
-    def get_sources(self, stype='so2_lbs'):
+    def get_sources(self, stype='so2_lbs', unit=False):
         """ 
         Returns a dataframe with rows indexed by date.
         column has info about lat, lon, 
@@ -201,39 +215,93 @@ class SEmissions(object):
         self.ehash is constructed in find. 
         """
         #print("GET SOURCES")
+        getstackvals=False
+        if stype=='stack values': 
+           stype='so2_lbs'
+           getstackvals=True
+
         if self.cems.df.empty: self.find()
+        ut=unit
         sources = self.cems.cemspivot((stype), daterange=[self.d1, self.d2],
-                  verbose=False, unitid=False)
+                  verbose=False, unitid=ut)
         ehash = self.cems.create_location_dictionary()
         stackhash = cems_mod.get_stack_dict(cems_mod.read_stack_height(), orispl=self.ehash.keys())
         ##This block replaces ORISP code with (lat, lon) tuple as headers
         cnew = []
         sources.drop(self.badoris, inplace=True, axis=1)
         columns=list(sources.columns.values)
-        for oris in columns:
+        #print('----columns------')
+        #print(columns) #EXTRA
+        #print(stackhash)
+        #print('----columns------')
+        stackdf = sources.copy() 
+        ################################################################################
+        ################################################################################
+        ##original column header contains either just ORIS code or 
+        ##(ORIS,UNITID)
+        ##This block adds additional information into the COLUMN HEADER.
+        for ckey in columns:
+            if ut: 
+               sid = ckey[1]
+               oris = ckey[0]
+            else: oris = ckey
             if oris in stackhash.keys():
-                sid, ht = zip(*stackhash[oris])
-                ht = np.array(ht) * 0.3048  #convert to meters! 
+                bid, ht, diam, temp, vel = zip(*stackhash[oris])
+                ht = np.array(ht) * 0.3048  #convert to meters!
+                bhash = dict(zip(bid,ht))   #key is boiler id. value is height. 
+                dhash = dict(zip(bid,diam)) #key is boiler id. value is diam 
+                thash = dict(zip(bid,temp)) #key is boiler id. value is temp. 
+                vhash = dict(zip(bid,vel))  #key is boiler id. value is velocity 
+                try:
+                   ##tuple of diameter, temperature, velocity
+                   stackval = (dhash[sid], thash[sid], vhash[sid])
+                except:
+                   stackval = (-99, -99, -99) 
             else:
                 sid=-99
                 ht = -99
             ##puts the maximum stack height associated with that orispl code.
-            newcolumn = (ehash[oris][0], ehash[oris][1], np.max(ht), oris)
+            if ut:
+                try:
+                    ht = bhash[sid]
+                except:
+                    print('WARNING in svcems.py get_sources')
+                    print('ORIS '+ str(oris) + ' unitid in CEMS data ' + str(sid))
+                    print('No match found in ptinv file')
+                    print(stackhash[oris])
+                    ht = np.max(ht)
+                newcolumn = (ehash[oris][0], ehash[oris][1], ht, oris,
+                             sid)
+            else:
+                newcolumn = (ehash[oris][0], ehash[oris][1], np.max(ht), oris,
+                             -99)
             cnew.append(newcolumn)
+            ##stackdf is a dataframe with tuple of (stack diameter, temperature
+            ##and velocity. These are obtained from the ptinv file.
+            ##and so each column will have one value. They are input as a string
+            ##so can be written in emitimes file.
+            stackdf[ckey] = ' '.join(map(str, stackval))
         sources.columns=cnew
+        stackdf.columns=cnew
+        ################################################################################
+        ################################################################################
+        if getstackvals:  return stackdf
         #print(sources[0:20])
         return sources
 
 
+    #def create_heatfile(self,edate, schunks=1000, tdir='./', unit=True):
 
-    def create_emitimes(self, edate, schunks=1000, tdir='./'):
+    def create_emitimes(self, edate, schunks=1000, tdir='./', unit=True):
         """
         create emitimes file for CEMS emissions.
         edate is the date to start the file on.
         Currently, 24 hour cycles are hard-wired.
         """
-        df = self.get_so2()
-        dfheat = self.get_heat()
+        df = self.get_so2(unit=unit)
+        print(df[0:10])
+        dfheat = self.get_heat(unit=unit)
+        if unit: dfstack = self.get_stackvalues(unit=unit)
         locs=df.columns.values
         done = False
         iii=0
@@ -242,9 +310,12 @@ class SEmissions(object):
             d2 = d1 + datetime.timedelta(hours=schunks-1)
             dftemp = df.loc[d1:d2]
             hdf = dfheat[d1:d2]
+            if unit: sdf = dfstack[d1:d2]
             if dftemp.empty: 
                break
-            self.emit_subroutine(dftemp, hdf, d1, schunks, tdir)       
+            self.emit_subroutine(dftemp, hdf, d1, schunks, tdir, unit=unit)       
+            if unit: self.emit_subroutine(dftemp, sdf, d1, schunks, tdir, unit=unit,
+                                 bname='STACKFILE')       
             d1 = d2 + datetime.timedelta(hours=1)
             iii+=1
             if iii > 1000: done=True
@@ -253,7 +324,8 @@ class SEmissions(object):
     #def emit_subroutine(self, df, dfheat):
 
 
-    def emit_subroutine(self, df, dfheat,edate, schunks, tdir='./'):
+    def emit_subroutine(self, df, dfheat,edate, schunks, tdir='./', unit=True,
+                        bname='EMIT'):
         """
         create emitimes file for CEMS emissions.
         edate is the date to start the file on.
@@ -269,6 +341,10 @@ class SEmissions(object):
             dfh = dfheat[hdr]
             
             oris = hdr[3]
+            ename = bname + str(oris) 
+            if unit:
+               sid = hdr[4]
+               ename  += '.' + str(sid)
             height = hdr[2] 
             lat = hdr[0]
             lon = hdr[1]
@@ -279,8 +355,11 @@ class SEmissions(object):
             ##chkdir=True means date2dir will create the directory if
             ##it does not exist already.
             odir =  date2dir(tdir, edate, dhour=schunks, chkdir=True)
-            ename = odir + 'EMIT' + str(oris) + '.txt'
+            ename = odir + ename + '.txt'
             efile = emitimes.EmiTimes(filename=ename)
+            if 'STACK' in bname:
+                hstring = efile.header.replace('HEAT(w)','DIAMETER TEMP VELOCITY')
+                efile.modify_header(hstring)
             ##hardwire 24 hour cycle length
             dt = datetime.timedelta(hours=24)
             efile.add_cycle(d1, "0024")

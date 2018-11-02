@@ -104,6 +104,8 @@ parser.add_option('-q', type="int", dest="quiet", default=0, \
                         groups of 10, \
                         1 only show maps, \
                         2 show no graphs')
+parser.add_option('-u', action="store_true", dest="unit", default=False, \
+                  help='Create EMITIMES for each unit. Create STACKFILE as well.')
 parser.add_option('--cems', action="store_true", dest="cems", default=False,\
                   help='Find and plot SO2 emissions')
 parser.add_option('--obs', action="store_true", dest="obs", default=False, \
@@ -231,7 +233,8 @@ if options.cems:
     ef.find()
     ef.print_source_summary(options.tdir)
     ef.plot(save=True, quiet=options.quiet)
-    ef.create_emitimes(ef.d1, schunks=source_chunks, tdir=options.tdir)
+    ef.create_emitimes(ef.d1, schunks=source_chunks, tdir=options.tdir,
+                       unit=options.unit)
     rfignum = ef.fignum 
     if options.quiet==1:
        plt.close('all')
@@ -247,10 +250,13 @@ if options.cems:
         
     
 if options.obs:
+    import sys
     from monet.util.svobs import SObs
     obs = SObs([d1,d2], area, states, tdir=options.tdir)
     obs.fignum=rfignum
     obs.find(pload=True, tdir=options.tdir)
+    #obs.check()
+    #sys.exit()
     obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir) 
     obs.plot(save=True, quiet=options.quiet)
     fignum = obs.fignum 
@@ -266,6 +272,6 @@ if options.obs:
     plt.savefig(options.tdir + 'map.jpg')
     if options.quiet<2:
        plt.show()
-
+    
 
 ##------------------------------------------------------##

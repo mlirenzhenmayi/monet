@@ -278,6 +278,11 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks,
                 if sdate < dstart or sdate > dend: 
                    continue
                 suffix = fl[4:8]
+                temp = fl.split('.')
+                print(temp)
+                print('************')
+                if temp[1] != 'txt':
+                   suffix += '.' + temp[1]
                 wdir=dirpath
                 if dirpath == firstdirpath:
                     parinit =(None, None, None)
@@ -359,6 +364,11 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
                 print(dirpath, dirnames, filenames)
                 print(fl)   
                 suffix = fl[4:8]
+                temp = fl.split('.')
+                print(temp)
+                print('************')
+                if temp[1] != 'txt':
+                   suffix += '.' + temp[1]
                 wdir=dirpath
 
                 ##read emitfile and modify number of locations
@@ -385,7 +395,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
                 setupfile.add('POUTF', '"PARDUMP.' + suffix + '"')
                 setupfile.add('PINPF', '"PARINIT.' + suffix + '"')
                 setupfile.add('NINIT', '1')
-                setupfile.add('DELT', '5')
+                #setupfile.add('DELT', '5')
                 setupfile.rename('SETUP.' + suffix, working_directory=wdir+'/')
                 setupfile.write(verbose=True)
              

@@ -21,12 +21,16 @@ class EmiTimes(object):
        self.sdatelist =[] 
        self.nanvalue = nanvalue  #if NaN shows up, what value to use.
                                  #if None, will throw and error if there a Nan
+       self.header = self.header_str()
 
    def header_str(self):
       returnval =  'YYYY MM DD HH    DURATION(hhhh) #RECORDS \n'
       returnval += 'YYYY MM DD HH MM DURATION(hhmm) LAT LON HGT(m) RATE(/h) AREA(m2) HEAT(w)  \n'
       return returnval 
 
+
+   def modify_header(self, hstring):
+       self.header = hstring
 
    def findmaxrec(self):
        maxrec = 0
@@ -39,7 +43,7 @@ class EmiTimes(object):
    def write_new(self, filename):
        maxrec = self.findmaxrec()
        with open(filename, 'w') as fid:
-           fid.write(self.header_str())
+           fid.write(self.header)
        for ecycle in self.cycle_list:
            for iii in range(0, maxrec - ecycle.nrecs):
               ecycle.add_dummy_record()
@@ -268,10 +272,10 @@ class EmitLine(object):
           self.rate = nanvalue      
           nanpresent=True
           self.message += 'rate is Nan \n'
-       if np.isnan(self.heat):
-          self.heat = nanvalue      
-          nanpresent=True
-          self.message += 'heat is Nan \n'
+       #if np.isnan(self.heat):
+       #   self.heat = nanvalue      
+       #   nanpresent=True
+       #   self.message += 'heat is Nan \n'
        return nanpresent 
  
 
@@ -283,6 +287,9 @@ class EmitLine(object):
        returnstr += str(self.height) + ' '
        returnstr += '{:1.2e}'.format(self.rate) + ' '
        returnstr += '{:1.2e}'.format(self.area) + ' '
-       returnstr += '{:1.2e}'.format(self.heat) + ' \n'
+       try:
+        returnstr += '{:1.2e}'.format(self.heat) + ' \n'
+       except:
+        returnstr += str(self.heat)  + ' \n'
        return returnstr
 

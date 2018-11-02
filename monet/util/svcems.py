@@ -248,15 +248,21 @@ class SEmissions(object):
             if oris in stackhash.keys():
                 bid, ht, diam, temp, vel = zip(*stackhash[oris])
                 ht = np.array(ht) * 0.3048  #convert to meters!
+                diam = np.array(diam) * 0.3048 #convert to meters
+                temp = np.array(temp)  
+                kelvin = (temp-32)*(5/9.0) + 273.15 #convert F to K
+                vel = np.array(vel) * 0.3048 #convert from ft/s to m/s 
                 bhash = dict(zip(bid,ht))   #key is boiler id. value is height. 
                 dhash = dict(zip(bid,diam)) #key is boiler id. value is diam 
-                thash = dict(zip(bid,temp)) #key is boiler id. value is temp. 
+                thash = dict(zip(bid,kelvin)) #key is boiler id. value is temp. 
                 vhash = dict(zip(bid,vel))  #key is boiler id. value is velocity 
                 try:
                    ##tuple of diameter, temperature, velocity
-                   stackval = (dhash[sid], thash[sid], vhash[sid])
+                   stackval = ("{:.2f}".format(dhash[sid]),  
+                               "{:.2f}".format(thash[sid]), 
+                               "{:.2f}".format(vhash[sid]))
                 except:
-                   stackval = (-99, -99, -99) 
+                   stackval = ('-99', '-99', '-99') 
             else:
                 sid=-99
                 ht = -99
@@ -280,7 +286,7 @@ class SEmissions(object):
             ##and velocity. These are obtained from the ptinv file.
             ##and so each column will have one value. They are input as a string
             ##so can be written in emitimes file.
-            stackdf[ckey] = ' '.join(map(str, stackval))
+            stackdf[ckey] = ' '.join(stackval)
         sources.columns=cnew
         stackdf.columns=cnew
         ################################################################################
@@ -358,7 +364,8 @@ class SEmissions(object):
             ename = odir + ename + '.txt'
             efile = emitimes.EmiTimes(filename=ename)
             if 'STACK' in bname:
-                hstring = efile.header.replace('HEAT(w)','DIAMETER TEMP VELOCITY')
+                hstring = efile.header.replace('HEAT(w)',
+                                'DIAMETER(m) TEMP(K) VELOCITY(m/s)')
                 efile.modify_header(hstring)
             ##hardwire 24 hour cycle length
             dt = datetime.timedelta(hours=24)

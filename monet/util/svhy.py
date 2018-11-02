@@ -104,9 +104,16 @@ def default_setup(setupname='SETUP.CFG',  wdir='./' ):
         namelist['kmix0'] = '250'                #default value is 250. controls minimum mixing depth.
         namelist['kblt'] =  '2'                  #Use Kantha Clayson for vertical mixing. 
         namelist['kbls'] =  '1'
-        namelist['numpar'] =  '10000'      #number of particles/puffs to release per hour.
-        namelist['maxpar'] =  '100000'       #maximum number of particles/puffs to simulate
 
+        ##emission cycles are 24 hours and each run lasts 5 days. 
+        ##Also need enough particles to handle pardump from previous simulation.
+
+        namelist['numpar'] =  '24000'      #number of particles/puffs to release
+                                           #per emission cycle.
+        namelist['maxpar'] =  '400000'       #maximum number of particles/puffs to simulate
+        namelist['khmax'] = 72             #maximum time to allow particles to
+                                           #live
+      
         ##The pardump file can be used to restart HYSPLIT if it crashes. Although the runs
         ##are short enough in this application that rather than restart a run, we would just re-run it.
         #namelist['NDUMP'] = str(int(hrs))                #create pardump file after this many hours.
@@ -150,7 +157,7 @@ def getmetfiles(sdate, runtime, verbose=False, warn_file = 'MetFileWarning.txt',
        List of tuples with (met dir, met filename)    
        If the met files cannot be found in the mdir or the altdir then
     '''
-    verbose=True
+    verbose=False
     mdirbase = mdir.strip()
     if mdirbase[-1] != '/': mdirbase += '/'
     dt =datetime.timedelta(days=1)
@@ -356,17 +363,20 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
     base_setup = NameList('SETUP.0', working_directory=tdirpath)    
     dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks) 
     iii=0
-    for (dirpath, dirnames, filenames) in walk(tdirpath):
-        #print(dirpath, dirnames, filenames)
-        for fl in filenames:
+    #for (dirpath, dirnames, filenames) in walk(tdirpath):
+    for dirpath in dtree:
+        print(dirpath)
+        for (d1, dirnames, filenames) in walk(dirpath):
+          for fl in filenames:
+            #print(dirpath, dirnames, fl)
             if iii==0: firstdirpath = dirpath
             if 'EMIT' in fl: 
-                print(dirpath, dirnames, filenames)
-                print(fl)   
+                #print(dirpath, dirnames, filenames)
+                #print(fl)   
                 suffix = fl[4:8]
                 temp = fl.split('.')
-                print(temp)
-                print('************')
+                #print(temp)
+                #print('************')
                 if temp[1] != 'txt':
                    suffix += '.' + temp[1]
                 wdir=dirpath
@@ -374,7 +384,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
                 ##read emitfile and modify number of locations
                 et = emitimes.EmiTimes(filename=dirpath+'/' + fl) 
                 et.read_file()
-                print(str(et.ncycles)) 
+                #print(str(et.ncycles)) 
                 nrecs = et.cycle_list[0].nrecs
                 #print('NRECS', nrecs)
                 #sys.exit()
@@ -397,7 +407,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
                 setupfile.add('NINIT', '1')
                 #setupfile.add('DELT', '5')
                 setupfile.rename('SETUP.' + suffix, working_directory=wdir+'/')
-                setupfile.write(verbose=True)
+                setupfile.write(verbose=False)
              
                 ##Write a control file for this emitimes file 
                 control = HycsControl(fname='CONTROL.0', working_directory=tdirpath) 

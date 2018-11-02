@@ -739,7 +739,6 @@ class HycsControl():
                 if sptemp.definition(lines):
                    self.species.append(sptemp)
             zz += 4*self.num_sp
-            print( content[zz])
             self.num_grids = int(content[zz].strip())
             self.concgrids=[]
             for ii in range(zz, zz+10*self.num_grids, 10):

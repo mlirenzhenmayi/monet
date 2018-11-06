@@ -137,7 +137,7 @@ class SObs(object):
         self.obs.to_csv(fname)
 
     def read_csv(self, name):
-        print('in subroutine read_csv', name)
+        #print('in subroutine read_csv', name)
         to_datetime = lambda d: datetime.datetime.strptime(d, '%Y-%m-%d %H:%M:%S')
         obs = pd.read_csv(name, sep=',', 
                           converters={'time': to_datetime})
@@ -146,26 +146,36 @@ class SObs(object):
     def create_pickle(self, tdir='./' ):
         pickle.dump(self.obs, open(tdir + self.pfile, "wb"))
 
-    def find(self, verbose=False, pload=True, getairnow=False, tdir='./'):
+    def find(self, verbose=False, pload=True, getairnow=False, tdir='./',
+             test=False):
         """
         """
-        make_pickle=False  #to create/load from a pickle file set to TRUE
         make_csv = True    #to create/load from a csv file set to TRUE
-        if pload:
+        if test:
+           aqs = aqs_mod.AQS()
+           basedir = os.path.abspath(os.path.dirname(__file__))[:-4]
+           fn='testaqs.csv'
+           fname = os.path.join(basedir,'data',fn) 
+           df = aqs.load_aqs_file(fname,None)
+           self.obs = aqs.add_data2(df)
+           print('--------------TEST1--------------------------------')
+           print(self.obs[0:10])
+           rt = datetime.timedelta(hours=72)
+           self.obs = obs_util.timefilter(self.obs, [self.d1, self.d2+rt])
+           print('--------------TEST2--------------------------------')
+           print(self.obs[0:10])
+           self.save(tdir, 'testobs.csv')          
+        elif pload:
            try:
-            print('trying to load file')
-            if make_pickle: 
-               print(self.pfile)
-               self.obs = pickle.load(open(tdir + self.pfile,"rb"))
-            if make_csv: 
+               print('trying to load file')
                print(self.csvfile)
                self.obs = self.read_csv(tdir + self.csvfile)
            except:
-            pload=False
-            print('Failed to load')
-           if pload: print('loaded file')
-           if not pload: print('Not loading pkl file' + self.pfile + "\n")
+               pload=False
+            #print('Failed to load')
+           if pload: print('Loaded csv file file ' + tdir + self.pfile)
         if not pload:
+            print('LOADING from EPA site. Please wait\n')
             if getairnow: 
                aq = airnow.AirNow()
                aq.add_data([self.d1, self.d2], download=True)

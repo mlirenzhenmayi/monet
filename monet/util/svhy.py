@@ -15,8 +15,7 @@ from monet.util.hcontrol import NameList
 from monet.util.hcontrol import writelanduse
 
 """
-NAME: ashfall_base.py
-UID: r100
+NAME: svhy.py
 PRGMMR: Alice Crawford  ORG: ARL  
 This code written at the NOAA  Air Resources Laboratory
 ABSTRACT: This code manages HYSPLIT runs for Hanford resuspension project.
@@ -24,40 +23,25 @@ CTYPE: source code
 
 List of classes and functions in this file:
 
-class RunParams - defines critical parameters for each run number.
+FUNCTIONS
+create_controls: create control and setupfiles as well as running script.
 
--------------------------------------------------------------------------------
-functions to create directory tree based on date and to get directory from date.
--------------------------------------------------------------------------------
-function get_vlist
-function date2dir
+default_setup: creates default SETUP.0 file
+getmetfiles:  returns met file name and directory to use based on dates.
+default_control: creates default CONTROL.0 file
 
--------------------------------------------------------------------------------
-functions and classes to create source locations.
--------------------------------------------------------------------------------
-function make_sourceid - creates string from lat lon point. 
-class Source  - Helper class which stores information about a source.
-function source_generator (generator function) - returns a Source object
-function get_landuse_sources - returns list of tuples (lat, lon) of sources which have land
-                               use of 2,3 or 8 (dryland cropland, irrigated cropland, shrubland)
+create_script: creates the script to run HYSPLIT runs for SO2 project
+statmainstr : returns string which is used to run concmerge, c2datem, statmain.
 
--------------------------------------------------------------------------------
-functions and classes to create CONTROL and SETUP files
--------------------------------------------------------------------------------
-function add_psizes - defines ash particle sizes and densities to be used.
-function make_setup - creates SETUP.CFG needed as input to  HYSPLIT.
-function getmetfiles - returns directory and name of WRF ARL files which are needed for each run.
-function add_pterm_grid - add an extra concentration grid for terminating particles.
-class Station - helper class which contains information about location for concentration 
-function stations_info - returns a Station object.
+CLASSES
+class RunDescriptor:  main purpose currently is to produce a string for the
+                      create_script function.
 
--------------------------------------------------------------------------------
-Main functions
--------------------------------------------------------------------------------
 
-function mult_run - main function for making multiple HYSPLIT runs.
-
+create_runlist:  returns a runlist. Similar to create_controls but does not
+write CONTROL and SETUP files.
 """
+
 def source_generator(df, area=1, altitude=10):
     """df is a pandas dataframe with index being release date and column headers showing
        location of release and values are emission rates"""
@@ -71,23 +55,8 @@ def source_generator(df, area=1, altitude=10):
 
 
 ##------------------------------------------------------------------------------------##
-##------------------------------------------------------------------------------------##
-###The following functions and classes define the sources used  
-## make_sourceid, Source, source_generator 
-##source_generator can easily be modified to produce different sources.
-##------------------------------------------------------------------------------------##
-##------------------------------------------------------------------------------------##
 
 
-def make_sourceid(lat, lon):
-        """Returns string for identifying lat lon point"""
-        latstr = str(abs(int(round(lat*100))))
-        lonstr = str(abs(int(round(lon*100))))
-        return latstr + '_' + lonstr
-
-
-def default_landuse(landusedir, tdirpath):
-    writelanduse(landusedir=landusedir , working_directory=tdirpath)
 
 
 def default_setup(setupname='SETUP.CFG',  wdir='./' ):
@@ -286,8 +255,8 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks,
                    continue
                 suffix = fl[4:8]
                 temp = fl.split('.')
-                print(temp)
-                print('************')
+                #print(temp)
+                #print('************')
                 if temp[1] != 'txt':
                    suffix += '.' + temp[1]
                 wdir=dirpath
@@ -463,55 +432,6 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
                 runlist.append(run)
                 iii+=1
     return runlist
-
-def results(dfile, runlist):
-    from monet.util.datem import read_dataA
-    from monet.util.datem import frame2datem
-    import matplotlib.pyplot as plt
-    df = pd.DataFrame()
-    nnn=0
-    for run in runlist:
-        fname = run.directory + '/dataA.txt'
-        tempdf = read_dataA(fname)
-        if nnn==0 and not tempdf.empty:
-           df = tempdf.copy()
-           nnn+=1
-        elif not tempdf.empty:
-           df = pd.merge(df, tempdf, how='outer')
-        elif tempdf.empty:
-           print('-----------------------------')
-           print('WARNING: svhy.py results method empty dataframe')
-           print(fname)
-           print('-----------------------------')
-    df['duration'] = "0100"
-    df['altitude'] = 20
-    print(df[0:10])
-    #frame2datem(dfile, df, cnames=['date','duration','lat', 'lon',
-    #                        'obs','model','sid','altitude'] )
-    for site in df['sid'].unique():
-        dfile2 = str(site) + '.' + dfile 
-        dftemp = df[df['sid']==site]
-        dftemp.set_index('date', inplace=True)
-        dftemp = dftemp.resample('H').asfreq()
-        dftemp['obs'].fillna(0, inplace=True)
-        dftemp['model'].fillna(0, inplace=True)
-        dftemp['duration'].fillna(method='bfill', inplace=True)
-        dftemp['lat'].fillna(method='bfill', inplace=True)
-        dftemp['lon'].fillna(method='bfill', inplace=True)
-        dftemp['sid'].fillna(method='bfill', inplace=True)
-        dftemp['altitude'].fillna(method='bfill', inplace=True)
-        dftemp.reset_index(inplace=True)
-        #print(dftemp[0:10])
-        #frame2datem(dfile2, dftemp, cnames=['date','duration','lat', 'lon',
-        #                    'obs','model','sid','altitude'] )
-         
-        dftemp.set_index('date', inplace=True)
-        obs= dftemp['obs']
-        model = dftemp['model']
-        plt.plot(obs,'--r')
-        plt.plot(model,'--k')
-        plt.title(str(site))
-        plt.show()
 
 
 def statmainstr():

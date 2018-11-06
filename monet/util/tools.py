@@ -102,7 +102,7 @@ def long_to_wideB(df):
     return wpivot
 
 def get_info(df):
-    rdf = df.drop(['obs','time','variable','units','time_local','Unnamed: 0'],axis=1)
+    rdf = df.drop(['obs','time','variable','units','time_local'],axis=1)
     rdf.drop_duplicates(inplace=True)
     #print('HEADER------')
     #print(rdf.columns.values)

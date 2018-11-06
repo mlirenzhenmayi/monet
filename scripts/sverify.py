@@ -110,6 +110,10 @@ parser.add_option('--cems', action="store_true", dest="cems", default=False,\
                   help='Find and plot SO2 emissions')
 parser.add_option('--obs', action="store_true", dest="obs", default=False, \
                    help='Find and plot SO2 observations')
+parser.add_option('--test', action="store_true", dest="test", default=False, \
+                   help='Run tests on the observations processing. 
+                         Only works with the --cems option.
+                         daterange and bounds will be chosen.')
 parser.add_option('--def', action="store_true", dest="defaults", default=False, \
                    help='write a default CONTROL and SETP file to the top\
                          directory')
@@ -137,6 +141,8 @@ parser.add_option('--results', action="store_true", dest="results",
 
 #opkl = options.opkl
 
+
+
 temp = options.drange.split(':')
 try:
     d1 = datetime.datetime(int(temp[0]), int(temp[1]), int(temp[2]), 0)
@@ -147,12 +153,25 @@ try:
 except:
     print('daterange is not correct ' + temp)
 
+#for running with the test.csv file
+if options.test and options.cems:
+   d1 = datetime.datetime(2016,1,2,0)
+   d2 = datetime.datetime(2016,1,9,0)
+
 if options.bounds:
    temp=options.bounds.split(':')
    latll=float(temp[0])
    lonll=float(temp[1])
    latur=float(temp[2])
    lonur=float(temp[3])
+   area = (latll, lonll, latur, lonur)
+
+#for running with the test.csv file
+if options.test and options.cems:
+   latll=30
+   lonll=-80
+   latur=40
+   lonur=-100
    area = (latll, lonll, latur, lonur)
 
 states=[]
@@ -196,6 +215,8 @@ run_duration = source_chunks
 datemchunks = source_chunks
 ncycle = source_chunks
 
+
+
 ##METHOD B
 ##The run will need to extend beyond this time.
 ##the amount of observation data in the datem file should match the run time.
@@ -222,7 +243,7 @@ if options.create_runs:
 
 if options.results:
    from monet.util.svhy import create_runlist
-   from monet.util.svhy import results
+   from monet.util.svresults import results
    runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
    results('outfile.txt', runlist)   
 
@@ -254,7 +275,7 @@ if options.obs:
     from monet.util.svobs import SObs
     obs = SObs([d1,d2], area, states, tdir=options.tdir)
     obs.fignum=rfignum
-    obs.find(pload=True, tdir=options.tdir)
+    obs.find(pload=True, tdir=options.tdir, test=options.test)
     #obs.check()
     #sys.exit()
     obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir) 

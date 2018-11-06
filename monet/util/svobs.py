@@ -173,7 +173,7 @@ class SObs(object):
            except:
                pload=False
             #print('Failed to load')
-           if pload: print('Loaded csv file file ' + tdir + self.pfile)
+           if pload: print('Loaded csv file file ' + tdir + self.csvfile)
         if not pload:
             print('LOADING from EPA site. Please wait\n')
             if getairnow: 
@@ -190,7 +190,6 @@ class SObs(object):
         ##save all the data here.
         if not pload: 
            if make_csv: self.save(tdir, self.csvfile)          
-           if make_pickle: self.create_pickle(tdir)          
 
         ##now create a dataframe with met data.
         #print(self.obs.columns.values)

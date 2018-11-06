@@ -111,8 +111,8 @@ parser.add_option('--cems', action="store_true", dest="cems", default=False,\
 parser.add_option('--obs', action="store_true", dest="obs", default=False, \
                    help='Find and plot SO2 observations')
 parser.add_option('--test', action="store_true", dest="test", default=False, \
-                   help='Run tests on the observations processing. 
-                         Only works with the --cems option.
+                   help='Run tests on the observations processing. \
+                         Only works with the --cems option.\
                          daterange and bounds will be chosen.')
 parser.add_option('--def', action="store_true", dest="defaults", default=False, \
                    help='write a default CONTROL and SETP file to the top\

@@ -20,10 +20,10 @@ monet.models.cmaq module
     :undoc-members:
     :show-inheritance:
 
-monet.models.combinetool module
--------------------------------
+monet.models.fv3chem module
+---------------------------
 
-.. automodule:: monet.models.combinetool
+.. automodule:: monet.models.fv3chem
     :members:
     :undoc-members:
     :show-inheritance:

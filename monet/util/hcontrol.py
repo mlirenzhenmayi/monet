@@ -25,6 +25,14 @@ ABSTRACT: classes and functions for creating HYSPLIT control and setup files.
 def writelanduse(landusedir, working_directory='./'):
     """writes an ASCDATA.CFG file in the outdir. The landusedir must
        be the name of the directory where the landuse files are located.
+    Parameters
+    ----------
+    landusedir : string
+    working_directory : string
+    
+    Returns
+    ----------
+    None
     """
     with  open(working_directory + "ASCDATA.CFG", "w") as fid:
           fid.write("-90.0  -180.0 \n")
@@ -34,16 +42,58 @@ def writelanduse(landusedir, working_directory='./'):
           fid.write("0.2 \n")
           fid.write(landusedir + "/bdyfiles/ \n")
 
-
 class ConcGrid():
     """concentration grid as defined by 10 lines in the HYSPLIT concentration CONTROL file.
-       interval is
-       sample type (0 is average) 
-       """
-    def __init__(self, name, levels=None, centerlat = 0, centerlon= 0, latdiff=-1, londiff=-1, 
-                 latspan=90, lonspan=360, outdir='./', outfile='cdump', nlev=-1, 
-                 sample_start='00 00 00 00 00', sample_stop='00 00 00 00 00',
+    Methods
+    -------
+    __init__
+    get_nlev 
+    set_annotate
+    describe
+    __str__
+    typestrg
+    definition
+  
+    Attributes
+    ----------
+    centerlat
+    centerlon
+    latdiff
+    londiff
+    latspan
+    lonspan
+    outdir
+    outfile
+    nlev
+    sample_start
+    sample_stop
+    sampletype
+    interval
+    annotate : boolean 
+    """
+    def __init__(self, name, levels=None, 
+                 centerlat = 0.0, centerlon= 0.0, 
+                 latdiff=-1.0, londiff=-1.0, 
+                 latspan=90.0, lonspan=360.0, 
+                 outdir='./', outfile='cdump', nlev=-1, 
+                 sample_start='00 00 00 00 00', 
+                 sample_stop='00 00 00 00 00',
                  sampletype=0 , interval = (-1,-1)):
+
+       """
+       Parameters
+       ----------
+       name : string
+       levels : list of floats/ints
+       center_lat : float
+       center_lon : float
+       interval is
+       sample type : integer (0 is average) 
+ 
+       Return
+       -------
+       None
+       """
        self.name = name
        if levels is None:
           self.levels=[]
@@ -66,12 +116,18 @@ class ConcGrid():
        self.annotate=False
 
     def set_annotate(self, on=True):
+        """
+        write 
+        """
         if on:
            self.annotate=True
         else:
            self.annotate=False
            
     def get_nlev(self):
+       """
+       computes self.levels from self.nlev
+       """
        if self.nlev == -1:
           self.nlev = len(self.levels)
           
@@ -135,7 +191,6 @@ class ConcGrid():
         return returnstr
            
 
-
     def typestr(self):
        """returns a string describing what kind of sampling interval is used"""
        print(self.interval[0], self.interval[1])
@@ -152,7 +207,16 @@ class ConcGrid():
        
 
     def definition(self, lines):
-       """input list of 10 lines of the control file which define a concentration grid"""
+       """
+       Parameters
+       -----------
+       lines : string
+       input list of 10 lines of the control file which define a concentration grid
+
+       Return
+       ------
+       boolean
+       """
        temp = lines[0].split()
        try:
            self.centerlat = float(temp[0])
@@ -228,9 +292,15 @@ class ConcGrid():
 
 class Species():
     """Class which contains information to define a species or pollutant in a HYSPLIT control file.
-       methods:
-       definition - input 3 lines from control file for defining a pollutant
-       define_dep - input 5 lines from control file for defining deposition"""
+       Methods
+       -------
+       __init__   : initialize attributes
+       definition : input 3 lines from control file for defining a pollutant
+       define_dep : input 5 lines from control file for defining deposition
+
+
+       
+    """
     total = 0
 
     @staticmethod
@@ -447,7 +517,6 @@ class NameList():
                     kstr=False
                 if not kstr: fid.write(str(key) + '=' + str(self.nlist[key]) + ',\n')
             fid.write('/ \n')
-#    def describe(self):
 
 
     

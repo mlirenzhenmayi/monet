@@ -73,6 +73,8 @@ def default_setup(setupname='SETUP.CFG',  wdir='./' ):
         namelist['kmix0'] = '250'                #default value is 250. controls minimum mixing depth.
         namelist['kblt'] =  '2'                  #Use Kantha Clayson for vertical mixing. 
         namelist['kbls'] =  '1'
+        namelist['ichem'] =  '6'                 #mass/divided by air density
+                                                 #mixing ratio.
 
         ##emission cycles are 24 hours and each run lasts 5 days. 
         ##Also need enough particles to handle pardump from previous simulation.
@@ -174,9 +176,18 @@ def getmetfiles(sdate, runtime, verbose=False, warn_file = 'MetFileWarning.txt',
     return list(zip(mdirlist, mfiles))
 
 
-def default_control(name, tdirpath, runtime, sdate):
-    cdiff = 0.05
-    span = 20
+def default_control(name, tdirpath, runtime, sdate, cpack=1):
+    if cpack==1:
+        latdiff = 0.05
+        londiff = 0.05
+        latspan = 20
+        lonspan = 20
+    elif cpack==3:  #polar grid
+        latdiff = 5  #sector angle in degrees
+        londiff = 2  #sector spacing in km.
+        latspan = 360.0
+        lonspan = 200  #downwind distance in km.
+        
     sample_start = "00 00 00 00" 
     ztop = 10000
     lat = 47
@@ -190,8 +201,8 @@ def default_control(name, tdirpath, runtime, sdate):
   
     cgrid = ConcGrid("junkname", levels=[20,50,100,150,175,225,300],
                      centerlat=lat, centerlon=lon,
-                     latdiff = cdiff, londiff= cdiff,
-                     latspan=span, lonspan = span,
+                     latdiff = latdiff, londiff= londiff,
+                     latspan=latspan, lonspan = lonspan,
                      sampletype=0, interval =(1,0), sample_start = sample_start) 
     control.add_cgrid(cgrid) 
     ##TO DO check webdep for so2

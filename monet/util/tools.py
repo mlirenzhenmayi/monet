@@ -94,7 +94,8 @@ def long_to_wide(df):
 def long_to_wideB(df):
     """
     df: pandas dataframe
-    
+    Returns:
+    wpivot :   dataframe 
     """
     from pandas import Series, merge
     wpivot = df.pivot_table(

@@ -147,9 +147,19 @@ class SObs(object):
         pickle.dump(self.obs, open(tdir + self.pfile, "wb"))
 
     def find(self, verbose=False, pload=True, getairnow=False, tdir='./',
-             test=False):
+             test=False, units='UG/M3'):
         """
+        Parameters
+        -----------
+        verbose   : boolean
+        pload     : boolean
+                    if True try to load from csv file.
+        getairnow : boolean
+        tdir      : string
+        test      : boolean 
         """
+        area = self.area
+
         make_csv = True    #to create/load from a csv file set to TRUE
         if test:
            aqs = aqs_mod.AQS()
@@ -181,9 +191,10 @@ class SObs(object):
                aq.add_data([self.d1, self.d2], download=True)
             else:
                aq = aqs_mod.AQS()
-               aq.add_data([self.d1, self.d2], param=['SO2','WIND','TEMP','RHDP'], download=True)
+               aq.add_data([self.d1, self.d2], param=['SO2','WIND','TEMP','RHDP'], download=False)
+               #aq.add_data([self.d1, self.d2], param=['SO2','WIND','TEMP'], download=False)
             self.obs = aq.df.copy()
-        area = self.area
+        #filter by area.
         if area: self.obs = obs_util.latlonfilter(self.obs, (area[0], area[1]), (area[2], area[3]))
         rt = datetime.timedelta(hours=72)
         self.obs = obs_util.timefilter(self.obs, [self.d1, self.d2+rt])
@@ -193,11 +204,13 @@ class SObs(object):
 
         ##now create a dataframe with met data.
         #print(self.obs.columns.values)
+        print('saving to file ' ,  tdir + 'met' + self.csvfile)
         met_obs = tools.long_to_wideB(self.obs)  #pivot table
         met_obs.to_csv(tdir + 'met' + self.csvfile, header=True,
                        float_format="%g")
         ##now create a dataframe with data for each site.
         obs_info = tools.get_info(self.obs)
+        print('saving to file ' ,  tdir + 'info_' + self.csvfile)
         obs_info.to_csv(tdir + 'info_' + self.csvfile, float_format="%g")
         self.met = met_obs
         ##this would be used for filtering by a list of siteid's.
@@ -217,7 +230,9 @@ class SObs(object):
         ##get rid of the meteorological variables in the file.
         self.obs = self.obs[self.obs['variable'] == 'SO2']
         ##convert units of SO2
-        self.obs = convert_epa_unit(self.obs, obscolumn='obs', unit='UG/M3')
+        units = units.upper()
+        if units=='UG/M3':
+            self.obs = convert_epa_unit(self.obs, obscolumn='obs', unit=units)
 
     #def mkpkl(self):
     #    tdir = self.tdir + 'run' + str(self.rnum) + '/'

@@ -59,7 +59,7 @@ def source_generator(df, area=1, altitude=10):
 
 
 
-def default_setup(setupname='SETUP.CFG',  wdir='./' ):
+def default_setup(setupname='SETUP.CFG',  wdir='./', units='PPB' ):
         """writes the SETUP file which is needed to run HYSPLIT.
            input rhash iu a RunParams object.
         """
@@ -73,7 +73,9 @@ def default_setup(setupname='SETUP.CFG',  wdir='./' ):
         namelist['kmix0'] = '250'                #default value is 250. controls minimum mixing depth.
         namelist['kblt'] =  '2'                  #Use Kantha Clayson for vertical mixing. 
         namelist['kbls'] =  '1'
-        namelist['ichem'] =  '6'                 #mass/divided by air density
+          
+        if units=='ppb': 
+           namelist['ichem'] =  '6'              #mass/divided by air density
                                                  #mixing ratio.
 
         ##emission cycles are 24 hours and each run lasts 5 days. 

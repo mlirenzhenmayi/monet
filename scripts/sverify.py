@@ -109,6 +109,9 @@ parser.add_option('--cems', action="store_true", dest="cems", default=False,\
                   help='Find and plot SO2 emissions')
 parser.add_option('--obs', action="store_true", dest="obs", default=False, \
                    help='Find and plot SO2 observations')
+parser.add_option('--unit', type="str", dest="units", default='PPB', \
+                   help='Units for concentrations. Choose PPB or UG/M3\
+                         Setting ppb will cause ichem=6 option to be set for HYSPLIT.')
 parser.add_option('--test', action="store_true", dest="test", default=False, \
                    help='Run tests on the observations processing. \
                          Only works with the --cems option.\
@@ -203,7 +206,8 @@ ncycle = source_chunks
 if options.defaults:
    from monet.util.svhy import default_setup
    from monet.util.svhy import default_control
-   default_setup('SETUP.0', options.tdir)
+   ##if units='ppb' then ichem=6 is set to output mixing ratios.
+   default_setup('SETUP.0', options.tdir, units=options.units)
    default_control('CONTROL.0', options.tdir, run_duration, d1)
 
 if options.create_runs:
@@ -247,7 +251,7 @@ if options.obs:
     from monet.util.svobs import SObs
     obs = SObs([d1,d2], area, states, tdir=options.tdir)
     obs.fignum=rfignum
-    obs.find(pload=True, tdir=options.tdir, test=options.test)
+    obs.find(pload=True, tdir=options.tdir, test=options.test, units=options.units)
     #obs.check()
     #sys.exit()
     obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir) 

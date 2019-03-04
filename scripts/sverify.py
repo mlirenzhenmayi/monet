@@ -85,7 +85,6 @@ def create_map(fignum):
 
 
 parser = OptionParser()
-
 parser.add_option('-a', type="string", dest="state", default="ND",\
                   help='two letter state code (ND)')
 parser.add_option('-b', type="string", dest="bounds", default=None,\
@@ -125,23 +124,7 @@ parser.add_option('--run', type="string", dest="create_runs", default=None, \
 parser.add_option('--results', action="store_true", dest="results",
                    default=False)
 
-##-----##
-#parser.add_option('--run', action="store_true", dest="runh", default=False)
-#parser.add_option('--map', action="store_true", dest="emap", default=False)
-#parser.add_option('--plote', action="store_true", dest="eplot", default=False, \
-#                  help='plot emissions')
-#parser.add_option('--datem', action="store_true", dest="datem", default=False)
-#parser.add_option('--rundatem', action="store_true", dest="rundatem", default=False)
-#parser.add_option('--pickle', action="store_true", dest="pickle", default=False)
-#parser.add_option('--tcm', action="store_true", dest="tcm", default=False)
-#parser.add_option('--test', action="store_true", dest="runtest", default=False)
-#parser.add_option('--obs', action="store_true", dest="findobs", default=False)
-#parser.add_option('-x', action="store_false", dest="opkl", default=True)
 (options, args) = parser.parse_args()
-
-#opkl = options.opkl
-
-
 
 temp = options.drange.split(':')
 try:
@@ -179,15 +162,6 @@ if options.state:
    temp=options.state.split(':')
    for tt in temp: 
        states.append(tt.lower())
- 
-#if options.bounds.lower().strip() == 'nd':
-#    area = [44.5,-105.0, 49.5, -97.0]
-#    states=['nd']
-##else:
-#    area = None
-#    state=[options.area.strip()]
-
-#sv = SO2Verify([d1,d2], area, state)
 
 ##emissions are on order of 1,000-2,000 lbs (about 1,000 kg)
 ##10,000 particles - each particle would be 0.1 kg or 100g.
@@ -197,10 +171,10 @@ if options.state:
 ##Need a 100 particles to get to 6.7 ug/m3.
 ##This seems reasonable.
 
-days=5
 ##source_chunks specify how many source times go into 
 ##an emittimes file. They will also determine the directory
 ##tree structure. Since directories will be according to run start times.
+days=5
 source_chunks = 24*days
 
 ##run_duration specifies how long each run lasts.
@@ -214,8 +188,6 @@ run_duration = 24*(days) + 2
 run_duration = source_chunks  
 datemchunks = source_chunks
 ncycle = source_chunks
-
-
 
 ##METHOD B
 ##The run will need to extend beyond this time.

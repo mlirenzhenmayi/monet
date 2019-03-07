@@ -14,7 +14,7 @@ from monet.util.hcontrol import ConcGrid
 from monet.util.hcontrol import NameList
 from monet.util.hcontrol import writelanduse
 from monet.verification.statmain import MatchedData
-
+import seaborn as sns
 """
 """
 
@@ -26,6 +26,7 @@ def results(dfile, runlist):
     nnn=0
     for run in runlist:
         fname = run.directory + '/dataA.txt'
+        print(fname)
         tempdf = read_dataA(fname)
         if nnn==0 and not tempdf.empty:
            df = tempdf.copy()
@@ -42,14 +43,15 @@ def results(dfile, runlist):
     #print(df[0:10])
     #frame2datem(dfile, df, cnames=['date','duration','lat', 'lon',
     #                        'obs','model','sid','altitude'] )
-
+       
     df['obs'].fillna(0, inplace=True)
     df['model'].fillna(0, inplace=True)
     df2 = df.set_index('date') 
     mdata = MatchedData(df2['obs'], df2['model'])
     print('*ALL*')
-    print(df2[0:10])
+    #print(df2[0:10])
     print(mdata.find_stats()) 
+    sns.set()
     for site in df['sid'].unique():
         dfile2 = str(site) + '.' + dfile 
         dftemp = df[df['sid']==site]
@@ -75,8 +77,10 @@ def results(dfile, runlist):
         print(str(site))
         print('RMSE', str(dhash['rmse']))
         print('NMSE', str(dhash['nmse']))
-        plt.plot(obs,'--r')
-        plt.plot(model,'--k')
+        #plt.plot(obs,'--r')
+        #plt.plot(model,'--k')
+        obs.plot()
+        model.plot()
         plt.title(str(site))
         plt.show()
 

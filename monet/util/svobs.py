@@ -102,7 +102,8 @@ class SObs(object):
            if not quiet: print('Too many sites to pop up all plots')
            quiet=True
         for sid in sra:
-            ts = get_tseries(self.obs, sid, var='obs', svar='siteid', convert=True)
+            ts = get_tseries(self.obs, sid, var='obs', svar='siteid',
+convert=False)
             ms = get_tseries(self.obs, sid, var='mdl', svar='siteid')
             dist.extend(ts.tolist())
             fig = plt.figure(self.fignum)

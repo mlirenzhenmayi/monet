@@ -13,7 +13,7 @@ from monet.util.svdir import date2dir
 #from arlhysplit.runh import source_generator
 #from arlhysplit.runh import create_plume
 #from arlhysplit.tcm import TCM
-from monet.util import emitimes
+from monet.utilhysplit import emitimes
 #from monet.obs.epa_util import convert_epa_unit
 
 """

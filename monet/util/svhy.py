@@ -8,11 +8,11 @@ from subprocess import call
 import pandas as pd
 #from arlhysplit.process import is_process_running
 #from arlhysplit.process import ProcessList
-from monet.util.hcontrol import HycsControl
-from monet.util.hcontrol import Species
-from monet.util.hcontrol import ConcGrid
-from monet.util.hcontrol import NameList
-from monet.util.hcontrol import writelanduse
+from monet.utilhysplit.hcontrol import HycsControl
+from monet.utilhysplit.hcontrol import Species
+from monet.utilhysplit.hcontrol import ConcGrid
+from monet.utilhysplit.hcontrol import NameList
+from monet.utilhysplit.hcontrol import writelanduse
 
 """
 NAME: svhy.py
@@ -239,7 +239,7 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks,
             run duration.
     """
     from os import walk
-    from monet.util import emitimes 
+    from monet.utilhysplit import emitimes 
     #from arlhysplit.runh import getmetfiles
     from monet.util.svdir import date2dir
 
@@ -326,7 +326,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
             run duration.
     """
     from os import walk
-    from monet.util import emitimes 
+    from monet.utilhysplit import emitimes 
     #from arlhysplit.runh import getmetfiles
     from monet.util.svdir import dirtree
     from monet.util.svdir import date2dir

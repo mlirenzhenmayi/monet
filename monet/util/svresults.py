@@ -12,11 +12,16 @@ import seaborn as sns
 """
 
 def results(dfile, runlist):
+    """
+    reads file output by datem.
+    """
     from monet.util.datem import read_dataA
     from monet.util.datem import frame2datem
     import matplotlib.pyplot as plt
+    # Initialize dataframe to store c2datem output in.
     df = pd.DataFrame()
     nnn=0
+    # read output from c2datem in each subdirectory.
     for run in runlist:
         fname = run.directory + '/dataA.txt'
         print(fname)
@@ -36,7 +41,9 @@ def results(dfile, runlist):
     #print(df[0:10])
     #frame2datem(dfile, df, cnames=['date','duration','lat', 'lon',
     #                        'obs','model','sid','altitude'] )
-       
+  
+    #TO DO. 
+    # fill missing data with 0. MAY NEED TO CHANGE THIS.    
     df['obs'].fillna(0, inplace=True)
     df['model'].fillna(0, inplace=True)
     df2 = df.set_index('date') 
@@ -45,7 +52,18 @@ def results(dfile, runlist):
     #print(df2[0:10])
     print(mdata.find_stats()) 
     sns.set()
-    for site in df['sid'].unique():
+    ##create datem output for each month (for nick)
+    mnths=[7]
+    for mmm in mnths:
+        dfile2 = 'month' + str(mmm) + '.' + dfile 
+        df['month']=df['date'].map(lambda x: x.month)
+        print(df[0:10])
+        dftemp = df[df['month']==mmm]
+        frame2datem(dfile2, dftemp, cnames=['date','duration','lat','lon',
+                    'obs','model','sid','altitude'])
+    ##plot obs vs. model for each site.
+    #for site in df['sid'].unique():
+    for site in []:
         dfile2 = str(site) + '.' + dfile 
         dftemp = df[df['sid']==site]
         dftemp.set_index('date', inplace=True)

@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import requests
 import json
+import sys
 """
 NAME: cems_mod.py
 PGRMMER: Alice Crawford   ORG: ARL
@@ -12,6 +13,31 @@ This code written at the NOAA air resources laboratory
 Python 3
 #################################################################
 """
+
+
+def unpack_facilities(dhash):
+    hash1={}  # key=oris, value = (lat, lon)
+    hash2={}  # key=oris, value= list of unit ids
+    hash3={}  # key=oris, value = list of monitoring locations which are not
+              #                   units.
+    for val in dhash['data']:
+        unitra=[]
+        nonunitra=[]
+        oris = int(val['orisCode'])
+        name = val['name']
+        
+        lat = val['geographicLocation']['latitude']
+        lon = val['geographicLocation']['longitude']
+        hash1[oris] = (lat, lon)
+        for sid in val['monitoringPlans']:
+            for unit in sid['monitoringLocations']:
+                if unit['isUnit']:
+                   unitra.append(unit['name'])     
+                else:
+                   nonunitra.append(unit['name'])  
+        hash2[oris] = unitra
+        hash3[oris] = nonunitra
+    return hash1, hash2, hash3    
 
 def unpack_response(dhash, deep=100, pid=0):
     """
@@ -175,7 +201,6 @@ def read_stack_height(verbose=False, testing=False):
     #print('done here')
     return df2
 
-
 def getdegrees(degrees, minutes, seconds):
     """
     Parameters
@@ -189,7 +214,6 @@ def getdegrees(degrees, minutes, seconds):
     decimal degrees.
     """
     return degrees + minutes / 60.0 + seconds / 3600.00
-
 
 def addmonth(dt):
     """
@@ -219,7 +243,6 @@ def addmonth(dt):
             else:
                 day = 28
     return datetime.datetime(year, month, day, hour)
-
 
 def get_date_fmt(date, verbose=False):
     """Determines what format of the date is in.
@@ -295,6 +318,13 @@ class CEMS(object):
     def __str__(self):
         return self.info
 
+    def sendrequest(self,rqq):
+        rqq = self.apiurl + rqq + '?api_key=' + self.key
+        print('Request: ' , rqq)
+        data = requests.get(rqq)
+        print('Status Code', data.status_code)
+        return data
+
     def get_lookups(self):
         getstr='lookUps'
         rqq = self.apiurl + 'emissions/' + getstr 
@@ -302,13 +332,149 @@ class CEMS(object):
         data = requests.get(rqq)
         dstr = self.unpack(data)
         print(dstr)
+
+    def get_mplan(self, oris, locationID, date):
+        """
+        oris : int
+        locationID : str or int
+        date : datetime object
+
+        The monitoring plan has locationAttributes which
+        include the stackHeight, crossAreaExit, crossAreaFlow.
+
+        It also includes monitoringSystems which includes
+        ststeymTypeDescription (such as So2 Concentration)
+
+        QuarterlySummaries gives so2Mass each quarter. 
+        """
+        dstr = date.strftime("%Y-%m-%d")
+        mstr='monitoringplan'
+        getstr = '/'.join([mstr,str(oris),str(locationID),dstr])
+        data = self.sendrequest(getstr)
+        dstr = self.unpack(data)
+        print(dstr)
+
+    def sumdf(self, df):
+        for header in df.columns.values:
+            print(header)
+            print(df[header].unique())
+
+    def plot_emissions(self):
+        import matplotlib.pyplot as plt
+        print('plot emissions')
+        df = self.df.copy()
+        print(df['date'][0:10])
+        print(df['USO2'][0:10])
+        print(type(df['USO2'][0]))
+        #plt.plot(df['date'][0:100], df['USO2'][0:100], '-b.')
+        temp = df[df['date'].dt.year != 1900]
+        plt.plot(temp['date'], temp['ASO2'], '-b.')
+        temp = df[df['SO2MODC'].isin(['01','02','03','04'])]
+        plt.plot(temp['date'], temp['USO2'], 'r.')
+        plt.show() 
+        #plt.plot(df['DateHour'], df['SO2MODC'], '-b.')
+        # According to lookups MODC values
+        # 01 primary monitoring system
+        # 02 backup monitoring system
+        # 03 alternative monitoring system
+        # 04 backup monitoring system
+
+        # 06 average hour before/hour after
+        # 07 average hourly
+
+        # 21 negative value replaced with 0.
+        # 08 90th percentile value in Lookback Period
+        # 09 95th precentile value in Lookback Period
+        # etc.
+
+        # it looks like values between 1-4 ok
+        # 6-7 probably ok
+        # higher values should be flagged.
+
+    def load_emissions(self, ifile):
+        if os.path.isfile(ifile):
+           df = pd.read_csv(ifile)
+        self.df = df
  
-    def get_emissions(self, oris, locationID, year, quarter):
-        getstr = '/'.join[oris,locationID,year,quarter]
-        rqq = self.apiurl + 'emissions/hourlyData/csv/' + getstr 
-        rqq += '?api_key=' + self.key
-        data = requests.get(rqq)
-        dstr= self.unpack(data)
+    def get_emissions(self, oris, locationID, year, quarter, ifile='efile.txt'):
+        if locationID == None:
+           unitra = self.get_units(oris)
+        else:
+           unitra = [locationID]
+        if int(quarter) > 4: 
+           print('Warning: quarter greater than 4')
+           sys.exit()
+        for locationID in unitra:
+            locationID = str(locationID)
+            efile = 'efile.txt'
+            estr = 'emissions/hourlyData/csv'
+            getstr = '/'.join([estr, oris,locationID,year,quarter])
+            data = self.sendrequest(getstr)
+            print('DATA TYPE: ', type(data))
+            print('HEADERS', data.headers)
+            iii=0
+            tra=[]
+            cols=[]
+            for line in data.iter_lines(decode_unicode=True):
+                if iii==0: 
+                    cols=line.split(',')
+                    cols.append('unit id')
+                else:
+                    lt=line.split(',')
+                    lt.append(locationID)
+                    tra.append(lt)
+                iii+=1
+                with open(efile, 'a') as fid:
+                    fid.write(line) 
+        df = pd.DataFrame(tra, columns=cols)
+        print(df[0:10])
+        df.apply(pd.to_numeric, errors='ignore')
+        self.df = df
+        self.manage_date()
+        self.convert_cols()
+        #self.sumdf(df) 
+             
+        #print(data.data)
+        #dstr= self.unpack(data)
+ 
+    def convert_cols(self):
+        def tofloat(xxx):
+            try:
+               rt=float(xxx)
+            except:
+               rt=-999
+            return rt 
+        self.df['USO2'] = self.df['UnadjustedSO2'].map(tofloat)
+        self.df['ASO2'] = self.df['SO2CEMReportedAdjustedSO2'].map(tofloat)
+        temp = self.df[self.df['USO2'].isin([-999])]
+        print('Values that cannot be converted to float')
+        print(temp['UnadjustedSO2'].unique())
+        print(temp['SO2MODC'].unique())
+        print(temp['MATSStartupShutdownFlag'].unique())
+        #print(temp['date'].unique())
+        print(temp['OperatingTime'].unique())
+        print(self.df['OperatingTime'].unique())
+        #for line in temp.iterrows():
+        #    print(line)       
+
+
+
+    def manage_date(self):
+        """DateHour field is originally in string form 4/1/2016 02:00:00 PM
+           Here, change to a datetime object.
+        """
+        # Using the %I for the hour field and %p for AM/Pm converts time
+        # correctly.
+        def newdate(xxx):
+            fmt="%m/%d/%Y %I:%M:%S %p"
+            try:
+               rdt=datetime.datetime.strptime(xxx['DateHour'], fmt)
+            except:
+               print(xxx['DateHour'])
+               rdt = datetime.datetime(1900,1,1,0)
+            return rdt
+        self.df['date'] = self.df.apply(newdate, axis=1)
+         
  
     def unpack(self, response, deep=100):
         print('Status Code', response.status_code)
@@ -319,8 +485,20 @@ class CEMS(object):
     def get_facilities(self):
         rqq = self.apiurl + 'facilities?api_key=' + self.key
         data = requests.get(rqq)
-        dstr= self.unpack(data)
-        print(dstr)
+        #dstr= self.unpack(data)
+        #print(dstr)
+        return(data)
+
+    def get_units(self, oris):
+        oris=int(oris)
+        data = self.get_facilities()
+        jobject = data.json()
+        lochash, unithash, nonunithash = unpack_facilities(jobject)         
+        return unithash[oris]
+
+    def facdata(self, oris):
+        data = self.get_facilities()
+        jobject = response.json()
         # facilties 'data' is a list of dictionaries.
         # there is one dictionary for each oris code.
         # Each dictionary has a list under the key monitoringLocations.

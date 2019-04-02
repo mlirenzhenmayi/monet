@@ -133,33 +133,10 @@ def read_stack_height(verbose=False, testing=False):
 
 
 def getdegrees(degrees, minutes, seconds):
-    """
-    Parameters
-    ----------
-    degrees: integer
-    minutes: integer
-    seconds: integer
-
-    Returns
-    ----------
-    decimal degrees.
-    """
     return degrees + minutes / 60.0 + seconds / 3600.00
 
 
 def addmonth(dt):
-    """
-    Parameters
-    ----------
-    dt : datetime object
-
-    Returns: datetime object
-    datetime that is one month from input datetime.
-    handles ambiguities that arise when input date is
-    at the end of a month and next month does not have the
-    same number of days.
-
-    """
     month = dt.month + 1
     year = dt.year
     day = dt.day
@@ -186,7 +163,7 @@ def get_date_fmt(date, verbose=False):
           with format either YYYY-mm-DD or mm-DD-YYYY
     verbose: boolean
           if TRUE print extra information
-    Returns
+    Rerturns
     --------
     fmt: str
         string which can be used with datetime object to give format of date
@@ -302,6 +279,7 @@ class CEMS(object):
                 self.load(url, verbose=verbose)
         return self.df
 
+
     def match_column(self, varname):
         """varname is list of strings.
            returns column name which contains all the strings.
@@ -319,8 +297,7 @@ class CEMS(object):
                 cmatch = ccc
         return cmatch
 
-    def cemspivot(self, varname, daterange=None, unitid=False, stackht=False,
-                  verbose=True):
+    def cemspivot(self, varname, daterange=None, unitid=False, verbose=True):
         """
         Parameters
         ----------
@@ -333,8 +310,6 @@ class CEMS(object):
                  separate columns in the pivot table.
         verbose: boolean
                  if true print out extra information.
-        stackht: boolean
-                 NOT IMPLEMENTED YET. if true stack height is in header column.
         Returns: pandas DataFrame object
             returns dataframe with rows time. Columns are (orispl_code,
             unit_id).
@@ -343,8 +318,8 @@ class CEMS(object):
              an orispl_code. Values are from the column specified by the
              varname input.
         """
+
         from .obs_util import timefilter
-        stackht = False  # option not tested.
         temp = self.df.copy()
         if daterange:
             temp = timefilter(temp, daterange)
@@ -363,20 +338,16 @@ class CEMS(object):
             if stackht:
                 cols.append('stackht')
         else:
-            cols = ['orispl_code']
-            if stackht:
-                cols.append('max_stackht')
-
-        # create pandas frame with index datetime and columns for value for
-        # each unit_id,orispl
-        pivot = pd.pivot_table(
-            temp,
-            values=varname,
-            index=['time'],
-            columns=cols,
-            aggfunc=np.sum)
-        #print('PIVOT ----------')
-        # print(pivot[0:20])
+            if verbose:
+                print('NO UNIT ID')
+            # returns data frame where rows are date and columns are the values
+            # of cmatch for orispl
+            pivot = pd.pivot_table(
+                temp,
+                values=varname,
+                index=['time'],
+                columns=['orispl_code'],
+                aggfunc=np.sum)
         return pivot
 
     def get_var(self,
@@ -398,6 +369,8 @@ class CEMS(object):
 
            if a particular unitid is specified then will return values for that
             unit.
+
+
         Parameters
         ----------
         varname : string or iteratable of strings
@@ -416,10 +389,9 @@ class CEMS(object):
             ui = False
         temp = self.cemspivot(varname, daterange, unitid=ui)
         if not ui:
-            returnval = temp[orisp]
+            return temp[orisp]
         else:
-            returnval = temp[orisp, unitid]
-        return returnval
+            return temp[orisp, unitid]
 
     def retrieve(self, rdate, state, download=True, verbose=False):
         """Short summary.
@@ -639,7 +611,7 @@ class CEMS(object):
         return dftemp
         # return dfnew
 
-    def load(self, efile, verbose=False):
+    def load(self, efile, verbose=True):
         """
         loads information found in efile into a pandas dataframe.
         Parameters
@@ -656,7 +628,6 @@ class CEMS(object):
         columns = self.columns_rename(columns, verbose)
         dftemp.columns = columns
         if verbose:
-            print('Data available in CEMS file')
             print(columns)
         dfmt = get_date_fmt(dftemp['date'][0], verbose=verbose)
 

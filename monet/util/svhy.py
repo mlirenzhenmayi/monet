@@ -8,11 +8,11 @@ from subprocess import call
 import pandas as pd
 #from arlhysplit.process import is_process_running
 #from arlhysplit.process import ProcessList
-from monet.util.hcontrol import HycsControl
-from monet.util.hcontrol import Species
-from monet.util.hcontrol import ConcGrid
-from monet.util.hcontrol import NameList
-from monet.util.hcontrol import writelanduse
+from monet.utilhysplit.hcontrol import HycsControl
+from monet.utilhysplit.hcontrol import Species
+from monet.utilhysplit.hcontrol import ConcGrid
+from monet.utilhysplit.hcontrol import NameList
+from monet.utilhysplit.hcontrol import writelanduse
 
 """
 NAME: svhy.py
@@ -74,7 +74,7 @@ def default_setup(setupname='SETUP.CFG',  wdir='./', units='PPB' ):
         namelist['kblt'] =  '2'                  #Use Kantha Clayson for vertical mixing. 
         namelist['kbls'] =  '1'
           
-        if units=='ppb': 
+        if units.lower().strip()=='ppb': 
            namelist['ichem'] =  '6'              #mass/divided by air density
                                                  #mixing ratio.
 
@@ -239,7 +239,7 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks,
             run duration.
     """
     from os import walk
-    from monet.util import emitimes 
+    from monet.utilhysplit import emitimes 
     #from arlhysplit.runh import getmetfiles
     from monet.util.svdir import date2dir
 
@@ -295,7 +295,7 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks,
 
 
 def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, 
-                   bg=True):
+                   bg=True, units='ppb'):
     """
     read the base control file in tdirpath CONTROL.0
     read the base SETUP.0 file in tdirpath
@@ -326,7 +326,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
             run duration.
     """
     from os import walk
-    from monet.util import emitimes 
+    from monet.utilhysplit import emitimes 
     #from arlhysplit.runh import getmetfiles
     from monet.util.svdir import dirtree
     from monet.util.svdir import date2dir
@@ -424,7 +424,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
 
                 with open(wdir + '/rundatem.sh', 'w') as fid:
                      fid.write('MDL=' + hysplitdir + '\n')
-                     fid.write('mult=1e9 #emission in kg' + '\n')
+                     fid.write(unit_mult(units=units))
                      fid.write(statmainstr())
 
                 if dirpath == firstdirpath:
@@ -446,6 +446,17 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks,
                 iii+=1
     return runlist
 
+def unit_mult(units='ug/m3'):
+    rstr= ('#emission in kg (mult by 1e9)' + '\n')
+    if(units.lower().strip()=='ppb'):
+       rstr += ('#convert to volume mixing ratio' )
+       rstr += ('#(mult by 0.4522)' + '\n')
+       rstr += ('mult=4.522e8' + '\n')
+    else:
+       rstr += ('#emission in kg (mult by 1e9)' + '\n')
+       rstr += ('#output in ug/m3' + '\n')
+       rstr += ('mult=1e9 #emission in kg' + '\n')
+    return rstr
 
 def statmainstr():
     """returns string to create_script for
@@ -462,7 +473,7 @@ def statmainstr():
     return rstr 
 
 
-def create_script(runlist, tdirpath, scriptname,write=True):
+def create_script(runlist, tdirpath, scriptname, units='ppb', write=True):
     """
     Creates bash script which will 
     1. Copy pardump files for use as parinit files
@@ -481,7 +492,7 @@ def create_script(runlist, tdirpath, scriptname,write=True):
     prev_directory = 'None'
     rstr=''
     rstr='MDL=' + runlist[0].hysplitdir + '\n'
-    rstr+= 'mult=1e9 #emissions are in kg and measurements are in ug\n\n #-------------------\n'
+    rstr+= unit_mult(units=units)
     dstr = rstr
     for run in runlist:
         if run.directory != prev_directory: 
@@ -489,7 +500,6 @@ def create_script(runlist, tdirpath, scriptname,write=True):
               rstr += 'wait' + '\n\n'
               rstr += 'echo "Finished ' +  prev_directory + '"  >> ' + logfile
               rstr += '\n\n'
-              #rstr += statmainstr()
               dstr += statmainstr()
               rstr += '#-----------------------------------------\n' 
            rstr += 'cd ' + run.directory  + '\n\n'

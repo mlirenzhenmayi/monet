@@ -13,7 +13,7 @@ from monet.util.svdir import date2dir
 #from arlhysplit.runh import source_generator
 #from arlhysplit.runh import create_plume
 #from arlhysplit.tcm import TCM
-from monet.util import emitimes
+from monet.utilhysplit import emitimes
 #from monet.obs.epa_util import convert_epa_unit
 
 """
@@ -60,7 +60,7 @@ class SEmissions(object):
         self.ethresh = 100 #lbs emittimes only created if max emission over
                            #this.
     
-
+        self.lbs2kg = 0.453592
 
     def find(self, testcase=False, byunit=False, verbose=False):
         """find emissions using the CEMSEmissions class
@@ -126,13 +126,13 @@ class SEmissions(object):
             sublist.append(self.ehash[oris][1])  #latlon tuple
             print(self.ehash[oris])
             if not np.isnan(qmean):
-                self.meanhash[oris] = qmean * 0.453592
-                sublist.append(int(qmean*0.453592)) #mean emission (kg)
+                self.meanhash[oris] = qmean * self.lbs2kg
+                sublist.append(int(qmean*self.lbs2kg)) #mean emission (kg)
             else: 
                 self.meanhash[oris] = -99
                 sublist.append(-99) #mean emission (kg)
             if not np.isnan(qmax):
-                sublist.append(int(qmax*0.453592))  #max emission (kg)
+                sublist.append(int(qmax*self.lbs2kg))  #max emission (kg)
             else:  
                 sublist.append(-99)  #max emission (kg)
 
@@ -162,7 +162,7 @@ class SEmissions(object):
 
     def get_so2(self, unit=False):
         sources = self.get_sources(stype='so2_lbs', unit=unit) 
-        sources = sources * 0.453592  #convert from lbs to kg.
+        sources = sources * self.lbs2kg  #convert from lbs to kg.
         return sources
 
     def get_heat(self, unit=False):
@@ -402,7 +402,7 @@ class SEmissions(object):
             print(loc)
             fig = plt.figure(self.fignum)
             ax = fig.add_subplot(1,1,1)
-            data = data1[loc] * 0.453592
+            data = data1[loc] * self.lbs2kg
             ax.plot(data, '--b.')   
             plt.ylabel('SO2 mass kg')
             plt.title(str(loc) + ' ' + namehash[loc])

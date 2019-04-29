@@ -1,6 +1,5 @@
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 import datetime
-
 import numpy as np
 
 
@@ -305,15 +304,6 @@ class EmitCycle(object):
         """
         check = True
         recordra = []
-        # header = fid.readline()
-        # if verbose: print('HEADER', header, str(self.nrecs))
-        #  if not header:
-        #   check=False
-        #  else:
-        #     try:
-        #        nrecs =  self.parse_header(header)
-        #     except:
-        #        return False
         for temp in lines:
             if verbose:
                 print("Line", temp)
@@ -398,12 +388,12 @@ class EmitLine(object):
         output in correct format for EMITTIMES file.
         """
         returnstr = self.date.strftime("%Y %m %d %H %M ")
-        returnstr += self.duration + " "
-        returnstr += "{:1.4f}".format(self.lat) + " "
-        returnstr += "{:1.4f}".format(self.lon) + " "
-        returnstr += str(self.height) + " "
-        returnstr += "{:1.2e}".format(self.rate) + " "
-        returnstr += "{:1.2e}".format(self.area) + " "
+        returnstr += self.duration + ' '
+        returnstr += '{:1.4f}'.format(self.lat) + ' '
+        returnstr += '{:1.4f}'.format(self.lon) + ' '
+        returnstr += str(self.height) + ' '
+        returnstr += '{:1.2e}'.format(self.rate) + ' '
+        returnstr += '{:1.2e}'.format(self.area) + ' '
         try:
             returnstr += "{:1.2e}".format(self.heat) + " \n"
         except BaseException:

@@ -1,5 +1,6 @@
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 import datetime
+
 import numpy as np
 
 
@@ -306,13 +307,13 @@ class EmitCycle(object):
         recordra = []
         # header = fid.readline()
         # if verbose: print('HEADER', header, str(self.nrecs))
-        # if not header:
-        #  check=False
-        # else:
-        #    try:
-        #       nrecs =  self.parse_header(header)
-        #    except:
-        #       return False
+        #  if not header:
+        #   check=False
+        #  else:
+        #     try:
+        #        nrecs =  self.parse_header(header)
+        #     except:
+        #        return False
         for temp in lines:
             if verbose:
                 print("Line", temp)

@@ -117,6 +117,8 @@ class MONETAccessor(object):
                     x1 = self.obj.x.where(self.obj.x >= x_ll, drop=True).values
                     x2 = self.obj.x.where(self.obj.x <= x_ur, drop=True).values
                     xrange = concatenate([x1, x2]).astype(int)
+                    self.obj['longitude'][:] = utils.wrap_longitudes(
+                        self.obj.longitude.values)
                     # xrange = arange(float(x_ur), float(x_ll), dtype=int)
                 else:
                     xrange = slice(x_ll, x_ur)
@@ -126,7 +128,7 @@ class MONETAccessor(object):
                     yrange = concatenate([y1, y2]).astype(int)
                 else:
                     yrange = slice(y_ll, y_ur)
-                return self.obj.sel(x=xrange, y=yrange)
+                return self.obj.isel(x=xrange, y=yrange)
             else:
                 raise ImportError
         except ImportError:
@@ -286,15 +288,20 @@ class MONETAccessor(object):
 
         """
         from .plots.mapgen import draw_map
+        from .plots import _dynamic_fig_size
         from matplotlib.pyplot import tight_layout
         import cartopy.crs as ccrs
         import seaborn as sns
+        sns.set_context('notebook', font_scale=1.2)
         # sns.set_context('talk', font_scale=.9)
         if 'crs' not in map_kwarg:
             map_kwarg['crs'] = ccrs.PlateCarree()
         if 'figsize' in kwargs:
             map_kwarg['figsize'] = kwargs['figsize']
             kwargs.pop('figsize', None)
+        else:
+            figsize = _dynamic_fig_size(self.obj)
+            map_kwarg['figsize'] = figsize
         ax = draw_map(**map_kwarg)
         self.obj.plot(
             x='longitude',
@@ -304,7 +311,7 @@ class MONETAccessor(object):
             infer_intervals=True,
             **kwargs)
         ax.outline_patch.set_alpha(0)
-        tight_layout()
+        tight_layout(pad=0)
         return ax
 
     def _check_swath_def(self, defin):
@@ -513,13 +520,15 @@ class MONETAccessorDataset(object):
         dataarray = dset[loop_vars[0]]
         da = self._remap_xesmf_dataarray(
             dataarray, self.obj, filename=filename, **kwargs)
-        if da.name in self.obj.variables:
-            da.name = da.name + '_y'
         self.obj[da.name] = da
+        das = {}
+        das[da.name] = da
         for i in loop_vars[1:]:
             dataarray = dset[i]
-            self._remap_xesmf_dataarray(
+            tmp = self._remap_xesmf_dataarray(
                 dataarray, filename=filename, reuse_weights=True, **kwargs)
+            das[tmp.name] = tmp.copy()
+        return xr.Dataset(das)
 
     def _remap_xesmf_dataarray(self,
                                dataarray,
@@ -543,7 +552,6 @@ class MONETAccessorDataset(object):
         target = self.obj
         out = resample.resample_xesmf(
             dataarray, target, method=method, filename=filename, **kwargs)
-        print(out)
         if out.name in self.obj.variables:
             out.name = out.name + '_y'
         self.obj[out.name] = out
@@ -812,6 +820,8 @@ class MONETAccessorDataset(object):
                     x1 = self.obj.x.where(self.obj.x >= x_ll, drop=True).values
                     x2 = self.obj.x.where(self.obj.x <= x_ur, drop=True).values
                     xrange = concatenate([x1, x2]).astype(int)
+                    self.obj['longitude'][:] = utils.wrap_longitudes(
+                        self.obj.longitude.values)
                     # xrange = arange(float(x_ur), float(x_ll), dtype=int)
                 else:
                     xrange = slice(x_ll, x_ur)
@@ -845,15 +855,7 @@ class MONETAccessorDataset(object):
             Description of returned object.
 
         """
-        print('dataframe')
-        print(df)
-        from .util.combinetool import combine_da_to_df_xesmf
-        try:
-            if ~isinstance(df, pd.core.frame.DataFrame):
-                raise TypeError
-        except TypeError:
-            print('df must be of type pd.DataFrame')
-        for i in mapping_table:
-            df = combine_da_to_df_xesmf(
-                self.obj[mapping_table[i]], df, col=i, **kwargs)
+        # from .util.combinetool import combine_da_to_df_xesmf
+        for key, val in mapping_table.items():
+            df = self.obj[key].monet.combine_point(df, col=val, **kwargs)
         return df

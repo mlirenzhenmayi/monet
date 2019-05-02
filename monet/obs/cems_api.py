@@ -1,11 +1,12 @@
 from __future__ import print_function
 import os
 import datetime
+import sys
 import pandas as pd
 import numpy as np
 import requests
-import json
-import sys
+
+# import json
 import seaborn as sns
 import monet.obs.obs_util as obs_util
 
@@ -15,18 +16,20 @@ PGRMMER: Alice Crawford   ORG: ARL
 This code written at the NOAA air resources laboratory
 Python 3
 #################################################################
+The key and url for the epa api should be stored in a file called
+.epaapirc in the $HOME directory.
+The contents should be
+
+key: apikey
+url: https://api.epa.gov/FACT/1.0/
+
 
 Classes:
 ----------
-
-CEMS
-
-helper classes for CEMS
-
 Emissions
 FacilitiesData
 MonitoringPlan
-
+CEMS
 
 Functions:
 ----------
@@ -34,13 +37,35 @@ Functions:
 addquarter
 get_datelist
 findquarter
-
 sendrequest
+getkey
 
 """
 
 
-def sendrequest(rqq, key):
+def getkey():
+    """
+    key and url should be stored in $HOME/.epaapirc
+    """
+    dhash = {}
+    homedir = os.environ["HOME"]
+    fname = "/.epaapirc"
+    if os.path.isfile(homedir + fname):
+        with open(homedir + fname) as fid:
+            temp = fid.readline()
+            temp = temp.split(" ")
+            dhash[temp[0].strip().replace(":", "")] = temp[1].strip()
+            temp = fid.readline()
+            temp = temp.split(" ")
+            dhash[temp[0].strip().replace(":", "")] = temp[1].strip()
+        return dhash
+    else:
+        dhash["key"] = None
+        dhash["url"] = None
+        return dhash
+
+
+def sendrequest(rqq, key=None, url=None):
     """
     Method for sending requests to the EPA API
     Inputs :
@@ -51,12 +76,59 @@ def sendrequest(rqq, key):
     --------
     data : response object
     """
-    apiurl = "https://api.epa.gov/FACT/1.0/"
-    rqq = apiurl + rqq + "?api_key=" + key
-    print("Request: ", rqq)
-    data = requests.get(rqq)
-    print("Status Code", data.status_code)
-    return data
+    if not key or not url:
+        keyhash = getkey()
+        apiurl = keyhash["url"]
+        key = keyhash["key"]
+    if key:
+        # apiurl = "https://api.epa.gov/FACT/1.0/"
+        rqq = apiurl + rqq + "?api_key=" + key
+        print("Request: ", rqq)
+        data = requests.get(rqq)
+        print("Status Code", data.status_code)
+        return data
+
+def get_lookuphash(df, key, value):
+    """
+    returns dictionary. key is oris code. value is name
+    """
+    if key not in df.columns:
+        return None
+    if value not in df.columns:
+        return None
+    dseries = df.set_index(key)
+    dseries = dseries[value]
+    return dseries.to_dict()
+
+
+def get_lookups():
+    """
+        Request to get lookups - descriptions of various codes.
+        """
+    getstr = "emissions/lookUps"
+    # rqq = self.apiurl + "emissions/" + getstr
+    # rqq += "?api_key=" + self.key
+    data = sendrequest(getstr)
+    dstr = unpack_response(data)
+    return dstr
+
+    # According to lookups MODC values
+    # 01 primary monitoring system
+    # 02 backup monitoring system
+    # 03 alternative monitoring system
+    # 04 backup monitoring system
+
+    # 06 average hour before/hour after
+    # 07 average hourly
+
+    # 21 negative value replaced with 0.
+    # 08 90th percentile value in Lookback Period
+    # 09 95th precentile value in Lookback Period
+    # etc.
+
+    # it looks like values between 1-4 ok
+    # 6-7 probably ok
+    # higher values should be flagged.
 
 
 def addquarter(rdate):
@@ -122,79 +194,82 @@ def findquarter(idate):
     return qtr
 
 
-def columns_rename(columns, verbose=False):
-    """
-    Maps columns with one name to a standard name
-    Parameters:
-    ----------
-    columns: list of strings
-
-    Returns:
-    --------
-    rcolumn: list of strings
-    """
-    rcolumn = []
-    for ccc in columns:
-        if "facility" in ccc.lower() and "name" in ccc.lower():
-            rcolumn.append("facility_name")
-        elif "oris" in ccc.lower():
-            rcolumn.append("oris")
-        elif "facility" in ccc.lower() and "id" in ccc.lower():
-            rcolumn.append("fac_id")
-        elif (
-            "so2" in ccc.lower()
-            and ("lbs" in ccc.lower() or "pounds" in ccc.lower())
-            and ("rate" not in ccc.lower())
-        ):
-            rcolumn.append("so2_lbs")
-        elif (
-            "nox" in ccc.lower()
-            and ("lbs" in ccc.lower() or "pounds" in ccc.lower())
-            and ("rate" not in ccc.lower())
-        ):
-            rcolumn.append("nox_lbs")
-        elif "co2" in ccc.lower() and (
-            "short" in ccc.lower() and "tons" in ccc.lower()
-        ):
-            rcolumn.append("co2_short_tons")
-        elif "date" in ccc.lower():
-            rcolumn.append("date")
-        elif "hour" in ccc.lower():
-            rcolumn.append("hour")
-        elif "lat" in ccc.lower():
-            rcolumn.append("latitude")
-        elif "lon" in ccc.lower():
-            rcolumn.append("longitude")
+def keepcols(df, keeplist):
+    tcols = df.columns.values
+    tdrop = np.setdiff1d(tcols, keeplist)
+    droplist = []
+    for ttt in tdrop.tolist():
+        if ttt not in tcols:
+            print("NOT IN", ttt)
         else:
-            rcolumn.append(ccc.strip().lower())
-    return rcolumn
+            droplist.append(ttt)
+    tempdf = df.drop(droplist, axis=1)
+    return tempdf
+
+
+def get_so2(df):
+    """
+    drop columns that are not in keep.
+    """
+    keep = [
+        "DateHour",
+        "time",
+        "OperatingTime",
+        "HourLoad",
+        "u so2_lbs",
+        "so2_lbs",
+        "AdjustedFlow",
+        "UnadjustedFlow",
+        "FlowMODC",
+        "SO2MODC",
+        "unit",
+        "stackht",
+        "oris",
+        "latitude",
+        "longitude",
+    ]
+    return keepcols(df, keep)
 
 
 class Emissions:
+    """
+    class that represents data returned by emissions/hourlydata call to the restapi.
+    Attributes
+    self.df : DataFrame
+
+    Methods
+    __init__
+    add
+
+    class that represents data returned by facilities call to the restapi.
     # NOTES
     # BAF - bias adjustment factor
     # MEC - maximum expected concentraiton
     # MPF - maximum potential stack gas flow rate
     # monitoring plan specified monitor range.
 
-    def __init__(self, key):
+
+    """
+
+    def __init__(self):
         self.df = pd.DataFrame()
-        self.key = key
         self.orislist = []
         self.unithash = {}
         self.so2name = "SO2CEMReportedAdjustedSO2"
         self.so2nameB = "UnadjustedSO2"
 
     def add(
-        self,
-        oris,
-        locationID,
-        year,
-        quarter,
-        ifile="efile.txt",
-        verbose=False,
-        stackht=None,
-        logfile="warnings.emit.txt",
+            self,
+            oris,
+            locationID,
+            year,
+            quarter,
+            ifile="efile.txt",
+            verbose=False,
+            # data2add=None,
+            # stackht=None,
+            # facname=None,
+            logfile="warnings.emit.txt",
     ):
         """
         oris : int
@@ -202,14 +277,19 @@ class Emissions:
         year : int
         quarter : int
         ifile : str
+        data2add : list of tuples (str, value)
+                   str is name of column. value to add to column.
 
         """
+
         if oris not in self.orislist:
             self.orislist.append(oris)
         if oris not in self.unithash.keys():
             self.unithash[oris] = []
         self.unithash[oris].append(locationID)
-
+        with open(logfile, "w") as fid:
+            dnow = datetime.datetime.now()
+            fid.write(dnow.strftime("%Y %m %d %H:%M/n"))
         # if locationID == None:
         #   unitra = self.get_units(oris)
         # else:
@@ -229,84 +309,93 @@ class Emissions:
         efile = "efile.txt"
         estr = "emissions/hourlyData/csv"
         oris = str(oris)
-        getstr = "/".join([estr, str(oris), locationID, str(year), str(quarter)])
-        data = sendrequest(getstr, self.key)
+        getstr = "/".join([estr, str(oris), locationID,
+                           str(year), str(quarter)])
+
+        # returns csv file rather than json object.
+        data = sendrequest(getstr)
+
         if data.status_code != 200:
             return data.status_code
+
         iii = 0
         cols = []
         for line in data.iter_lines(decode_unicode=True):
+
+            # 1. Process First line
             if iii == 0:
                 tcols = line.split(",")
-                tcols.append("unit id")
-                tcols.append("stackht")
+                # add columns for unit id and oris code
+                tcols.append("unit")
                 tcols.append("oris")
+                # add columns for other info (stack height, latitude etc).
+                # for edata in data2add:
+                #    tcols.append(edata[0])
+                # 1a write column headers to a file.
                 if verbose:
                     with open("headers.txt", "w") as fid:
                         for val in tcols:
                             fid.write(val + "\n")
                     # print('press a key to continue ')
                     # input()
+                # 1b check to see if desired emission variable is in the file.
                 if self.so2name not in tcols:
                     with open(logfile, "a") as fid:
                         rstr = "ORIS " + str(oris)
-                        rstr += "mid " + str(locationID) + "\n"
+                        rstr += " mid " + str(locationID) + "\n"
                         rstr += "NO adjusted SO2 data \n"
                         if self.so2nameB not in tcols:
                             rstr += "NO SO2 data \n"
                         rstr += "------------------------\n"
                         fid.write(rstr)
                     print("--------------------------------------")
-                    print("UNIT" + str(locationID) + " no SO2 data")
+                    print("ORIS " + str(oris))
+                    print("UNIT " + str(locationID) + " no SO2 data")
                     print("--------------------------------------")
                     return -999
                 else:
                     cols = tcols
+            # 2. Process rest of lines
             else:
                 lt = line.split(",")
+                # add input info to line.
                 lt.append(locationID)
-                lt.append(float(stackht))
                 lt.append(int(oris))
+                # for edata in data2add:
+                #    lt.append(edata[1])
                 tra.append(lt)
             iii += 1
-            with open(efile, "a") as fid:
-                fid.write(line)
+            # with open(efile, "a") as fid:
+            #    fid.write(line)
         # ----------------------------------------------------
         df = pd.DataFrame(tra, columns=cols)
         # print(df[0:10])
         df.apply(pd.to_numeric, errors="ignore")
         df = self.manage_date(df)
         df = self.convert_cols(df)
+        tempdf = get_so2(df)
         if self.df.empty:
             self.df = df
         else:
             self.df = self.df.append(df)
+        tempdf.to_csv(efile)
         return data.status_code
 
-    def get_so2(self):
-        keep = [
-            "DateHour",
-            "OperatingTime",
-            "HourLoad",
-            "u so2_lbs",
-            "so2_lbs",
-            "AdjustedFlow",
-            "UnadjustedFlow",
-            "FlowMODC",
-            "SO2MODC",
-            "unit id",
-            "stackht",
-            "oris",
-        ]
-        tcols = self.df.columns.values
-        tdrop = np.setdiff1(tcols, keep)
-        tempdf = self.df.drop(tdrop, axis=1)
-        columns = columns_rename(tempdf.columns.values)
-        tempdf.columns = columns
-        return tempdf
+    def merg_facilities(self, dfac):
+        dfnew = pd.merge(
+            self.df,
+            dfac,
+            how="left",
+            left_on=["oris", "unit"],
+            right_on=["oris", "unit"],
+        )
+        return dfnew
 
     def convert_cols(self, df):
         """
+        All columns are read in as strings and must be converted to the
+        appropriate units. NaNs or empty values may be present in the columns.
+
         OperatingTime : fraction of the clock hour during which the unit
                         combusted any fuel. If unit, stack or pipe did not
                         operate report 0.00.
@@ -331,14 +420,21 @@ class Emissions:
 
         # map OperatingTime to a float
         df["OperatingTime"] = df["OperatingTime"].map(simpletofloat)
+        # map Adjusted Flow to a float
         df["AdjustedFlow"] = df["AdjustedFlow"].map(simpletofloat)
         # map SO2 data to a float
         # if operating time is zero then map to 0 (it is '' in file)
         optime = "OperatingTime"
         cname = "UnadjustedSO2"
-        df["u so2_lbs"] = df.apply(lambda row: tofloat(row[optime], row[cname]), axis=1)
+        df["u so2_lbs"] = df.apply(
+            lambda row: tofloat(
+                row[optime], row[cname]), axis=1)
         cname = "SO2CEMReportedAdjustedSO2"
-        df["so2_lbs"] = df.apply(lambda row: tofloat(row[optime], row[cname]), axis=1)
+        df["so2_lbs"] = df.apply(
+            lambda row: tofloat(
+                row[optime],
+                row[cname]),
+                axis=1)
 
         # temp is values that are not valid
         temp = df[df["u so2_lbs"].isin([-999])]
@@ -348,7 +444,8 @@ class Emissions:
         print("MODC ", temp["SO2MODC"].unique())
         ky = "MATSSstartupshutdownflat"
         if ky in temp.keys():
-            print("MATSSstartupshutdownflat", temp["MATSStartupShutdownFlag"].unique())
+            print("MATSSstartupshutdownflat",
+                  temp["MATSStartupShutdownFlag"].unique())
         # print(temp['date'].unique())
 
         ky = "Operating Time"
@@ -363,6 +460,8 @@ class Emissions:
     def manage_date(self, df):
         """DateHour field is originally in string form 4/1/2016 02:00:00 PM
            Here, change to a datetime object.
+
+           # also need to change to UTC.
         """
         # Using the %I for the hour field and %p for AM/Pm converts time
         # correctly.
@@ -371,11 +470,11 @@ class Emissions:
             try:
                 rdt = datetime.datetime.strptime(xxx["DateHour"], fmt)
             except BaseException:
-                print("PROBLEM DATE", xxx["DateHour"])
+                print("PROBLEM DATE :", xxx["DateHour"], ":")
                 rdt = datetime.datetime(1700, 1, 1, 0)
             return rdt
 
-        df["date"] = df.apply(newdate, axis=1)
+        df["time"] = df.apply(newdate, axis=1)
         return df
 
     def plot(self):
@@ -389,15 +488,16 @@ class Emissions:
         # plt.plot(df['date'][0:100], df['USO2'][0:100], '-b.')
         temp1 = df[df["date"].dt.year != 1700]
         sns.set()
-        for unit in df["unit id"].unique():
-            temp = temp1[temp1["unit id"] == unit]
+        for unit in df["unit"].unique():
+            temp = temp1[temp1["unit"] == unit]
             temp = temp[temp["SO2MODC"].isin(["01", "02", "03", "04"])]
             plt.plot(temp["date"], temp["so2_lbs"], label=str(unit))
             print("UNIT", str(unit))
             print(temp["SO2MODC"].unique())
-        for unit in df["unit id"].unique():
-            temp = temp1[temp1["unit id"] == unit]
-            temp = temp[temp["SO2MODC"].isin(["01", "02", "03", "04"]) == False]
+        for unit in df["unit"].unique():
+            temp = temp1[temp1["unit"] == unit]
+            temp = temp[temp["SO2MODC"].isin(
+                ["01", "02", "03", "04"]) == False]
             plt.plot(temp["date"], temp["so2_lbs"], label="bad " + str(unit))
             print("UNIT", str(unit))
             print(temp["SO2MODC"].unique())
@@ -405,8 +505,8 @@ class Emissions:
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles, labels)
         plt.show()
-        for unit in df["unit id"].unique():
-            temp = temp1[temp1["unit id"] == unit]
+        for unit in df["unit"].unique():
+            temp = temp1[temp1["unit"] == unit]
             print("BAF", temp["FlowBAF"].unique())
             print("MODC", temp["FlowMODC"].unique())
             print("PMA", temp["FlowPMA"].unique())
@@ -415,15 +515,19 @@ class Emissions:
 
 
 class MonitoringPlan:
-    def __init__(self, oris, mid, key):
+    def __init__(self, oris, mid):
         self.df = pd.DataFrame()
         self.oris = oris  # oris code of facility
         self.mid = mid  # monitoring location id.
-        self.key = key
         self.stackht = None
 
-    def printall(self):
-        data = self.get(oris, mid, date)
+    def printall(self, date):
+        oris = self.oris
+        mid = self.mid
+        dstr = date.strftime("%Y-%m-%d")
+        mstr = "monitoringplan"
+        getstr = "/".join([mstr, str(oris), str(mid), dstr])
+        data = sendrequest(getstr)
         jobject = data.json()
         rstr = unpack_response(jobject)
         return rstr
@@ -450,39 +554,61 @@ class MonitoringPlan:
         dstr = date.strftime("%Y-%m-%d")
         mstr = "monitoringplan"
         getstr = "/".join([mstr, str(oris), str(mid), dstr])
-        data = sendrequest(getstr, self.key)
+        data = sendrequest(getstr)
         if data.status_code != 200:
             return None
         jobject = data.json()
-        dhash = self.unpack(jobject["data"])
-        return dhash
+        dlist = self.unpack(jobject["data"])
+        return dlist
 
-    def unpack(self, dhash):
+    # @staticmethod
+    def unpack(self, ihash):
         """
         dhash :
         Returns:
 
-        df : pandas dataframe
-        Information for one oris code.
+        Information for one oris code and monitoring location.
         columns
         stackname, unit, stackheight, crossAreaExit,
         crossAreaFlow, locID, isunit
         """
         dlist = []
-        print(dhash.keys())
-        stackname = dhash["unitStackName"]
-        for unit in dhash["monitoringLocations"]:
-            for att in unit["locationAttributes"]:
-                dhash = {}
+        # print(ihash.keys())
+        stackname = ihash["unitStackName"]
+        for unithash in ihash["monitoringLocations"]:
+            dhash = {}
+            dhash["unit"] = self.mid
+            dhash["name"] = unithash["name"]
+            dhash["isunit"] = unithash["isUnit"]
+            for att in unithash["locationAttributes"]:
+                # dhash = {}
                 dhash["stackname"] = stackname
-                dhash["unit"] = unit
+                # dhash["unit"] = self.mid
                 dhash["stackht"] = att["stackHeight"]  # int
                 dhash["crossAreaExit"] = att["crossAreaExit"]  # int
                 dhash["crossAreaFlow"] = att["crossAreaFlow"]  # int
                 dhash["locID"] = att["locId"]
-                dhash["isunit"] = att["isUnit"]
-                dlist.append(dhash)
-        # self.df = pd.DataFrame(dlist)
+                # dhash["isunit"] = att["isUnit"]
+                # dlist.append(dhash)
+            for method in unithash["monitoringMethods"]:
+                if method["parameterCode"] == "SO2":
+                    dhash["parameterCode"] = "SO2"
+                    dhash["methodCode"] = method["methodCode"]
+                    dhash["subDataCode"] = method["subDataCode"]
+                    dhash["parameterCodeDesc"] = method["parameterCodeDesc"]
+            for method in unithash["emissionsFormulas"]:
+                if method["parameterCode"] == "SO2":
+                    elist = [
+                        "formulaId",
+                        "parameterCode",
+                        "equationCode",
+                        "formulaEquation",
+                        "equationCodeDesc",
+                    ]
+                    for val in elist:
+                        dhash[val] = method[val]
+
+            dlist.append(dhash)
         return dlist
 
         # Then have list of dicts
@@ -522,7 +648,7 @@ class MonitoringPlan:
 # monitoringSystems
 # some systems may be more accurate than others.
 # natural gas plants emissions may have less uncertainty.
-
+# this is complicated because entires for multiple types of equipment.
 
 # monitoringQualifications
 
@@ -540,16 +666,40 @@ class MonitoringPlan:
 
 
 class FacilitiesData:
-    def __init__(self, key):
+    """
+    class that represents data returned by facilities call to the restapi.
+
+    Attributes:
+        self.df  : dataframe
+         columns are
+         begin time,
+         end time,
+         isunit (boolean),
+         latitude,
+         longitude,
+         facility_name,
+         oris,
+         unit
+
+    Methods:
+        __init__
+        printall : returns a string with the unpacked data.
+        get : sends request to the restapi and calls unpack.
+        oris_by_area : returns list of oris codes in an area
+        get_units : returns a list of units for an oris code
+        unpack : creates the dataframe
+
+    """
+
+    def __init__(self):
         self.df = pd.DataFrame()
-        self.key = key
         self.get()
         # self.oris = oris   #oris code of facility
         # self.mid = mid     #monitoring location id.
 
     def printall(self):
         getstr = "facilities"
-        data = sendrequest(getstr, self.key)
+        data = sendrequest(getstr)
         jobject = data.json()
         rstr = unpack_response(jobject)
         return rstr
@@ -559,7 +709,7 @@ class FacilitiesData:
         Request to get facilities information
         """
         getstr = "facilities"
-        data = sendrequest(getstr, self.key)
+        data = sendrequest(getstr)
         jobject = data.json()
         self.df = self.unpack(jobject)
         # return(data)
@@ -577,13 +727,15 @@ class FacilitiesData:
         """
         oris : int
         Returns list of monitoring location ids
+        for a particular oris code.
         """
         oris = int(oris)
-        if self.df.empty:
-            self.facdata()
+        # if self.df.empty:
+        #    self.facdata()
         temp = self.df[self.df["oris"] == oris]
         units = temp["unit"].unique()
         return units
+
 
     def unpack(self, dhash):
         """
@@ -593,7 +745,10 @@ class FacilitiesData:
         # Each dictionary has a list under the key monitoringLocations.
         # each monitoryLocation has a name which is what is needed
         # for the locationID input into the get_emissions.
+
+
         """
+        # dlist is a list of dictionaries.
         dlist = []
 
         # originally just used one dictionary but if doing
@@ -608,7 +763,7 @@ class FacilitiesData:
         for val in dhash["data"]:
             ahash = {}
             ahash["oris"] = int(val["orisCode"])
-            ahash["name"] = val["name"]
+            ahash["facility_name"] = val["name"]
             ahash["latitude"] = val["geographicLocation"]["latitude"]
             ahash["longitude"] = val["geographicLocation"]["longitude"]
             for sid in val["monitoringPlans"]:
@@ -670,73 +825,6 @@ def unpack_response(dhash, deep=100, pid=0):
     return rstr
 
 
-def get_stack_dict(df, orispl=None):
-    """
-    Parameters
-    ----------
-    df dataframe created with stack_height() call
-    orispl : list
-           list of orispl codes to consider
-    Returns
-    -------
-    stackhash: dictionary
-    key orispl code and value list of tuples with
-    (stackid, stackht (in feet))
-    """
-    stackhash = {}
-    df = df[df["oris"].isin(orispl)]
-    # df = df[['oris', 'boilerid', 'stackht','stackdiam']]
-
-    def newc(x):
-        return (
-            x["boilerid"],
-            x["stackht"],
-            x["stackdiam"],
-            x["stacktemp"],
-            x["stackvel"],
-        )
-
-    for oris in df["oris"].unique():
-        dftemp = df[df["oris"] == oris]
-        dftemp["tuple"] = dftemp.apply(newc, axis=1)
-        value = dftemp["tuple"].unique()
-        stackhash[oris] = value
-    return stackhash
-
-
-def max_stackht(df, meters=True, verbose=False):
-    """
-       adds 'max_stackht' column to dataframe returned by stack_height function.
-       this column indicates the largest stack height associated with that
-       orispl code.
-    """
-    df2 = pd.DataFrame()
-    iii = 0
-    mult = 1
-    if meters:
-        mult = 0.3048
-    for orispl in df["oris"].unique():
-        dftemp = df[df["oris"] == orispl]
-        slist = mult * np.array(dftemp["stackht"].unique())
-
-        maxval = np.max(slist)
-        dftemp["max_stackht"] = maxval
-        dftemp.drop(["stackht", "stackdiam"], inplace=True, axis=1)
-        dftemp.drop_duplicates(inplace=True)
-        # dftemp['list_stackht'] = 0
-        # dftemp.at[orispl, 'list_stackht'] =  list(slist)
-
-        if iii == 0:
-            df2 = dftemp.copy()
-        else:
-            df2 = pd.concat([df2, dftemp], axis=0)
-        iii += 1
-        if verbose:
-            print("ORISPL", orispl, maxval, slist)
-        # print(dftemp['list_stackht'].unique())
-    return df2
-
-
 class CEMS(object):
     """
     Class for data from continuous emission monitoring systems (CEMS).
@@ -767,203 +855,231 @@ class CEMS(object):
     rename(self, ccc, newname, rcolumn, verbose):
     """
 
-    def __init__(self, key=None):
+    def __init__(self):
         self.efile = None
-        self.url = "ftp://newftp.epa.gov/DmDnLoad/emissions/"
-        self.apiurl = "https://api.epa.gov/FACT/1.0/"
         self.lb2kg = 0.453592  # number of kilograms per pound.
         self.info = "Data from continuous emission monitoring systems (CEMS)\n"
-        self.info += self.url + "\n"
-
         self.df = pd.DataFrame()
-
         self.so2name = "SO2CEMReportedAdjustedSO2"
-        self.namehash = {}  # if columns are renamed keeps track of original names.
         # Each facility may have more than one unit which is specified by the
         # unit id.
-        self.key = key  # key to use for epa rest api request
+        self.emit = Emissions()
+        self.orislist = []
 
-        self.emit = Emissions(key)
-
-    def __str__(self):
-        return self.info
-
-    def get_lookups(self):
+    def add_data(self, rdate, area, verbose=True):
         """
-        Request to get lookups - descriptions of various codes.
+        INPUTS:
+        rdate :  either datetime object or tuple of two datetime objects.
+        area  : list of 4 floats. (lat, lon, lat, lon)
+        verbose : boolean
+
+        RETURNS:
+        emitdf : pandas DataFrame with SO2 emission information.
+
+        # 1. get list of oris codes within the area of interest
+        # 2. get list of monitoring location ids for each oris code
+        # 3. each unit has a monitoring plan.
+        # 4. get stack heights for each monitoring location from
+        #    class MonitoringPlan
+        # 5. Call to the Emissions class to add each monitoring location
+        #    to the dataframe.
+
+
+        TODO - MonitoringPlan contains quarterly summaries of mass and operating
+               time. May be able to use those
+
+        TODO - to generalize to emissions besides SO2. Modify get_so2 routine.
+
+        TODO - what is the flow rate?
+
+
         """
-        getstr = "lookUps"
-        rqq = self.apiurl + "emissions/" + getstr
-        rqq += "?api_key=" + self.key
-        data = requests.get(rqq)
-        dstr = self.unpack(data)
-        print(dstr)
-
-        # According to lookups MODC values
-        # 01 primary monitoring system
-        # 02 backup monitoring system
-        # 03 alternative monitoring system
-        # 04 backup monitoring system
-
-        # 06 average hour before/hour after
-        # 07 average hourly
-
-        # 21 negative value replaced with 0.
-        # 08 90th percentile value in Lookback Period
-        # 09 95th precentile value in Lookback Period
-        # etc.
-
-        # it looks like values between 1-4 ok
-        # 6-7 probably ok
-        # higher values should be flagged.
-
-    def load_emissions(self, ifile):
-        if os.path.isfile(ifile):
-            df = pd.read_csv(ifile)
-        self.df = df
-
-    def unpack(self, response, deep=100):
-        print("Status Code", response.status_code)
-        jobject = response.json()
-        dstr = unpack_response(jobject)
-        return dstr
-
-    def add_data(self, rdate, area, states=["md"], verbose=True, download=False):
         # 1. get list of oris codes within the area of interest
         # class FacilitiesData for this
-        fac = FacilitiesData(key=self.key)
+        fac = FacilitiesData()
         llcrnr = (area[0], area[1])
         urcrnr = (area[2], area[3])
         orislist = fac.oris_by_area(llcrnr, urcrnr)
         datelist = get_datelist(rdate)
-        print("ORIS to retrieve ", orislist)
-        print("DATES ", datelist)
+        if verbose:
+            print("ORIS to retrieve ", orislist)
+        if verbose:
+            print("DATES ", datelist)
         # 2. get list of monitoring location ids for each oris code
         # FacilitiesData also provides this.
+        facdf = fac.df[fac.df["oris"].isin(orislist)]
+        facdf = facdf.drop(["begin time", "end time"], axis=1)
+        dflist = []
         for oris in orislist:
             units = fac.get_units(oris)
-            print("Units to retrieve ", str(oris), units)
+            if verbose:
+                print("Units to retrieve ", str(oris), units)
+            # 3. each unit has a monitoring plan.
             for mid in units:
-                plan = MonitoringPlan(oris, mid, self.key)
+                plan = MonitoringPlan(oris, mid)
                 for ndate in datelist:
-                    # 3. get stack heights for each monitoring location from
-                    #    class MonitoringPlan
+                    # 4. get stack heights for each monitoring location from
+                    #    class
+
+                    # also need to change to UTC. MonitoringPlan
                     mhash = plan.get(ndate)
+                    if len(mhash) > 1:
+                        print(
+                            "CEMS class WARNING: more than one \
+                              Monitoring location for this unit\n"
+                        )
+                        for val in mhash:
+                            print("unit " + val["name"] + " oris " + str(oris))
+                        sys.exit()
+                    else:
+                        mhash = mhash[0]
                     if not mhash:
                         stackht = None
                     else:
-                        stackht = mhash[0]["stackht"]
-                    # 4. Call to the Emissions class to add each monitoring location
+                        stackht = float(mhash["stackht"])
+                    dflist.append((oris, mid, stackht))
+                    # 5. Call to the Emissions class to add each monitoring location
                     #    to the dataframe.
                     quarter = findquarter(ndate)
                     status = self.emit.add(
-                        oris, mid, ndate.year, quarter, stackht=stackht, verbose=False
+                        oris,
+                        mid,
+                        ndate.year,
+                        quarter,
+                        # facname=facname,
+                        # stackht=stackht,
+                        verbose=False,
                     )
-                    rstr = ""
-                    ustr = ""
-                    if status != 200:
-                        if status == -99:
-                            rstr = "NO SO2 \n"
-                        else:
-                            rstr = "Failed \n"
-                        rstr += datetime.datetime.now().strftime("%Y %d %m %H:%M")
-                        rstr += " Oris " + str(oris)
-                        rstr += " Mid " + str(mid)
-                        rstr += " Qrtr " + str(quarter)
-                        rstr += "\n"
-                    else:
-                        ustr = "Loaded \n"
-                        ustr += datetime.datetime.now().strftime("%Y %d %m %H:%M")
-                        ustr += " Oris " + str(oris)
-                        ustr += " Mid " + str(mid)
-                        ustr += " Qrtr " + str(quarter)
-                        ustr += "\n"
-                    with open("log.txt", "a") as fid:
-                        fid.write(rstr)
-                        fid.write(ustr)
-
-    def get_so2(self):
-        self.df = emit.get_so2()
-        return self.df
-
-    def match_column(self, varname):
-        """varname is list of strings.
-           returns column name which contains all the strings.
-        """
-        columns = list(self.df.columns.values)
-        cmatch = None
-        for ccc in columns:
-            # print('-----'  + ccc + '------')
-            # print( temp[ccc].unique())
-            match = 0
-            for vstr in varname:
-                if vstr.lower() in ccc.lower():
-                    match += 1
-            if match == len(varname):
-                cmatch = ccc
-        return cmatch
-
-    def cemspivot(
-        self, varname, daterange=None, unitid=False, stackht=False, verbose=True
-    ):
-        """
-        Parameters
-        ----------
-        varname: string
-            name of column in the cems dataframe
-        daterange: list of two datetime objects
-            define a date range
-        unitid: boolean.
-                 If True and unit id columns exist then these will be kept as
-                 separate columns in the pivot table.
-        verbose: boolean
-                 if true print out extra information.
-        stackht: boolean
-                 NOT IMPLEMENTED YET. if true stack height is in header column.
-        Returns: pandas DataFrame object
-            returns dataframe with rows time. Columns are (oris,
-            unit_id).
-            If no unit_id in the file then columns are just oris.
-            if unitid flag set to False then sums over unit_id's that belong to
-             an oris. Values are from the column specified by the
-             varname input.
-        """
-        from .obs_util import timefilter
-
-        # stackht = False  # option not tested.
-        temp = self.df.copy()
-        if daterange:
-            temp = timefilter(temp, daterange)
-        # if stackht:
-        #    stack_df = read_stack_height(verbose=verbose)
-        #    olist = temp['oris'].unique()
-        #    stack_df = stack_df[stack_df['oris'].isin(olist)]
-        #    stack_df = max_stackht(stack_df)
-        #    temp = temp.merge(stack_df, left_on=['oris'],
-        #                      right_on=['oris'], how='left')
-        if "unitid" in temp.columns.values and unitid:
-            # if temp['unit_id'].unique():
-            #    if verbose:
-            #        print('UNIT IDs ', temp['unit_id'].unique())
-            cols = ["oris", "unitid", "stackht"]
-            # if stackht:
-            #    cols.append('stackht')
-        else:
-            cols = ["oris", "stackht"]
-            # if stackht:
-            #    cols.append('max_stackht')
-
-        # create pandas frame with index datetime and columns for value for
-        # each unit_id,orispl
-        pivot = pd.pivot_table(
-            temp, values=varname, index=["time"], columns=cols, aggfunc=np.sum
+                    if status == 200:
+                        self.orislist.append((oris, mid))
+                    write_status_message(status, oris, mid, quarter, "log.txt")
+        # merge stack height data into the facilities information data frame.
+        tempdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])
+        facdf = pd.merge(
+            tempdf,
+            facdf,
+            how="left",
+            left_on=["oris", "unit"],
+            right_on=["oris", "unit"],
         )
-        # print('PIVOT ----------')
-        # print(pivot[0:20])
-        return pivot
+        # drop un-needed columns from the emissions DataFrame
+        emitdf = get_so2(self.emit.df)
+        # merge data from the facilties DataFrame into the Emissions DataFrame
+        emitdf = pd.merge(
+            emitdf,
+            facdf,
+            how="left",
+            left_on=["oris", "unit"],
+            right_on=["oris", "unit"],
+        )
+        self.df = emitdf
+        return emitdf
 
-    def get_var(self, varname, orisp=None, daterange=None, unitid=-99, verbose=True):
-        """
+
+def write_status_message(status, oris, mid, quarter, logfile):
+    rstr = ""
+    # ustr = ""
+    if status != 200:
+        if status == -99:
+            rstr = "NO SO2 \n"
+        else:
+            rstr = "Failed \n"
+        # rstr += datetime.datetime.now().strftime("%Y %d %m %H:%M")
+        # rstr += " Oris " + str(oris)
+        # rstr += " Mid " + str(mid)
+        # rstr += " Qrtr " + str(quarter)
+        # rstr += "\n"
+    else:
+        rstr = "Loaded \n"
+        rstr += datetime.datetime.now().strftime("%Y %d %m %H:%M")
+    rstr += " Oris " + str(oris)
+    rstr += " Mid " + str(mid)
+    rstr += " Qrtr " + str(quarter)
+    rstr += "\n"
+    with open(logfile, "a") as fid:
+        fid.write(rstr)
+        # fid.write(ustr)
+
+
+def match_column(df, varname):
+    """varname is list of strings.
+       returns column name which contains all the strings.
+    """
+    columns = list(df.columns.values)
+    cmatch = None
+    for ccc in columns:
+        # print('-----'  + ccc + '------')
+        # print( temp[ccc].unique())
+        match = 0
+        for vstr in varname:
+            if vstr.lower() in ccc.lower():
+                match += 1
+        if match == len(varname):
+            cmatch = ccc
+    return cmatch
+
+
+def latlon2str(lat, lon):
+    latstr = "{:.4}".format(lat)
+    lonstr = "{:.4}".format(lon)
+    return (latstr, lonstr)
+
+
+def cemspivot(df, varname, cols=['oris','stackht'], daterange=None,  verbose=True):
+    """
+    Parameters
+    ----------
+    varname: string
+        name of column in the cems dataframe
+    daterange: list of two datetime objects
+        define a date range
+    unitid: boolean.
+             If True and unit id columns exist then these will be kept as
+             separate columns in the pivot table.
+    verbose: boolean
+             if true print out extra information.
+    stackht: boolean
+             NOT IMPLEMENTED YET. if true stack height is in header column.
+    Returns: pandas DataFrame object
+        returns dataframe with rows time. Columns are (oris, stackht)
+        If no unit_id in the file then columns are just oris.
+        if unitid flag set to False then sums over unit_id's that belong to
+        an oris. Values are from the column specified by the
+        varname input.
+    """
+    from .obs_util import timefilter
+
+    temp = df.copy()
+    if daterange:
+        temp = timefilter(temp, daterange)
+    #if "unitid" in temp.columns.values and unitid:
+        # if temp['unit_id'].unique():
+        #    if verbose:
+        #        print('UNIT IDs ', temp['unit_id'].unique())
+    #    cols = ["oris", "unitid", "stackht"]
+        # if stackht:
+        #    cols.append('stackht')
+    #else:
+    #    cols = ["oris", "stackht", "latlon"]
+        # if stackht:
+        #    cols.append('max_stackht')
+    #temp["latlon"] = temp.apply(
+    #    lambda row: latlon2str(row["latitude"], row["longitude"]), axis=1
+    #)
+    # create pandas frame with index datetime and columns for value for
+    # each unit_id,orispl
+
+    #cols = ['oris','stackht']
+    pivot = pd.pivot_table(
+        temp, values=varname, index=["time"], columns=cols, aggfunc=np.sum
+    )
+    # print('PIVOT ----------')
+    # print(pivot[0:20])
+    return pivot
+
+
+def get_var(df, varname, orisp=None, daterange=None, unitid=-99, verbose=True):
+    """
            returns time series with variable indicated by varname.
            returns data frame where rows are date and columns are the
            values of cmatch for each fac_id.
@@ -990,161 +1106,11 @@ class CEMS(object):
         type
             Description of returned object.
         """
-        if unitid == -99:
-            ui = False
-        temp = self.cemspivot(varname, daterange, unitid=ui)
-        if not ui:
-            returnval = temp[orisp]
-        else:
-            returnval = temp[orisp, unitid]
-        return returnval
-
-    def retrieve(self, rdate, state, download=True, verbose=False):
-        """Short summary.
-
-        Parameters
-        ----------
-        rdate : datetime object
-             Uses year and month. Day and hour are not used.
-        state : string
-            state abbreviation to retrieve data for
-        download : boolean
-            set to True to download
-            if download FALSE then returns string with url of ftp
-            if download TRUE then returns name of downloaded file
-
-        Returns
-        -------
-        efile string
-            if download FALSE then returns string with url of ftp
-            if download TRUE then returns name of downloaded file
-        """
-        # import requests
-        # TO DO: requests does not support ftp sites.
-        efile = "empty"
-        ftpsite = self.url
-        ftpsite += "hourly/"
-        ftpsite += "monthly/"
-        ftpsite += rdate.strftime("%Y") + "/"
-        print(ftpsite)
-        print(rdate)
-        print(state)
-        fname = rdate.strftime("%Y") + state + rdate.strftime("%m") + ".zip"
-        if not download:
-            efile = ftpsite + fname
-        if not os.path.isfile(fname):
-            # print('retrieving ' + ftpsite + fname)
-            # r = requests.get(ftpsite + fname)
-            # open(efile, 'wb').write(r.content)
-            # print('retrieved ' + ftpsite + fname)
-            efile = ftpsite + fname
-            print("WARNING: Downloading file not supported at this time")
-            print("you may download manually using the following address")
-            print(efile)
-        else:
-            print("file exists " + fname)
-            efile = fname
-        self.info += "File retrieved :" + efile + "\n"
-        return efile
-
-    def create_location_dictionary(self, verbose=False):
-        """
-        returns dictionary withe key oris and value  (latitude,
-        longitude) tuple
-        """
-        if "latitude" in list(self.df.columns.values):
-            dftemp = self.df.copy()
-            pairs = zip(dftemp["oris"], zip(dftemp["latitude"], dftemp["longitude"]))
-            pairs = list(set(pairs))
-            lhash = dict(pairs)  # key is facility id and value is name.
-            if verbose:
-                print(lhash)
-            return lhash
-        else:
-            return False
-
-    def create_name_dictionary(self, verbose=False):
-        """
-        returns dictionary withe key oris and value facility name
-        """
-        if "latitude" in list(self.df.columns.values):
-            dftemp = self.df.copy()
-            pairs = zip(dftemp["oris"], dftemp["facility_name"])
-            pairs = list(set(pairs))
-            lhash = dict(pairs)  # key is facility id and value is name.
-            if verbose:
-                print(lhash)
-            return lhash
-        else:
-            return False
-
-
-def columns_rename(self, columns, verbose=False):
-    """
-    Maps columns with one name to a standard name
-    Parameters:
-    ----------
-    columns: list of strings
-
-    Returns:
-    --------
-    rcolumn: list of strings
-    """
-    rcolumn = []
-    for ccc in columns:
-        if "facility" in ccc.lower() and "name" in ccc.lower():
-            rcolumn = self.rename(ccc, "facility_name", rcolumn, verbose)
-        elif "oris" in ccc.lower():
-            rcolumn = self.rename(ccc, "oris", rcolumn, verbose)
-        elif "facility" in ccc.lower() and "id" in ccc.lower():
-            rcolumn = self.rename(ccc, "fac_id", rcolumn, verbose)
-        elif (
-            "so2" in ccc.lower()
-            and ("lbs" in ccc.lower() or "pounds" in ccc.lower())
-            and ("rate" not in ccc.lower())
-        ):
-            rcolumn = self.rename(ccc, "so2_lbs", rcolumn, verbose)
-        elif (
-            "nox" in ccc.lower()
-            and ("lbs" in ccc.lower() or "pounds" in ccc.lower())
-            and ("rate" not in ccc.lower())
-        ):
-            rcolumn = self.rename(ccc, "nox_lbs", rcolumn, verbose)
-        elif "co2" in ccc.lower() and (
-            "short" in ccc.lower() and "tons" in ccc.lower()
-        ):
-            rcolumn = self.rename(ccc, "co2_short_tons", rcolumn, verbose)
-        elif "date" in ccc.lower():
-            rcolumn = self.rename(ccc, "date", rcolumn, verbose)
-        elif "hour" in ccc.lower():
-            rcolumn = self.rename(ccc, "hour", rcolumn, verbose)
-        elif "lat" in ccc.lower():
-            rcolumn = self.rename(ccc, "latitude", rcolumn, verbose)
-        elif "lon" in ccc.lower():
-            rcolumn = self.rename(ccc, "longitude", rcolumn, verbose)
-        elif "state" in ccc.lower():
-            rcolumn = self.rename(ccc, "state_name", rcolumn, verbose)
-        else:
-            rcolumn.append(ccc.strip().lower())
-    return rcolumn
-
-
-def rename(self, ccc, newname, rcolumn, verbose):
-    """
-    keeps track of original and new column names in the namehash attribute
-    Parameters:
-    ----------
-    ccc: str
-    newname: str
-    rcolumn: list of str
-    verbose: boolean
-    Returns
-    ------
-    rcolumn: list of str
-    """
-    # dictionary with key as the newname and value as the original name
-    self.namehash[newname] = ccc
-    rcolumn.append(newname)
-    if verbose:
-        print(ccc + " to " + newname)
-    return rcolumn
+    if unitid == -99:
+        ui = False
+    temp = cemspivot(df, varname, daterange, unitid=ui)
+    if not ui:
+        returnval = temp[orisp]
+    else:
+        returnval = temp[orisp, unitid]
+    return returnval

@@ -216,7 +216,7 @@ def get_so2(df):
         "time",
         "OperatingTime",
         "HourLoad",
-        "u so2_lbs",
+        #"u so2_lbs",
         "so2_lbs",
         "AdjustedFlow",
         "UnadjustedFlow",
@@ -241,13 +241,25 @@ class Emissions:
     __init__
     add
 
+    see
+    https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-field-references#EMISSION
+     
     class that represents data returned by facilities call to the restapi.
     # NOTES
     # BAF - bias adjustment factor
     # MEC - maximum expected concentraiton
     # MPF - maximum potential stack gas flow rate
     # monitoring plan specified monitor range.
+    # FlowPMA % of time flow monitoring system available.
 
+    # SO2CEMReportedAdjustedSO2 - average adjusted so2 concentration
+    # SO2CEMReportedSO2MassRate - average adjusted so2 rate (lbs/hr)
+
+    # AdjustedFlow - average volumetric flow rate for the hour. adjusted for
+    # bias.
+
+    # It looks like MassRate is calculated from concentration of SO2 and flow
+    # rate. So flow rate should be rate of all gasses coming out of stack. 
 
     """
 
@@ -255,7 +267,9 @@ class Emissions:
         self.df = pd.DataFrame()
         self.orislist = []
         self.unithash = {}
-        self.so2name = "SO2CEMReportedAdjustedSO2"
+        #self.so2name = "SO2CEMReportedAdjustedSO2"
+        self.so2name = "SO2CEMReportedSO2MassRate"
+
         self.so2nameB = "UnadjustedSO2"
 
     def add(
@@ -332,6 +346,7 @@ class Emissions:
                 # for edata in data2add:
                 #    tcols.append(edata[0])
                 # 1a write column headers to a file.
+                verbose=True
                 if verbose:
                     with open("headers.txt", "w") as fid:
                         for val in tcols:
@@ -401,6 +416,13 @@ class Emissions:
                         operate report 0.00.
         """
 
+        def toint(xxx):
+            try:
+                rt = int(xxx)
+            except BaseException:
+                rt = xxx
+            return rt
+
         def simpletofloat(xxx):
             try:
                 rt = float(xxx)
@@ -408,36 +430,39 @@ class Emissions:
                 rt = -999
             return rt
 
-        def tofloat(optime, cname):
-            if optime == 0:
+        # calculate lbs of so2 by multiplyin rate by operating time.
+        def getmass(optime, cname):
+            if float(optime)==0:
                 rval = 0
             else:
                 try:
-                    rval = float(cname)
+                    rval = float(cname) * float(optime)
                 except BaseException:
                     rval = -999
+                    #rval = 0
             return rval
+
+
 
         # map OperatingTime to a float
         df["OperatingTime"] = df["OperatingTime"].map(simpletofloat)
         # map Adjusted Flow to a float
         df["AdjustedFlow"] = df["AdjustedFlow"].map(simpletofloat)
+        #df["oris"] = df["oris"].map(toint)
+        df["oris"] = df.apply(lambda row: toint(row['oris']), axis=1)
         # map SO2 data to a float
         # if operating time is zero then map to 0 (it is '' in file)
         optime = "OperatingTime"
         cname = "UnadjustedSO2"
-        df["u so2_lbs"] = df.apply(
-            lambda row: tofloat(
-                row[optime], row[cname]), axis=1)
-        cname = "SO2CEMReportedAdjustedSO2"
+        cname = self.so2name
         df["so2_lbs"] = df.apply(
-            lambda row: tofloat(
+            lambda row: getmass(
                 row[optime],
                 row[cname]),
                 axis=1)
 
         # temp is values that are not valid
-        temp = df[df["u so2_lbs"].isin([-999])]
+        temp = df[df["so2_lbs"].isin([-999])]
         temp = temp[temp["OperatingTime"] > 0]
         print("Values that cannot be converted to float")
         print(temp[cname].unique())
@@ -515,11 +540,15 @@ class Emissions:
 
 
 class MonitoringPlan:
+    """ 
+    Stack height is converted to meters.
+
+    """
+
     def __init__(self, oris, mid):
         self.df = pd.DataFrame()
         self.oris = oris  # oris code of facility
         self.mid = mid  # monitoring location id.
-        self.stackht = None
 
     def printall(self, date):
         oris = self.oris
@@ -572,6 +601,7 @@ class MonitoringPlan:
         stackname, unit, stackheight, crossAreaExit,
         crossAreaFlow, locID, isunit
         """
+        ft2meters = 0.3048
         dlist = []
         # print(ihash.keys())
         stackname = ihash["unitStackName"]
@@ -584,7 +614,8 @@ class MonitoringPlan:
                 # dhash = {}
                 dhash["stackname"] = stackname
                 # dhash["unit"] = self.mid
-                dhash["stackht"] = att["stackHeight"]  # int
+                dhash["stackht"] = att["stackHeight"]  * 0.3048 # int
+                dhash["stackht unit"] = 'm' # int
                 dhash["crossAreaExit"] = att["crossAreaExit"]  # int
                 dhash["crossAreaFlow"] = att["crossAreaFlow"]  # int
                 dhash["locID"] = att["locId"]
@@ -892,6 +923,7 @@ class CEMS(object):
 
         TODO - what is the flow rate?
 
+        
 
         """
         # 1. get list of oris codes within the area of interest

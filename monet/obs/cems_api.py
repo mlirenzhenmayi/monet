@@ -5,7 +5,7 @@ import sys
 import pandas as pd
 import numpy as np
 import requests
-
+import pytz
 # import json
 import seaborn as sns
 import monet.obs.obs_util as obs_util
@@ -23,6 +23,10 @@ The contents should be
 key: apikey
 url: https://api.epa.gov/FACT/1.0/
 
+TO DO
+-----
+Date is in local time (not daylight savings)
+Need to convert to UTC.
 
 Classes:
 ----------
@@ -43,6 +47,36 @@ getkey
 """
 
 
+def get_timezone_offset(latitude, longitude):
+    """
+    uses geonames API 
+    must store username in the $HOME/.epaapirc file
+    geousername: username
+    """
+    username=getkey()
+    print(username)
+    username = username['geousername']
+    url='http://api.geonames.org/timezoneJSON?lat='
+    request = url + str(latitude) 
+    request += '&lng=' 
+    request += str(longitude)
+    request += '&username='
+    request += username
+    try:
+        data = requests.get(request)
+    except BaseException:
+        data = -99
+ 
+    jobject = data.json()
+    print(jobject)
+    print(data)
+    #raw offset should give standard time offset.
+    if data == -99:
+        return 0
+    else:
+        offset = jobject['rawOffset']
+        return offset
+
 def getkey():
     """
     key and url should be stored in $HOME/.epaapirc
@@ -52,16 +86,15 @@ def getkey():
     fname = "/.epaapirc"
     if os.path.isfile(homedir + fname):
         with open(homedir + fname) as fid:
-            temp = fid.readline()
-            temp = temp.split(" ")
-            dhash[temp[0].strip().replace(":", "")] = temp[1].strip()
-            temp = fid.readline()
+            lines = fid.readlines()
+        for temp in lines:
             temp = temp.split(" ")
             dhash[temp[0].strip().replace(":", "")] = temp[1].strip()
         return dhash
     else:
         dhash["key"] = None
         dhash["url"] = None
+        dhash["geousername"] = None
         return dhash
 
 
@@ -88,17 +121,6 @@ def sendrequest(rqq, key=None, url=None):
         print("Status Code", data.status_code)
         return data
 
-def get_lookuphash(df, key, value):
-    """
-    returns dictionary. key is oris code. value is name
-    """
-    if key not in df.columns:
-        return None
-    if value not in df.columns:
-        return None
-    dseries = df.set_index(key)
-    dseries = dseries[value]
-    return dseries.to_dict()
 
 
 def get_lookups():
@@ -196,14 +218,14 @@ def findquarter(idate):
 
 def keepcols(df, keeplist):
     tcols = df.columns.values
-    tdrop = np.setdiff1d(tcols, keeplist)
-    droplist = []
-    for ttt in tdrop.tolist():
+    klist=[]
+    for ttt in keeplist:
         if ttt not in tcols:
-            print("NOT IN", ttt)
+            print("NOT IN ", ttt)
+            print('Available', tcols)
         else:
-            droplist.append(ttt)
-    tempdf = df.drop(droplist, axis=1)
+            klist.append(ttt)
+    tempdf = df[klist]
     return tempdf
 
 
@@ -797,6 +819,8 @@ class FacilitiesData:
             ahash["facility_name"] = val["name"]
             ahash["latitude"] = val["geographicLocation"]["latitude"]
             ahash["longitude"] = val["geographicLocation"]["longitude"]
+            #ahash['time_offset'] = get_timezone_offset(ahash['latitude'],
+            #                       ahash['longitude'])
             for sid in val["monitoringPlans"]:
                 bhash = {}
                 if sid["status"] == "Active":
@@ -995,6 +1019,7 @@ class CEMS(object):
             right_on=["oris", "unit"],
         )
         # drop un-needed columns from the emissions DataFrame
+        print('CEMS API ZZZZ')
         emitdf = get_so2(self.emit.df)
         # merge data from the facilties DataFrame into the Emissions DataFrame
         emitdf = pd.merge(

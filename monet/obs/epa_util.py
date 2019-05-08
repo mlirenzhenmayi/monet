@@ -1,5 +1,5 @@
 from __future__ import print_function
-from ..util import mystats
+from monet.util import mystats
 from future import standard_library
 import pandas as pd
 

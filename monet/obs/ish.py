@@ -1,5 +1,5 @@
 """Python module for reading NOAA ISH files"""
-from __future__ import division, print_function
+
 from builtins import object, zip
 
 import dask
@@ -7,17 +7,73 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 from dask.diagnostics import ProgressBar
-from future import standard_library
-from past.utils import old_div
-
-standard_library.install_aliases()
 
 ProgressBar().register()
 
 
-class ISH(object):
+def add_data(self,
+             dates,
+             box=None,
+             country=None,
+             state=None,
+             site=None,
+             resample=True,
+             window='H'):
+    """Add data from integrated surface database.
+
+    Parameters
+    ----------
+    dates : type
+        Description of parameter `dates`.
+    box : type
+        Description of parameter `box`.
+    country : type
+        Description of parameter `country`.
+    state : type
+        Description of parameter `state`.
+    site : type
+        Description of parameter `site`.
+    resample : type
+        Description of parameter `resample`.
+    window : type
+        Description of parameter `window`.
+
+    Returns
+    -------
+    type
+        Description of returned object.
+
     """
-    Integrated Surface Hourly (also known as ISD, Integrated Surface Data)
+    ish = ISH()
+    df = ish.add_data(
+        dates,
+        box=None,
+        country=None,
+        state=None,
+        site=None,
+        resample=True,
+        window='H')
+    return df
+
+
+class ISH(object):
+    """Integrated Surface Hourly (also known as ISD, Integrated Surface Data)
+
+    Attributes
+    ----------
+    WIDTHS : type
+        Description of attribute `WIDTHS`.
+    DTYPES : type
+        Description of attribute `DTYPES`.
+    NAMES : type
+        Description of attribute `NAMES`.
+    history_file : type
+        Description of attribute `history_file`.
+    history : type
+        Description of attribute `history`.
+    daily : type
+        Description of attribute `daily`.
+
     """
 
     def __init__(self):
@@ -25,41 +81,42 @@ class ISH(object):
             4, 11, 8, 4, 1, 6, 7, 5, 5, 5, 4, 3, 1, 1, 4, 1, 5, 1, 1, 1, 6, 1,
             1, 1, 5, 1, 5, 1, 5, 1
         ]
-        self.DTYPES = [('varlength', 'i2'), ('station_id',
-                                             'S11'), ('date', 'i4'), ('htime',
-                                                                      'i2'),
-                       ('source_flag',
-                        'S1'), ('latitude', 'float'), ('longitude', 'float'),
+        self.DTYPES = [('varlength', 'i2'), ('station_id', 'S11'),
+                       ('date', 'i4'), ('htime', 'i2'), ('source_flag', 'S1'),
+                       ('latitude', 'float'), ('longitude', 'float'),
                        ('code', 'S5'), ('elev', 'i2'), ('call_letters', 'S5'),
-                       ('qc_process',
-                        'S4'), ('wdir', 'i2'), ('wdir_quality',
-                                                'S1'), ('wdir_type',
-                                                        'S1'), ('ws', 'i2'),
-                       ('ws_quality',
-                        'S1'), ('ceiling',
-                                'i4'), ('ceiling_quality',
-                                        'S1'), ('ceiling_code',
-                                                'S1'), ('ceiling_cavok',
-                                                        'S1'), ('vsb', 'i4'),
-                       ('vsb_quality',
-                        'S1'), ('vsb_variability',
-                                'S1'), ('vsb_variability_quality',
-                                        'S1'), ('t', 'i2'), ('t_quality',
-                                                             'S1'),
-                       ('dpt', 'i2'), ('dpt_quality',
-                                       'S1'), ('p', 'i4'), ('p_quality', 'S1')]
+                       ('qc_process', 'S4'), ('wdir', 'i2'),
+                       ('wdir_quality', 'S1'), ('wdir_type', 'S1'), ('ws',
+                                                                     'i2'),
+                       ('ws_quality', 'S1'), ('ceiling', 'i4'),
+                       ('ceiling_quality', 'S1'), ('ceiling_code', 'S1'),
+                       ('ceiling_cavok', 'S1'), ('vsb', 'i4'),
+                       ('vsb_quality', 'S1'), ('vsb_variability', 'S1'),
+                       ('vsb_variability_quality', 'S1'), ('t', 'i2'),
+                       ('t_quality', 'S1'), ('dpt', 'i2'), ('dpt_quality',
+                                                            'S1'), ('p', 'i4'),
+                       ('p_quality', 'S1')]
         self.NAMES, _ = list(zip(*self.DTYPES))
-        self.history_file = 'https://www1.ncdc.noaa.gov/pub/data/noaa/'
-        'isd-history.csv'
+        self.history_file = 'https://www1.ncdc.noaa.gov/pub/data/noaa/isd-history.csv'
         self.history = None
         self.daily = False
 
     def delimit(self, file_object, delimiter=','):
         """Iterate over the lines in a file yielding comma delimited versions.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         file_object : file or filename
+            Description of parameter `file_object`.
+        delimiter : type
+            Description of parameter `delimiter`.
+        ' : type
+            Description of parameter `'`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
 
         """
 
@@ -107,7 +164,19 @@ class ISH(object):
         return frame
 
     def read_data_frame(self, file_object):
-        """Create a data frame from an ISH file."""
+        """Create a data frame from an ISH file.
+
+        Parameters
+        ----------
+        file_object : type
+            Description of parameter `file_object`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         frame_as_array = np.genfromtxt(
             file_object, delimiter=self.WIDTHS, dtype=self.DTYPES)
         frame = pd.DataFrame.from_records(frame_as_array)
@@ -124,7 +193,14 @@ class ISH(object):
         return df.loc[index, :].reset_index()
 
     def read_ish_history(self):
-        """ read ISH history file """
+        """read ISH history file
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         fname = self.history_file
         self.history = pd.read_csv(
             fname, parse_dates=['BEGIN', 'END'], infer_datetime_format=True)
@@ -170,16 +246,29 @@ class ISH(object):
                  site=None,
                  resample=True,
                  window='H'):
-        """
+        """Short summary.
+
+        Parameters
+        ----------
         dates : list of datetime objects
-               description
         box : list of floats
              [latmin, lonmin, latmax, lonmax]
-        country :
-        state :
-        site :
-        resample : boolean
-        window :
+        country : type
+            Description of parameter `country`.
+        state : type
+            Description of parameter `state`.
+        site : type
+            Description of parameter `site`.
+        resample : type
+            Description of parameter `resample`.
+        window : type
+            Description of parameter `window`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
         """
         from numpy import NaN
         self.dates = pd.to_datetime(dates)
@@ -239,7 +328,17 @@ class ISH(object):
         return self.df.copy()
 
     def get_url_file_objs(self, fname):
-        """
+        """Short summary.
+
+        Parameters
+        ----------
+        fname : type
+            Description of parameter `fname`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
 
         """
         import gzip

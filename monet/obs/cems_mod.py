@@ -1,8 +1,7 @@
-from __future__ import print_function
-import os
 import datetime
-import pandas as pd
+import os
 import numpy as np
+import pandas as pd
 
 """
 NAME: cems_mod.py

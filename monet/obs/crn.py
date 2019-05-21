@@ -110,20 +110,32 @@ Daily Data
    23   WIND_FLAG                      X
 
    """
-from __future__ import print_function
 
 import inspect
 import os
 from builtins import object, zip
 
 import pandas as pd
-from future import standard_library
 from numpy import array
 
-standard_library.install_aliases()
+
+def add_data(dates,
+             param=None,
+             daily=False,
+             sub_hourly=False,
+             download=False,
+             latlonbox=None):
+    a = CRN()
+    df = a.add_data(
+        dates,
+        daily=daily,
+        sub_hourly=sub_hourly,
+        download=download,
+        latlonbox=latlonbox)
+    return df
 
 
-class crn(object):
+class CRN(object):
     def __init__(self):
         self.dates = None
         self.daily = False
@@ -132,21 +144,19 @@ class crn(object):
         self.se_states = array(
             ['AL', 'FL', 'GA', 'MS', 'NC', 'SC', 'TN', 'VA', 'WV'],
             dtype='|S14')
-        self.ne_states = array(
-            [
-                'CT', 'DE', 'DC', 'ME', 'MD', 'MA', 'NH', 'NJ', 'NY', 'PA',
-                'RI', 'VT'
-            ],
+        self.ne_states = array([
+            'CT', 'DE', 'DC', 'ME', 'MD', 'MA', 'NH', 'NJ', 'NY', 'PA', 'RI',
+            'VT'
+        ],
             dtype='|S20')
         self.nc_states = array(
             ['IL', 'IN', 'IA', 'KY', 'MI', 'MN', 'MO', 'OH', 'WI'],
             dtype='|S9')
         self.sc_states = array(['AR', 'LA', 'OK', 'TX'], dtype='|S9')
-        self.r_states = array(
-            [
-                'AZ', 'CO', 'ID', 'KS', 'MT', 'NE', 'NV', 'NM', 'ND', 'SD',
-                'UT', 'WY'
-            ],
+        self.r_states = array([
+            'AZ', 'CO', 'ID', 'KS', 'MT', 'NE', 'NV', 'NM', 'ND', 'SD', 'UT',
+            'WY'
+        ],
             dtype='|S12')
         self.p_states = array(['CA', 'OR', 'WA'], dtype='|S10')
         self.objtype = 'CRN'

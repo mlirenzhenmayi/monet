@@ -539,7 +539,7 @@ def statmainstr():
     return rstr
 
 
-def create_script(runlist, tdirpath, scriptname, units="ppb", write=True):
+def create_script(runlist, tdirpath, scriptname, units="ppb", nice=True, write=True):
     """
     Creates bash script which will 
     1. Copy pardump files for use as parinit files
@@ -575,6 +575,7 @@ def create_script(runlist, tdirpath, scriptname, units="ppb", write=True):
         if run.parinitA != "None":
             rstr += "cp " + run.parinit_directory + run.parinitA
             rstr += " " + run.parinitB + "\n"
+        if nice: rstr += 'nice '
         rstr += "${MDL}" + run.hysplit_version + " " + run.suffix
         rstr += " & \n"
         prev_directory = run.directory
@@ -627,7 +628,7 @@ class RunDescriptor(object):
                 self.parinit_directory + self.parinitA, self.directory + self.parinitB
             )
 
-    def script(self):
+    def script(self, nice=True):
         """ produces a string that could be put in a bash script
         change to directory where CONTROL file resides
         run hysplit 
@@ -638,5 +639,6 @@ class RunDescriptor(object):
         if self.parinitA:
             rstr += "cp " + self.parinit_directory + self.parinitA
             rstr += " " + self.parinitB + "\n"
+        if nice: rstr += 'nice '
         rstr += self.hysplitdir + self.hysplit_version + " " + self.suffix
         return rstr

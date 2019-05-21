@@ -977,22 +977,23 @@ class CEMS(object):
                     # 4. get stack heights for each monitoring location from
                     #    class
 
-                    # also need to change to UTC. MonitoringPlan
+                    # also need to change to UTC. 
+                    # MonitoringPlan.get returns list of dictionaries
                     mhash = plan.get(ndate)
-                    if len(mhash) > 1:
-                        print(
-                            "CEMS class WARNING: more than one \
-                              Monitoring location for this unit\n"
-                        )
-                        for val in mhash:
-                            print("unit " + val["name"] + " oris " + str(oris))
-                        sys.exit()
+                    if mhash: 
+                        if len(mhash) > 1:
+                            print(
+                                "CEMS class WARNING: more than one \
+                                  Monitoring location for this unit\n"
+                            )
+                            for val in mhash:
+                                print("unit " + val["name"] + " oris " + str(oris))
+                            sys.exit()
+                        else:
+                            mhash = mhash[0]
+                            stackht = float(mhash["stackht"])
                     else:
-                        mhash = mhash[0]
-                    if not mhash:
                         stackht = None
-                    else:
-                        stackht = float(mhash["stackht"])
                     dflist.append((oris, mid, stackht))
                     # 5. Call to the Emissions class to add each monitoring location
                     #    to the dataframe.

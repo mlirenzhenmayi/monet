@@ -6,11 +6,102 @@ import os
 from os import path, chdir
 from subprocess import call
 import pandas as pd
-from monet.verification.statmain import MatchedData
+from monet.utilhysplit.statmain import MatchedData
+from monet.util.svcems import SourceSummary
+from monet.util.svcems import df2hash
+from monet.util.svobs import SObs
 import seaborn as sns
+from shapely.geometry import Point
+from shapely.geometry import LineString
+import geopandas as gpd
 
 """
 """
+
+def make_gpd(df, latstr, lonstr):
+    
+    geometry = [Point(xy) for xy in zip(df[lonstr], df[latstr])]
+    df = df.drop([lonstr,latstr], axis=1)
+    crs = {'init': 'epsg:4326'}
+    gdf = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
+    return gdf
+
+
+def cems2obs(obsfile, cemsfile):
+
+    # read cems csv file.
+    # create the SObs  ojbect.
+    sourcesum = SourceSummary().sumdf  
+    sourcesum = sourcesum.groupby(['ORIS','Name','Stack height (m)',
+                                   'lat','lon']).sum()
+    sourcesum.reset_index(inplace=True)
+    sourcesum = sourcesum[['ORIS','Name','Mean(lbs)','lat','lon']]
+
+    sgpd = make_gpd(sourcesum, 'lat', 'lon')
+    #print(sgpd[0:10])
+    print(sgpd[0:10])
+    #sgpd.set_index('ORIS', inplace=True)
+    #print(sgpd[0:10])
+
+    str1 = obsfile.split('.')
+    dt1 = datetime.datetime.strptime(str1[0], "info_obs%Y%m%d") 
+    dt2 = datetime.datetime.strptime(str1[1], "%Y%m%d") 
+    area=''
+    obs = SObs([dt1, dt2], area)
+    odf = obs.read_csv(obsfile, hdrs=[0])
+    #print('----------------------------------------')
+    osum = odf[['siteid','latitude','longitude']]
+    osum = make_gpd(osum.drop_duplicates(), 'latitude', 'longitude')
+    #print(osum[0:10])
+    #odf = make_gpd(odf, 'latitude', 'longitude')
+
+    orishash = df2hash(sgpd, 'ORIS','geometry')
+    # for each power plant:
+
+    def makeline(p1, p2):
+        br = bearing(p2,p1)
+        return(br)
+        #return LineString([p1,p2])
+        #return p1
+
+    for oris in orishash.keys():
+        cname = str(int(oris)) + 'dist' 
+        pnt = orishash[oris]
+        #pnt = 2
+        #print('ORIS', oris, type(orishash[oris]))
+        osum[cname] = osum.distance(orishash[oris]) 
+        lname = str(int(oris)) + 'direction'
+        osum[lname] = osum.apply(
+                           lambda row: bearing(row['geometry'], pnt),
+                           axis=1)
+    print('  ----------------------------------------')
+    print(osum[osum[cname]<3])
+        #osum[lname] = osum.apply(makeline(pnt, osum['geometry']), axis=1)
+    #print(' ALL DISTANCE ----------------------------------------')
+    #print(osum[0:20])
+    return -1 
+
+def bearing(p1, p2):
+    """
+    p1 : shapely Point
+    p2 : shapely Point
+
+    x should be longitude
+    y should be latitude
+    """
+    deg2met = 111.0  # doesn't matter.
+    a1 = p2.x-p1.x # distance in degrees
+    a2 = p2.y-p1.y # distance in degrees.
+    # change to meters.
+    a2 = a2 * deg2met
+    # estimate using latitude halfway between.
+    a1 = a1 * deg2met * np.cos(np.radians(0.5*(p1.y+p2.y))) 
+
+    #a1 = np.cos(p1.y)*np.sin(p2.y)-np.sin(p1.y)*np.cos(p2.y)*np.cos(p2.x-p1.x)
+    #a2 = np.sin(p2.x-p1.x)*np.cos(p2.y)
+    angle = np.arctan2(a1, a2)
+    angle = (np.degrees(angle) + 360) %360
+    return angle
 
 
 def results(dfile, runlist, xmeas=1):

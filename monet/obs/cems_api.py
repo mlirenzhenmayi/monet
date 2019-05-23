@@ -45,6 +45,27 @@ sendrequest
 getkey
 
 """
+def get_filename(fname, prompt):
+    if fname:
+        done=False
+        while not done:
+            if os.path.isfile(fname):
+               done = True
+            elif prompt==True:
+               istr = '\n' +  fname + ' is not a valid name for Facilities Data \n'
+               istr += 'Please enter a new filename \n'
+               istr += 'enter None to load from the api \n'
+               istr += 'enter x to exit program \n'
+               fname=input(istr)
+               #print('checking ' + fname)
+               if fname=='x': sys.exit()
+               if fname.lower()=='none': 
+                  fname=None
+                  done=True
+            else:
+               fname=None
+               done=True 
+    return fname
 
 
 def get_timezone_offset(latitude, longitude):
@@ -119,6 +140,9 @@ def sendrequest(rqq, key=None, url=None):
         print("Request: ", rqq)
         data = requests.get(rqq)
         print("Status Code", data.status_code)
+        if data.status_code==429:
+           print('Too many requests Please Wait before trying again.')
+           sys.exit()
         return data
 
 
@@ -452,7 +476,8 @@ class Emissions:
                 rt = -999
             return rt
 
-        # calculate lbs of so2 by multiplyin rate by operating time.
+        # calculate lbs of so2 by multiplying rate by operating time.
+        # checked this with FACTS
         def getmass(optime, cname):
             if float(optime)==0:
                 rval = 0
@@ -509,6 +534,8 @@ class Emissions:
            Here, change to a datetime object.
 
            # also need to change to UTC.
+
+           # time is local standard time (never daylight savings)
         """
         # Using the %I for the hour field and %p for AM/Pm converts time
         # correctly.
@@ -518,10 +545,10 @@ class Emissions:
                 rdt = datetime.datetime.strptime(xxx["DateHour"], fmt)
             except BaseException:
                 print("PROBLEM DATE :", xxx["DateHour"], ":")
-                rdt = datetime.datetime(1700, 1, 1, 0)
+                rdt = datetime.datetime(1000, 1, 1, 0)
             return rdt
 
-        df["time"] = df.apply(newdate, axis=1)
+        df["time local"] = df.apply(newdate, axis=1)
         return df
 
     def plot(self):
@@ -567,30 +594,37 @@ class MonitoringPlan:
 
     """
 
-    def __init__(self, oris, mid):
+    def __init__(self, oris, mid, date):
         self.df = pd.DataFrame()
         self.oris = oris  # oris code of facility
-        self.mid = mid  # monitoring location id.
+        self.mid = mid    # monitoring location id.
+        self.date = date  # date
+        self.getstr = self.create_getstr()
 
-    def printall(self, date):
-        oris = self.oris
-        mid = self.mid
-        dstr = date.strftime("%Y-%m-%d")
-        mstr = "monitoringplan"
-        getstr = "/".join([mstr, str(oris), str(mid), dstr])
+    def save(self, fname):
+        self.df.to_csv(fname) 
+
+    def printall(self):
+        getstr = self.create_getstr()
         data = sendrequest(getstr)
         jobject = data.json()
-        rstr = unpack_response(jobject)
+        rstr = getstr + '\n'
+        rstr += unpack_response(jobject)
         return rstr
 
-    def get(self, date):
+    def create_getstr(self):
+        oris = self.oris
+        mid = self.mid
+        dstr = self.date.strftime("%Y-%m-%d")
+        mstr = "monitoringplan"
+        getstr = "/".join([mstr, str(oris), str(mid), dstr])
+        return getstr 
+
+
+    def get(self):
         """
         Request to get monitoring plans for oris code and locationID.
         locationIDs for an oris code can be found in
-
-        oris : int
-        locationID : str or int
-        date : datetime object
 
         The monitoring plan has locationAttributes which
         include the stackHeight, crossAreaExit, crossAreaFlow.
@@ -600,12 +634,12 @@ class MonitoringPlan:
 
         QuarterlySummaries gives so2Mass each quarter.
         """
-        oris = self.oris
-        mid = self.mid
-        dstr = date.strftime("%Y-%m-%d")
-        mstr = "monitoringplan"
-        getstr = "/".join([mstr, str(oris), str(mid), dstr])
-        data = sendrequest(getstr)
+        #oris = self.oris
+        #mid = self.mid
+        #dstr = date.strftime("%Y-%m-%d")
+        #mstr = "monitoringplan"
+        #getstr = "/".join([mstr, str(oris), str(mid), dstr])
+        data = sendrequest(self.getstr)
         if data.status_code != 200:
             return None
         jobject = data.json()
@@ -718,11 +752,44 @@ class MonitoringPlan:
 # responsibilities
 
 
-class FacilitiesData:
+class EpaApiObject(object):
+    
+    def __init__(self, fname=None, prompt=False):
+        self.df = pd.DataFrame()
+        self.fname = get_filename(fname, prompt)
+        self.getstr = self.create_getstr()
+
+    def set_filename(self, fname):
+        self.fname = fname    
+
+    def load(self):
+        df = pd.read_csv(self.fname, index_col=[0])
+        return df
+
+    def save(self):
+        """
+        save to a csv file.
+        """
+        self.df.to_csv(self.fname)
+        self.fname = fname
+
+    def create_getstr():
+        return 'placeholder'
+
+    def get(self):
+        data = sendrequest(self.getstr)
+        jobject = data.json()
+        self.df = self.unpack(jobject)
+
+
+
+
+class FacilitiesData(EpaApiObject):
     """
     class that represents data returned by facilities call to the restapi.
 
     Attributes:
+        self.fname : filename for reading and writing df to csv file.
         self.df  : dataframe
          columns are
          begin time,
@@ -740,15 +807,45 @@ class FacilitiesData:
         get : sends request to the restapi and calls unpack.
         oris_by_area : returns list of oris codes in an area
         get_units : returns a list of units for an oris code
-        unpack : creates the dataframe
+
+        set_filename : set filename to save and load from.
+        load : load datafraem from csv file
+        save : save dateframe to csv file
+        get  : request facilities information from api
+        unpack : process the data sent back from the api
+                 and put relevant info in a dataframe.
 
     """
 
-    def __init__(self):
+    def __init__(self, fname=None, prompt=True):
         self.df = pd.DataFrame()
-        self.get()
+        self.fname = get_filename(fname, prompt)
+        if self.fname:
+           self.df = self.load()
+        else:
+           self.get() 
         # self.oris = oris   #oris code of facility
         # self.mid = mid     #monitoring location id.
+
+
+    def set_filename(self, fname):
+        self.fname = fname
+       
+    def load(self):
+        df = pd.read_csv(self.fname, index_col=[0])
+        return df
+ 
+    def save(self, fname):
+        """
+        save to a csv file.
+        """
+        self.df.to_csv(fname)
+        self.fname = fname
+
+    def __str__(self):
+        cols = self.df.columns
+        rstr = ', '.join(cols)
+        return rstr
 
     def printall(self):
         getstr = "facilities"
@@ -900,14 +997,7 @@ class CEMS(object):
     ----------
     __init__(self)
     add_data(self, rdate, states=['md'], download=False, verbose=True):
-    load(self, efile, verbose=True):
-    retrieve(self, rdate, state, download=True):
 
-    match_column(self, varname):
-    get_var(self, varname, loc=None, daterange=None, unitid=-99, verbose=True):
-    retrieve(self, rdate, state, download=True):
-    create_location_dictionary(self):
-    rename(self, ccc, newname, rcolumn, verbose):
     """
 
     def __init__(self):
@@ -920,6 +1010,13 @@ class CEMS(object):
         # unit id.
         self.emit = Emissions()
         self.orislist = []
+
+        #self.filehash = {}
+        #self.filehash{'facilities'} = 'Fac.csv'
+        #self.filehash{'monitoring'} = 'Mon.csv'
+
+    def add_facilities_file(self, fname):
+        self.filehash['facilities'] = fname
 
     def add_data(self, rdate, area, verbose=True):
         """
@@ -972,14 +1069,17 @@ class CEMS(object):
                 print("Units to retrieve ", str(oris), units)
             # 3. each unit has a monitoring plan.
             for mid in units:
-                plan = MonitoringPlan(oris, mid)
+                # 4. get stack heights for each monitoring location from
+                #    class
+                # although the date is included for the monitoring plan request,
+                # the information returned is the same most of the time
+                # (possibly unless the monitoring plan changes during the time
+                # of interst).
+                # to reduce number of requests, the monitoring plan is only
+                # requested for the first date in the list.
+                plan = MonitoringPlan(oris, mid, datelist[0])
+                mhash = plan.get()
                 for ndate in datelist:
-                    # 4. get stack heights for each monitoring location from
-                    #    class
-
-                    # also need to change to UTC. 
-                    # MonitoringPlan.get returns list of dictionaries
-                    mhash = plan.get(ndate)
                     if mhash: 
                         if len(mhash) > 1:
                             print(

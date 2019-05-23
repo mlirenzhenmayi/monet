@@ -277,6 +277,85 @@ def get_so2(df):
     return keepcols(df, keep)
 
 
+
+class EpaApiObject(object):
+    
+    def __init__(self, fname=None, save=True, prompt=False):
+        # fname is name of file that data would be saved to.
+        
+
+        self.df = pd.DataFrame()
+        self.fname = fname
+        # returns None if filename does not exist.
+        # if prompt True then will ask for new filename if does not exist.
+        fname = get_filename(fname, prompt)
+        self.getstr = self.create_getstr()
+        # if the file exists load data from it.
+        if fname:
+           self.fname = fname
+           self.df = self.load()
+        # if it doesn't load then get it from the api.
+        # if save is True then save.
+        if self.df.empty:
+           # get sends request to api and processes data received.
+           self.df = self.get()
+           if save: self.save()
+
+    def set_filename(self, fname):
+        self.fname = fname    
+
+    def load(self):
+        df = pd.read_csv(self.fname, index_col=[0])
+        return df
+
+    def save(self):
+        """
+        save to a csv file.
+        """
+        print('saving' , self.fname)
+        self.df.to_csv(self.fname)
+
+    def create_getstr(self):
+        return 'placeholder'
+
+    def printall(self):
+        data = sendrequest(self.getstr)
+        jobject = data.json()
+        rstr = self.getstr + '\n'
+        rstr += unpack_reponse(jobject)
+        return rst
+
+    def get_raw_data(self):
+        data = sendrequest(self.getstr)
+        if data.status_code != 200:
+           return None
+        else:
+           return data
+
+    def get(self):
+        data = self.get_raw_data()
+        try:
+            jobject = data.json()
+        except:
+            return data
+        df = self.unpack(jobject)
+        return df
+
+    def unpack(self, data):
+        return pd.DataFrame()
+
+
+class EmissionsCall(EpaApiObject):
+
+    def __init__(self, oris, mid, date, fname='Mplans.csv', save=True, prompt=False):
+        self.oris = oris  # oris code of facility
+        self.mid = mid    # monitoring location id.
+        self.date = date  # date
+        self.dfall = pd.DataFrame()
+        super().__init__(fname, save, prompt)
+    
+
+
 class Emissions:
     """
     class that represents data returned by emissions/hourlydata call to the restapi.
@@ -588,29 +667,57 @@ class Emissions:
         plt.show()
 
 
-class MonitoringPlan:
+class MonitoringPlan(EpaApiObject):
     """ 
     Stack height is converted to meters.
+    Request to get monitoring plans for oris code and locationID.
+    locationIDs for an oris code can be found in
+
+    The monitoring plan has locationAttributes which
+    include the stackHeight, crossAreaExit, crossAreaFlow.
+
+    It also includes monitoringSystems which includes
+    ststeymTypeDescription (such as So2 Concentration)
+
+    QuarterlySummaries gives so2Mass each quarter.
 
     """
 
-    def __init__(self, oris, mid, date):
-        self.df = pd.DataFrame()
+    def __init__(self, oris, mid, date, fname='Mplans.csv', save=True, prompt=False):
         self.oris = oris  # oris code of facility
         self.mid = mid    # monitoring location id.
         self.date = date  # date
-        self.getstr = self.create_getstr()
+        self.dfall = pd.DataFrame()
+        super().__init__(fname, save, prompt)
 
-    def save(self, fname):
-        self.df.to_csv(fname) 
+    def to_dict(self):
+        mhash = self.df.reset_index().to_dict("records")
+        return mhash
 
-    def printall(self):
-        getstr = self.create_getstr()
-        data = sendrequest(getstr)
-        jobject = data.json()
-        rstr = getstr + '\n'
-        rstr += unpack_response(jobject)
-        return rstr
+    def load(self):
+        # Multiple mplans may be saved to the same csv file.
+        # so this may return an emptly dataframe
+        df = super().load()
+        chash = {'mid':str, 'oris':str}
+        df = pd.read_csv(self.fname, index_col=[0],
+                         converters = chash)
+        self.dfall = df.copy()
+        df = df[df['oris'] == self.oris]
+        df = df[df['mid'] == self.mid]
+        return df
+ 
+    def save(self):
+        # do not want to overwrite other mplans in the file.
+        try:
+            self.load()
+        except:
+            pass
+        if not self.dfall.empty:
+            df = pd.concat([self.dfall, self.df])
+            df = df.drop_duplicates(subset=['oris','mid'])
+            df.to_csv(self.fname)  
+        else:
+            self.df.to_csv(self.fname) 
 
     def create_getstr(self):
         oris = self.oris
@@ -621,35 +728,8 @@ class MonitoringPlan:
         return getstr 
 
 
-    def get(self):
+    def unpack(self, data):
         """
-        Request to get monitoring plans for oris code and locationID.
-        locationIDs for an oris code can be found in
-
-        The monitoring plan has locationAttributes which
-        include the stackHeight, crossAreaExit, crossAreaFlow.
-
-        It also includes monitoringSystems which includes
-        ststeymTypeDescription (such as So2 Concentration)
-
-        QuarterlySummaries gives so2Mass each quarter.
-        """
-        #oris = self.oris
-        #mid = self.mid
-        #dstr = date.strftime("%Y-%m-%d")
-        #mstr = "monitoringplan"
-        #getstr = "/".join([mstr, str(oris), str(mid), dstr])
-        data = sendrequest(self.getstr)
-        if data.status_code != 200:
-            return None
-        jobject = data.json()
-        dlist = self.unpack(jobject["data"])
-        return dlist
-
-    # @staticmethod
-    def unpack(self, ihash):
-        """
-        dhash :
         Returns:
 
         Information for one oris code and monitoring location.
@@ -657,6 +737,7 @@ class MonitoringPlan:
         stackname, unit, stackheight, crossAreaExit,
         crossAreaFlow, locID, isunit
         """
+        ihash = data["data"]
         ft2meters = 0.3048
         dlist = []
         # print(ihash.keys())
@@ -694,9 +775,12 @@ class MonitoringPlan:
                     ]
                     for val in elist:
                         dhash[val] = method[val]
-
+            dhash['oris'] = self.oris
+            dhash['mid'] = self.mid
+            dhash['request_date'] = self.date
             dlist.append(dhash)
-        return dlist
+        df = pd.DataFrame(dlist)
+        return df
 
         # Then have list of dicts
         #  unitOperations
@@ -752,37 +836,6 @@ class MonitoringPlan:
 # responsibilities
 
 
-class EpaApiObject(object):
-    
-    def __init__(self, fname=None, prompt=False):
-        self.df = pd.DataFrame()
-        self.fname = get_filename(fname, prompt)
-        self.getstr = self.create_getstr()
-
-    def set_filename(self, fname):
-        self.fname = fname    
-
-    def load(self):
-        df = pd.read_csv(self.fname, index_col=[0])
-        return df
-
-    def save(self):
-        """
-        save to a csv file.
-        """
-        self.df.to_csv(self.fname)
-        self.fname = fname
-
-    def create_getstr():
-        return 'placeholder'
-
-    def get(self):
-        data = sendrequest(self.getstr)
-        jobject = data.json()
-        self.df = self.unpack(jobject)
-
-
-
 
 class FacilitiesData(EpaApiObject):
     """
@@ -817,52 +870,19 @@ class FacilitiesData(EpaApiObject):
 
     """
 
-    def __init__(self, fname=None, prompt=True):
-        self.df = pd.DataFrame()
-        self.fname = get_filename(fname, prompt)
-        if self.fname:
-           self.df = self.load()
-        else:
-           self.get() 
-        # self.oris = oris   #oris code of facility
-        # self.mid = mid     #monitoring location id.
-
-
-    def set_filename(self, fname):
-        self.fname = fname
-       
-    def load(self):
-        df = pd.read_csv(self.fname, index_col=[0])
-        return df
- 
-    def save(self, fname):
-        """
-        save to a csv file.
-        """
-        self.df.to_csv(fname)
-        self.fname = fname
+    def __init__(self, fname='Fac.csv', prompt=False, save=True):
+        super().__init__(fname, save, prompt)
 
     def __str__(self):
         cols = self.df.columns
         rstr = ', '.join(cols)
         return rstr
 
-    def printall(self):
-        getstr = "facilities"
-        data = sendrequest(getstr)
-        jobject = data.json()
-        rstr = unpack_response(jobject)
-        return rstr
-
-    def get(self):
+    def create_getstr(self):
         """
-        Request to get facilities information
+        used to send the request.
         """
-        getstr = "facilities"
-        data = sendrequest(getstr)
-        jobject = data.json()
-        self.df = self.unpack(jobject)
-        # return(data)
+        return "facilities"
 
     def oris_by_area(self, llcrnr, urcrnr):
         """
@@ -886,8 +906,7 @@ class FacilitiesData(EpaApiObject):
         units = temp["unit"].unique()
         return units
 
-
-    def unpack(self, dhash):
+    def unpack(self, data):
         """
         iterates through a response which contains nested dictionaries and lists.
         # facilties 'data' is a list of dictionaries.
@@ -895,8 +914,6 @@ class FacilitiesData(EpaApiObject):
         # Each dictionary has a list under the key monitoringLocations.
         # each monitoryLocation has a name which is what is needed
         # for the locationID input into the get_emissions.
-
-
         """
         # dlist is a list of dictionaries.
         dlist = []
@@ -910,7 +927,7 @@ class FacilitiesData(EpaApiObject):
         # dlist = [{'dog': 2}, {'dog':2}] instead of
         # dlist = [{'dog': 1}, {'dog':2}]
 
-        for val in dhash["data"]:
+        for val in data["data"]:
             ahash = {}
             ahash["oris"] = int(val["orisCode"])
             ahash["facility_name"] = val["name"]
@@ -1077,8 +1094,8 @@ class CEMS(object):
                 # of interst).
                 # to reduce number of requests, the monitoring plan is only
                 # requested for the first date in the list.
-                plan = MonitoringPlan(oris, mid, datelist[0])
-                mhash = plan.get()
+                plan = MonitoringPlan(str(oris), str(mid), datelist[0])
+                mhash = plan.to_dict()
                 for ndate in datelist:
                     if mhash: 
                         if len(mhash) > 1:

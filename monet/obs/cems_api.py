@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import requests
 import pytz
+
 # import json
 import seaborn as sns
 import monet.obs.obs_util as obs_util
@@ -30,9 +31,12 @@ Need to convert to UTC.
 
 Classes:
 ----------
-Emissions
+EpaApiObject
+EmissionsCall
 FacilitiesData
 MonitoringPlan
+
+Emissions
 CEMS
 
 Functions:
@@ -45,26 +49,29 @@ sendrequest
 getkey
 
 """
+
+
 def get_filename(fname, prompt):
     if fname:
-        done=False
+        done = False
         while not done:
             if os.path.isfile(fname):
-               done = True
-            elif prompt==True:
-               istr = '\n' +  fname + ' is not a valid name for Facilities Data \n'
-               istr += 'Please enter a new filename \n'
-               istr += 'enter None to load from the api \n'
-               istr += 'enter x to exit program \n'
-               fname=input(istr)
-               #print('checking ' + fname)
-               if fname=='x': sys.exit()
-               if fname.lower()=='none': 
-                  fname=None
-                  done=True
+                done = True
+            elif prompt == True:
+                istr = "\n" + fname + " is not a valid name for Facilities Data \n"
+                istr += "Please enter a new filename \n"
+                istr += "enter None to load from the api \n"
+                istr += "enter x to exit program \n"
+                fname = input(istr)
+                # print('checking ' + fname)
+                if fname == "x":
+                    sys.exit()
+                if fname.lower() == "none":
+                    fname = None
+                    done = True
             else:
-               fname=None
-               done=True 
+                fname = None
+                done = True
     return fname
 
 
@@ -74,29 +81,30 @@ def get_timezone_offset(latitude, longitude):
     must store username in the $HOME/.epaapirc file
     geousername: username
     """
-    username=getkey()
+    username = getkey()
     print(username)
-    username = username['geousername']
-    url='http://api.geonames.org/timezoneJSON?lat='
-    request = url + str(latitude) 
-    request += '&lng=' 
+    username = username["geousername"]
+    url = "http://api.geonames.org/timezoneJSON?lat="
+    request = url + str(latitude)
+    request += "&lng="
     request += str(longitude)
-    request += '&username='
+    request += "&username="
     request += username
     try:
         data = requests.get(request)
     except BaseException:
         data = -99
- 
+
     jobject = data.json()
     print(jobject)
     print(data)
-    #raw offset should give standard time offset.
+    # raw offset should give standard time offset.
     if data == -99:
         return 0
     else:
-        offset = jobject['rawOffset']
+        offset = jobject["rawOffset"]
         return offset
+
 
 def getkey():
     """
@@ -140,11 +148,10 @@ def sendrequest(rqq, key=None, url=None):
         print("Request: ", rqq)
         data = requests.get(rqq)
         print("Status Code", data.status_code)
-        if data.status_code==429:
-           print('Too many requests Please Wait before trying again.')
-           sys.exit()
+        if data.status_code == 429:
+            print("Too many requests Please Wait before trying again.")
+            sys.exit()
         return data
-
 
 
 def get_lookups():
@@ -242,11 +249,11 @@ def findquarter(idate):
 
 def keepcols(df, keeplist):
     tcols = df.columns.values
-    klist=[]
+    klist = []
     for ttt in keeplist:
         if ttt not in tcols:
             print("NOT IN ", ttt)
-            print('Available', tcols)
+        #    print('Available', tcols)
         else:
             klist.append(ttt)
     tempdf = df[klist]
@@ -259,10 +266,11 @@ def get_so2(df):
     """
     keep = [
         "DateHour",
+        "time local",
         "time",
         "OperatingTime",
         "HourLoad",
-        #"u so2_lbs",
+        # "u so2_lbs",
         "so2_lbs",
         "AdjustedFlow",
         "UnadjustedFlow",
@@ -277,12 +285,9 @@ def get_so2(df):
     return keepcols(df, keep)
 
 
-
 class EpaApiObject(object):
-    
     def __init__(self, fname=None, save=True, prompt=False):
         # fname is name of file that data would be saved to.
-        
 
         self.df = pd.DataFrame()
         self.fname = fname
@@ -291,46 +296,56 @@ class EpaApiObject(object):
         fname = get_filename(fname, prompt)
         self.getstr = self.create_getstr()
         # if the file exists load data from it.
+        getboolean = True
         if fname:
-           self.fname = fname
-           self.df = self.load()
+            print("Loading from file ", self.fname)
+            self.fname = fname
+            self.df, getboolean = self.load()
         # if it doesn't load then get it from the api.
         # if save is True then save.
-        if self.df.empty:
-           # get sends request to api and processes data received.
-           self.df = self.get()
-           if save: self.save()
+        if self.df.empty and getboolean:
+            # get sends request to api and processes data received.
+            self.df = self.get()
+            if save:
+                self.save()
 
     def set_filename(self, fname):
-        self.fname = fname    
+        self.fname = fname
 
     def load(self):
-        df = pd.read_csv(self.fname, index_col=[0])
-        return df
+        chash = {"mid": str, "oris": str}
+        df = pd.read_csv(self.fname, index_col=[0], converters=chash, parse_dates=True)
+        # df = pd.read_csv(self.fname, index_col=[0])
+        return df, True
 
     def save(self):
         """
         save to a csv file.
         """
-        print('saving' , self.fname)
-        self.df.to_csv(self.fname)
+        datefmt = "%Y %m %d %H:%M"
+        print("saving here", self.fname)
+        if not self.df.empty:
+            self.df.to_csv(self.fname, date_format=datefmt)
+        else:
+            with open(self.fname, "w") as fid:
+                fid.write("no data")
 
     def create_getstr(self):
-        return 'placeholder'
+        return "placeholder"
 
     def printall(self):
         data = sendrequest(self.getstr)
         jobject = data.json()
-        rstr = self.getstr + '\n'
+        rstr = self.getstr + "\n"
         rstr += unpack_reponse(jobject)
         return rst
 
     def get_raw_data(self):
         data = sendrequest(self.getstr)
         if data.status_code != 200:
-           return None
+            return None
         else:
-           return data
+            return data
 
     def get(self):
         data = self.get_raw_data()
@@ -346,14 +361,220 @@ class EpaApiObject(object):
 
 
 class EmissionsCall(EpaApiObject):
+    """
+    class that represents data returned by one emissions/hourlydata call to the restapi.
+    Attributes
+    """
 
-    def __init__(self, oris, mid, date, fname='Mplans.csv', save=True, prompt=False):
+    def __init__(self, oris, mid, year, quarter, fname=None, save=True, prompt=False):
         self.oris = oris  # oris code of facility
-        self.mid = mid    # monitoring location id.
-        self.date = date  # date
+        self.mid = mid  # monitoring location id.
+        self.year = str(year)
+        self.quarter = str(quarter)
+        if not fname:
+            fname = "Emissions." + self.year + ".q" + self.quarter
+            fname += "." + str(self.mid) + "." + str(oris) + ".csv"
         self.dfall = pd.DataFrame()
+        self.so2name = "SO2CEMReportedSO2MassRate"
+        self.so2nameB = "UnadjustedSO2"
         super().__init__(fname, save, prompt)
-    
+
+    def create_getstr(self):
+        # for locationID in unitra:
+        # efile = "efile.txt"
+        estr = "emissions/hourlyData/csv"
+        getstr = "/".join(
+            [estr, str(self.oris), str(self.mid), self.year, self.quarter]
+        )
+        return getstr
+
+    def load(self):
+        datefmt = "%Y %m %d %H:%M"
+        chash = {"mid": str, "oris": str, "unit": str}
+        df = pd.read_csv(self.fname, index_col=[0], converters=chash, parse_dates=False)
+        convert = True
+        print(df[0:10])
+        # if not df.empty:
+        if convert and not df.empty:
+
+            def newdate(x):
+                datefmt = "%Y-%m-%d %H:%M:00"
+                return datetime.datetime.strptime(x["time local"], datefmt)
+
+            df["time local"] = df.apply(newdate, axis=1)
+        # df = pd.read_csv(self.fname, index_col=[0])
+        return df, False
+
+    def get(self):
+        data = self.get_raw_data()
+        if data:
+            df = self.unpack(data)
+        else:
+            df = pd.DataFrame()
+        return df
+
+    def unpack(self, data):
+        logfile = "warnings.emit.txt"
+        iii = 0
+        cols = []
+        tra = []
+        for line in data.iter_lines(decode_unicode=True):
+
+            # 1. Process First line
+            if iii == 0:
+                tcols = line.split(",")
+                # add columns for unit id and oris code
+                tcols.append("unit")
+                tcols.append("oris")
+                # add columns for other info (stack height, latitude etc).
+                # for edata in data2add:
+                #    tcols.append(edata[0])
+                # 1a write column headers to a file.
+                verbose = True
+                if verbose:
+                    with open("headers.txt", "w") as fid:
+                        for val in tcols:
+                            fid.write(val + "\n")
+                    # print('press a key to continue ')
+                    # input()
+                # 1b check to see if desired emission variable is in the file.
+                if self.so2name not in tcols:
+                    with open(logfile, "a") as fid:
+                        rstr = "ORIS " + str(self.oris)
+                        rstr += " mid " + str(self.mid) + "\n"
+                        rstr += "NO adjusted SO2 data \n"
+                        if self.so2name not in tcols:
+                            rstr += "NO SO2 data \n"
+                        rstr += "------------------------\n"
+                        fid.write(rstr)
+                    print("--------------------------------------")
+                    print("ORIS " + str(self.oris))
+                    print("UNIT " + str(self.mid) + " no SO2 data")
+                    print("--------------------------------------")
+                    # return empty dataframe
+                    return pd.DataFrame()
+                else:
+                    cols = tcols
+            # 2. Process rest of lines
+            else:
+                lt = line.split(",")
+                # add input info to line.
+                lt.append(str(self.mid))
+                lt.append(str(self.oris))
+                # for edata in data2add:
+                #    lt.append(edata[1])
+                tra.append(lt)
+            iii += 1
+            # with open(efile, "a") as fid:
+            #    fid.write(line)
+        # ----------------------------------------------------
+        df = pd.DataFrame(tra, columns=cols)
+        df.apply(pd.to_numeric, errors="ignore")
+        df = self.manage_date(df)
+        df = self.convert_cols(df)
+        df = get_so2(df)
+        return df
+
+    # ----------------------------------------------------------------------------------------------
+
+    def manage_date(self, df):
+        """DateHour field is originally in string form 4/1/2016 02:00:00 PM
+           Here, change to a datetime object.
+
+           # also need to change to UTC.
+
+           # time is local standard time (never daylight savings)
+        """
+        # Using the %I for the hour field and %p for AM/Pm converts time
+        # correctly.
+        def newdate(xxx):
+            fmt = "%m/%d/%Y %I:%M:%S %p"
+            try:
+                rdt = datetime.datetime.strptime(xxx["DateHour"], fmt)
+            except BaseException:
+                print("PROBLEM DATE :", xxx["DateHour"], ":")
+                rdt = datetime.datetime(1000, 1, 1, 0)
+            return rdt
+
+        df["time local"] = df.apply(newdate, axis=1)
+        return df
+
+    def convert_cols(self, df):
+        """
+        All columns are read in as strings and must be converted to the
+        appropriate units. NaNs or empty values may be present in the columns.
+
+        OperatingTime : fraction of the clock hour during which the unit
+                        combusted any fuel. If unit, stack or pipe did not
+                        operate report 0.00.
+        """
+
+        ## three different ways to convert columns
+        def toint(xxx):
+            try:
+                rt = int(xxx)
+            except BaseException:
+                rt = -99
+            return rt
+
+        def tostr(xxx):
+            try:
+                rt = str(xxx)
+            except BaseException:
+                rt = "none"
+            return rt
+
+        def simpletofloat(xxx):
+            try:
+                rt = float(xxx)
+            except BaseException:
+                rt = -999
+            return rt
+
+        # calculate lbs of so2 by multiplying rate by operating time.
+        # checked this with FACTS
+        def getmass(optime, cname):
+            if float(optime) == 0:
+                rval = 0
+            else:
+                try:
+                    rval = float(cname) * float(optime)
+                except BaseException:
+                    rval = -999
+                    # rval = 0
+            return rval
+
+        # map OperatingTime to a float
+        df["OperatingTime"] = df["OperatingTime"].map(simpletofloat)
+        # map Adjusted Flow to a float
+        df["AdjustedFlow"] = df["AdjustedFlow"].map(simpletofloat)
+        # df["oris"] = df["oris"].map(toint)
+        df["oris"] = df.apply(lambda row: tostr(row["oris"]), axis=1)
+        # map SO2 data to a float
+        # if operating time is zero then map to 0 (it is '' in file)
+        optime = "OperatingTime"
+        cname = self.so2name
+        df["so2_lbs"] = df.apply(lambda row: getmass(row[optime], row[cname]), axis=1)
+
+        # temp is values that are not valid
+        #temp = df[df["so2_lbs"].isin([-999])]
+        #temp = temp[temp["OperatingTime"] > 0]
+        #print("Values that cannot be converted to float")
+        #print(temp[cname].unique())
+        #print("MODC ", temp["SO2MODC"].unique())
+        #ky = "MATSSstartupshutdownflat"
+        #if ky in temp.keys():
+        #    print("MATSSstartupshutdownflat", temp["MATSStartupShutdownFlag"].unique())
+        # print(temp['date'].unique())
+
+        #ky = "Operating Time"
+        #if ky in temp.keys():
+        #    print("Operating Time", temp["OperatingTime"].unique())
+        #if ky in df.keys():
+        #    print("All op times", df["OperatingTime"].unique())
+        # for line in temp.iterrows():
+        #    print(line)
+        return df
 
 
 class Emissions:
@@ -392,23 +613,22 @@ class Emissions:
         self.df = pd.DataFrame()
         self.orislist = []
         self.unithash = {}
-        #self.so2name = "SO2CEMReportedAdjustedSO2"
+        # self.so2name = "SO2CEMReportedAdjustedSO2"
         self.so2name = "SO2CEMReportedSO2MassRate"
-
         self.so2nameB = "UnadjustedSO2"
 
     def add(
-            self,
-            oris,
-            locationID,
-            year,
-            quarter,
-            ifile="efile.txt",
-            verbose=False,
-            # data2add=None,
-            # stackht=None,
-            # facname=None,
-            logfile="warnings.emit.txt",
+        self,
+        oris,
+        locationID,
+        year,
+        quarter,
+        ifile="efile.txt",
+        verbose=False,
+        # data2add=None,
+        # stackht=None,
+        # facname=None,
+        logfile="warnings.emit.txt",
     ):
         """
         oris : int
@@ -437,89 +657,22 @@ class Emissions:
             print("Warning: quarter greater than 4")
             sys.exit()
         tra = []
-        # print('Units at facility', unitra)
-        # unitra = sorted(set(unitra))
-        # if not unitra:
-        #   print('oris not in ', self.facdf['oris'].unique())
-        #   sys.exit()
-        # ----------------------------------------------------
+
         # for locationID in unitra:
         locationID = str(locationID)
-        efile = "efile.txt"
-        estr = "emissions/hourlyData/csv"
-        oris = str(oris)
-        getstr = "/".join([estr, str(oris), locationID,
-                           str(year), str(quarter)])
+        ec = EmissionsCall(oris, locationID, year, quarter)
+        df = ec.df
 
-        # returns csv file rather than json object.
-        data = sendrequest(getstr)
-
-        if data.status_code != 200:
-            return data.status_code
-
-        iii = 0
-        cols = []
-        for line in data.iter_lines(decode_unicode=True):
-
-            # 1. Process First line
-            if iii == 0:
-                tcols = line.split(",")
-                # add columns for unit id and oris code
-                tcols.append("unit")
-                tcols.append("oris")
-                # add columns for other info (stack height, latitude etc).
-                # for edata in data2add:
-                #    tcols.append(edata[0])
-                # 1a write column headers to a file.
-                verbose=True
-                if verbose:
-                    with open("headers.txt", "w") as fid:
-                        for val in tcols:
-                            fid.write(val + "\n")
-                    # print('press a key to continue ')
-                    # input()
-                # 1b check to see if desired emission variable is in the file.
-                if self.so2name not in tcols:
-                    with open(logfile, "a") as fid:
-                        rstr = "ORIS " + str(oris)
-                        rstr += " mid " + str(locationID) + "\n"
-                        rstr += "NO adjusted SO2 data \n"
-                        if self.so2nameB not in tcols:
-                            rstr += "NO SO2 data \n"
-                        rstr += "------------------------\n"
-                        fid.write(rstr)
-                    print("--------------------------------------")
-                    print("ORIS " + str(oris))
-                    print("UNIT " + str(locationID) + " no SO2 data")
-                    print("--------------------------------------")
-                    return -999
-                else:
-                    cols = tcols
-            # 2. Process rest of lines
-            else:
-                lt = line.split(",")
-                # add input info to line.
-                lt.append(locationID)
-                lt.append(int(oris))
-                # for edata in data2add:
-                #    lt.append(edata[1])
-                tra.append(lt)
-            iii += 1
-            # with open(efile, "a") as fid:
-            #    fid.write(line)
-        # ----------------------------------------------------
-        df = pd.DataFrame(tra, columns=cols)
-        # print(df[0:10])
-        df.apply(pd.to_numeric, errors="ignore")
-        df = self.manage_date(df)
-        df = self.convert_cols(df)
-        tempdf = get_so2(df)
         if self.df.empty:
             self.df = df
         else:
             self.df = self.df.append(df)
-        tempdf.to_csv(efile)
-        return data.status_code
+        # self.df.to_csv(efile)
+        # return data.status_code
+
+    def save(self):
+        efile = "efile.txt"
+        self.df.to_csv(efile)
 
     def merg_facilities(self, dfac):
         dfnew = pd.merge(
@@ -530,105 +683,6 @@ class Emissions:
             right_on=["oris", "unit"],
         )
         return dfnew
-
-    def convert_cols(self, df):
-        """
-        All columns are read in as strings and must be converted to the
-        appropriate units. NaNs or empty values may be present in the columns.
-
-        OperatingTime : fraction of the clock hour during which the unit
-                        combusted any fuel. If unit, stack or pipe did not
-                        operate report 0.00.
-        """
-
-        def toint(xxx):
-            try:
-                rt = int(xxx)
-            except BaseException:
-                rt = xxx
-            return rt
-
-        def simpletofloat(xxx):
-            try:
-                rt = float(xxx)
-            except BaseException:
-                rt = -999
-            return rt
-
-        # calculate lbs of so2 by multiplying rate by operating time.
-        # checked this with FACTS
-        def getmass(optime, cname):
-            if float(optime)==0:
-                rval = 0
-            else:
-                try:
-                    rval = float(cname) * float(optime)
-                except BaseException:
-                    rval = -999
-                    #rval = 0
-            return rval
-
-
-
-        # map OperatingTime to a float
-        df["OperatingTime"] = df["OperatingTime"].map(simpletofloat)
-        # map Adjusted Flow to a float
-        df["AdjustedFlow"] = df["AdjustedFlow"].map(simpletofloat)
-        #df["oris"] = df["oris"].map(toint)
-        df["oris"] = df.apply(lambda row: toint(row['oris']), axis=1)
-        # map SO2 data to a float
-        # if operating time is zero then map to 0 (it is '' in file)
-        optime = "OperatingTime"
-        cname = "UnadjustedSO2"
-        cname = self.so2name
-        df["so2_lbs"] = df.apply(
-            lambda row: getmass(
-                row[optime],
-                row[cname]),
-                axis=1)
-
-        # temp is values that are not valid
-        temp = df[df["so2_lbs"].isin([-999])]
-        temp = temp[temp["OperatingTime"] > 0]
-        print("Values that cannot be converted to float")
-        print(temp[cname].unique())
-        print("MODC ", temp["SO2MODC"].unique())
-        ky = "MATSSstartupshutdownflat"
-        if ky in temp.keys():
-            print("MATSSstartupshutdownflat",
-                  temp["MATSStartupShutdownFlag"].unique())
-        # print(temp['date'].unique())
-
-        ky = "Operating Time"
-        if ky in temp.keys():
-            print("Operating Time", temp["OperatingTime"].unique())
-        if ky in df.keys():
-            print("All op times", df["OperatingTime"].unique())
-        # for line in temp.iterrows():
-        #    print(line)
-        return df
-
-    def manage_date(self, df):
-        """DateHour field is originally in string form 4/1/2016 02:00:00 PM
-           Here, change to a datetime object.
-
-           # also need to change to UTC.
-
-           # time is local standard time (never daylight savings)
-        """
-        # Using the %I for the hour field and %p for AM/Pm converts time
-        # correctly.
-        def newdate(xxx):
-            fmt = "%m/%d/%Y %I:%M:%S %p"
-            try:
-                rdt = datetime.datetime.strptime(xxx["DateHour"], fmt)
-            except BaseException:
-                print("PROBLEM DATE :", xxx["DateHour"], ":")
-                rdt = datetime.datetime(1000, 1, 1, 0)
-            return rdt
-
-        df["time local"] = df.apply(newdate, axis=1)
-        return df
 
     def plot(self):
         import matplotlib.pyplot as plt
@@ -649,8 +703,7 @@ class Emissions:
             print(temp["SO2MODC"].unique())
         for unit in df["unit"].unique():
             temp = temp1[temp1["unit"] == unit]
-            temp = temp[temp["SO2MODC"].isin(
-                ["01", "02", "03", "04"]) == False]
+            temp = temp[temp["SO2MODC"].isin(["01", "02", "03", "04"]) == False]
             plt.plot(temp["date"], temp["so2_lbs"], label="bad " + str(unit))
             print("UNIT", str(unit))
             print(temp["SO2MODC"].unique())
@@ -683,9 +736,9 @@ class MonitoringPlan(EpaApiObject):
 
     """
 
-    def __init__(self, oris, mid, date, fname='Mplans.csv', save=True, prompt=False):
+    def __init__(self, oris, mid, date, fname="Mplans.csv", save=True, prompt=False):
         self.oris = oris  # oris code of facility
-        self.mid = mid    # monitoring location id.
+        self.mid = mid  # monitoring location id.
         self.date = date  # date
         self.dfall = pd.DataFrame()
         super().__init__(fname, save, prompt)
@@ -698,14 +751,13 @@ class MonitoringPlan(EpaApiObject):
         # Multiple mplans may be saved to the same csv file.
         # so this may return an emptly dataframe
         df = super().load()
-        chash = {'mid':str, 'oris':str}
-        df = pd.read_csv(self.fname, index_col=[0],
-                         converters = chash)
+        chash = {"mid": str, "oris": str}
+        df = pd.read_csv(self.fname, index_col=[0], converters=chash)
         self.dfall = df.copy()
-        df = df[df['oris'] == self.oris]
-        df = df[df['mid'] == self.mid]
-        return df
- 
+        df = df[df["oris"] == self.oris]
+        df = df[df["mid"] == self.mid]
+        return df, True
+
     def save(self):
         # do not want to overwrite other mplans in the file.
         try:
@@ -714,10 +766,10 @@ class MonitoringPlan(EpaApiObject):
             pass
         if not self.dfall.empty:
             df = pd.concat([self.dfall, self.df])
-            df = df.drop_duplicates(subset=['oris','mid'])
-            df.to_csv(self.fname)  
+            df = df.drop_duplicates(subset=["oris", "mid"])
+            df.to_csv(self.fname)
         else:
-            self.df.to_csv(self.fname) 
+            self.df.to_csv(self.fname)
 
     def create_getstr(self):
         oris = self.oris
@@ -725,8 +777,7 @@ class MonitoringPlan(EpaApiObject):
         dstr = self.date.strftime("%Y-%m-%d")
         mstr = "monitoringplan"
         getstr = "/".join([mstr, str(oris), str(mid), dstr])
-        return getstr 
-
+        return getstr
 
     def unpack(self, data):
         """
@@ -751,8 +802,8 @@ class MonitoringPlan(EpaApiObject):
                 # dhash = {}
                 dhash["stackname"] = stackname
                 # dhash["unit"] = self.mid
-                dhash["stackht"] = att["stackHeight"]  * 0.3048 # int
-                dhash["stackht unit"] = 'm' # int
+                dhash["stackht"] = att["stackHeight"] * 0.3048  # int
+                dhash["stackht unit"] = "m"  # int
                 dhash["crossAreaExit"] = att["crossAreaExit"]  # int
                 dhash["crossAreaFlow"] = att["crossAreaFlow"]  # int
                 dhash["locID"] = att["locId"]
@@ -775,9 +826,9 @@ class MonitoringPlan(EpaApiObject):
                     ]
                     for val in elist:
                         dhash[val] = method[val]
-            dhash['oris'] = self.oris
-            dhash['mid'] = self.mid
-            dhash['request_date'] = self.date
+            dhash["oris"] = self.oris
+            dhash["mid"] = self.mid
+            dhash["request_date"] = self.date
             dlist.append(dhash)
         df = pd.DataFrame(dlist)
         return df
@@ -836,7 +887,6 @@ class MonitoringPlan(EpaApiObject):
 # responsibilities
 
 
-
 class FacilitiesData(EpaApiObject):
     """
     class that represents data returned by facilities call to the restapi.
@@ -870,12 +920,12 @@ class FacilitiesData(EpaApiObject):
 
     """
 
-    def __init__(self, fname='Fac.csv', prompt=False, save=True):
+    def __init__(self, fname="Fac.csv", prompt=False, save=True):
         super().__init__(fname, save, prompt)
 
     def __str__(self):
         cols = self.df.columns
-        rstr = ', '.join(cols)
+        rstr = ", ".join(cols)
         return rstr
 
     def create_getstr(self):
@@ -899,7 +949,7 @@ class FacilitiesData(EpaApiObject):
         Returns list of monitoring location ids
         for a particular oris code.
         """
-        oris = int(oris)
+        oris = str(oris)
         # if self.df.empty:
         #    self.facdata()
         temp = self.df[self.df["oris"] == oris]
@@ -929,11 +979,11 @@ class FacilitiesData(EpaApiObject):
 
         for val in data["data"]:
             ahash = {}
-            ahash["oris"] = int(val["orisCode"])
+            ahash["oris"] = str(val["orisCode"])
             ahash["facility_name"] = val["name"]
             ahash["latitude"] = val["geographicLocation"]["latitude"]
             ahash["longitude"] = val["geographicLocation"]["longitude"]
-            #ahash['time_offset'] = get_timezone_offset(ahash['latitude'],
+            # ahash['time_offset'] = get_timezone_offset(ahash['latitude'],
             #                       ahash['longitude'])
             for sid in val["monitoringPlans"]:
                 bhash = {}
@@ -1028,12 +1078,12 @@ class CEMS(object):
         self.emit = Emissions()
         self.orislist = []
 
-        #self.filehash = {}
-        #self.filehash{'facilities'} = 'Fac.csv'
-        #self.filehash{'monitoring'} = 'Mon.csv'
+        # self.filehash = {}
+        # self.filehash{'facilities'} = 'Fac.csv'
+        # self.filehash{'monitoring'} = 'Mon.csv'
 
     def add_facilities_file(self, fname):
-        self.filehash['facilities'] = fname
+        self.filehash["facilities"] = fname
 
     def add_data(self, rdate, area, verbose=True):
         """
@@ -1097,7 +1147,7 @@ class CEMS(object):
                 plan = MonitoringPlan(str(oris), str(mid), datelist[0])
                 mhash = plan.to_dict()
                 for ndate in datelist:
-                    if mhash: 
+                    if mhash:
                         if len(mhash) > 1:
                             print(
                                 "CEMS class WARNING: more than one \
@@ -1129,6 +1179,7 @@ class CEMS(object):
                     write_status_message(status, oris, mid, quarter, "log.txt")
         # merge stack height data into the facilities information data frame.
         tempdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])
+        # facdf contains latitutde longitude information.
         facdf = pd.merge(
             tempdf,
             facdf,
@@ -1137,7 +1188,6 @@ class CEMS(object):
             right_on=["oris", "unit"],
         )
         # drop un-needed columns from the emissions DataFrame
-        print('CEMS API ZZZZ')
         emitdf = get_so2(self.emit.df)
         # merge data from the facilties DataFrame into the Emissions DataFrame
         emitdf = pd.merge(
@@ -1198,59 +1248,6 @@ def latlon2str(lat, lon):
     latstr = "{:.4}".format(lat)
     lonstr = "{:.4}".format(lon)
     return (latstr, lonstr)
-
-
-def cemspivot(df, varname, cols=['oris','stackht'], daterange=None,  verbose=True):
-    """
-    Parameters
-    ----------
-    varname: string
-        name of column in the cems dataframe
-    daterange: list of two datetime objects
-        define a date range
-    unitid: boolean.
-             If True and unit id columns exist then these will be kept as
-             separate columns in the pivot table.
-    verbose: boolean
-             if true print out extra information.
-    stackht: boolean
-             NOT IMPLEMENTED YET. if true stack height is in header column.
-    Returns: pandas DataFrame object
-        returns dataframe with rows time. Columns are (oris, stackht)
-        If no unit_id in the file then columns are just oris.
-        if unitid flag set to False then sums over unit_id's that belong to
-        an oris. Values are from the column specified by the
-        varname input.
-    """
-    from .obs_util import timefilter
-
-    temp = df.copy()
-    if daterange:
-        temp = timefilter(temp, daterange)
-    #if "unitid" in temp.columns.values and unitid:
-        # if temp['unit_id'].unique():
-        #    if verbose:
-        #        print('UNIT IDs ', temp['unit_id'].unique())
-    #    cols = ["oris", "unitid", "stackht"]
-        # if stackht:
-        #    cols.append('stackht')
-    #else:
-    #    cols = ["oris", "stackht", "latlon"]
-        # if stackht:
-        #    cols.append('max_stackht')
-    #temp["latlon"] = temp.apply(
-    #    lambda row: latlon2str(row["latitude"], row["longitude"]), axis=1
-    #)
-    # create pandas frame with index datetime and columns for value for
-    # each unit_id,orispl
-
-    #cols = ['oris','stackht']
-    pivot = pd.pivot_table(
-        temp, values=varname, index=["time"], columns=cols, aggfunc=np.sum
-    )
-    # print('PIVOT ----------')
-    # print(pivot[0:20])
-    return pivot
 
 
 def get_var(df, varname, orisp=None, daterange=None, unitid=-99, verbose=True):

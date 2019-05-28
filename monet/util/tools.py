@@ -92,7 +92,7 @@ def long_to_wide(df):
     
     """
     from pandas import Series, merge
-    w = df.pivot_table(
+    w = pd.pivot_table(df,
         values='obs', index=['time', 'siteid'],
         columns='variable').reset_index()
     cols = Series(df.columns)
@@ -109,7 +109,7 @@ def long_to_wideB(df):
     wpivot :   dataframe 
     """
     from pandas import Series, merge
-    wpivot = df.pivot_table(
+    wpivot = pd.pivot_table(df
         values='obs', index=['time', 'siteid', 'latitude','longitude'],
         columns=['variable','units']).reset_index()
     return wpivot

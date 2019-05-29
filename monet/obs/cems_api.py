@@ -251,10 +251,11 @@ def keepcols(df, keeplist):
     tcols = df.columns.values
     klist = []
     for ttt in keeplist:
-        if ttt not in tcols:
-            print("NOT IN ", ttt)
+        if ttt in tcols:
+        #if ttt not in tcols:
+        #    print("NOT IN ", ttt)
         #    print('Available', tcols)
-        else:
+        #else:
             klist.append(ttt)
     tempdf = df[klist]
     return tempdf
@@ -393,7 +394,7 @@ class EmissionsCall(EpaApiObject):
         chash = {"mid": str, "oris": str, "unit": str}
         df = pd.read_csv(self.fname, index_col=[0], converters=chash, parse_dates=False)
         convert = True
-        print(df[0:10])
+        #print(df[0:10])
         # if not df.empty:
         if convert and not df.empty:
 

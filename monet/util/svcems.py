@@ -8,52 +8,93 @@ import datetime
 import seaborn as sns
 from monet.obs import cems_api
 import monet.obs.obs_util as obs_util
+
 # from arlhysplit import runh
 from monet.util.svdir import date2dir
+from timezonefinder import TimezoneFinder
+
 # from arlhysplit.runh import source_generator
 # from arlhysplit.runh import create_plume
 # from arlhysplit.tcm import TCM
 from monet.utilhysplit import emitimes
+from shapely.geometry import Point
+import geopandas as gpd
+import pandas as pd
 
 # from monet.obs.epa_util import convert_epa_unit
 
 """
 SEmissions class
+
+methods:
+  __init__
+  find
+  get_so2_sources
+  get_heat
+  get_stackvalues
+  check_oris
+  get_sources
+  create_emitimes
+  emit_subroutine
+  plot
+  map
+
+# in script
+  A. ef.find
+  B  ef.plot
+  C  ef.create_emitimes
+  D  er.map
+
+SourceSummary class
 """
 
-class SourceSummary:
 
-    def __init__(self, tdir='./', fname='source_summary.csv', data=pd.DataFrame()):
-          
+def get_timezone(lat, lon):
+    """ returns time difference in hours"""
+    tf = TimezoneFinder()
+    tz = tf.closest_timezone_at(lng=lon, lat=lat)
+    #print("TZ-------------", tz, lat, lon)
+    dtest = datetime.datetime(2010, 2, 1, 0)
+    t1 = pd.Timestamp(dtest).tz_localize(tz)
+    t2 = t1.tz_convert("utc")
+
+    t1 = t1.tz_localize(None)
+    t2 = t2.tz_localize(None)
+    return (t2 - t1).seconds / 3600.0
+
+
+class SourceSummary:
+    def __init__(self, tdir="./", fname="source_summary.csv", data=pd.DataFrame()):
+
         if not data.empty:
             self.sumdf = self.create(data)
         else:
-            self.sumdf = self.load(tdir, fname) 
-          
+            self.sumdf = self.load(tdir, fname)
+
         self.tdir = tdir
         self.fname = fname
-        
+
     def check_oris(self, threshold):
         """
         return list of oris codes for which the max emission was above
         threshold.
         """
-        tempdf=self.sumdf[['ORIS','Max(lbs)']]
-        tempdf.groupby('ORIS').max() 
-        df = tempdf[tempdf['Max(lbs)'] >  threshold]
-        goodoris = df['ORIS'].unique()
+        tempdf = self.sumdf[["ORIS", "Max(lbs)"]]
+        tempdf.groupby("ORIS").max()
+        df = tempdf[tempdf["Max(lbs)"] > threshold]
+        goodoris = df["ORIS"].unique()
         return goodoris
 
     def operatingtime(self, data1):
-        grouplist = ['oris', 'unit' ]
+        grouplist = ["oris", "unit"]
         keep = grouplist.copy()
-        keep.append('OperatingTime')
+        keep.append("OperatingTime")
         data1 = cems_api.keepcols(data1, keep)
         optime = data1.groupby(grouplist).sum()
-        optime.reset_index(inplace=True) 
-        return optime 
+        optime.reset_index(inplace=True)
+        return optime
 
-    def  create(self,data1):
+    def create(self, data1):
         """
         creates a dataframe with columns 
         oris
@@ -64,7 +105,7 @@ class SourceSummary:
         Stack Height (m)
         Mean(lbs)  (mean 1 hour emission over the time period) 
         Max(lbs)  (Max 1 hour emission over the time period) 
-        """ 
+        """
         columns = [
             "ORIS",
             "unit",
@@ -79,49 +120,64 @@ class SourceSummary:
         print(data1.columns)
         optime = self.operatingtime(data1)
         # only average when plant was operating.
-        #data0 = data1.copy()
+        # data0 = data1.copy()
         # only average when plant was operating.
-        data1 = data1[data1['OperatingTime']>0]
-        # 
-        grouplist = ['oris', 'unit', 'facility_name', 'latitude','longitude', 'stackht']
+        data1 = data1[data1["OperatingTime"] > 0]
+        #
+        grouplist = [
+            "oris",
+            "unit",
+            "facility_name",
+            "latitude",
+            "longitude",
+            "stackht",
+        ]
         keep = grouplist.copy()
-        keep.append('so2_lbs')
-        print(keep)
+        keep.append("so2_lbs")
+        #print(keep)
         # drop columns not in the keep list.
-       
+
         data1 = cems_api.keepcols(data1, keep)
-       
+
         # get the mean of so2_lbs
         meandf = data1.groupby(grouplist).mean()
         # get the max of so2_lbs
         maxdf = data1.groupby(grouplist).max()
-        meandf.reset_index(inplace=True) 
-        maxdf.reset_index(inplace=True) 
+        meandf.reset_index(inplace=True)
+        maxdf.reset_index(inplace=True)
         # merge so mean and max in same DataFrame
-        sumdf = pd.merge(meandf, maxdf, how='left', left_on=grouplist,
-                         right_on=grouplist)
-        
-        sumdf = pd.merge(sumdf, optime, how='left', left_on=['oris','unit'],
-                         right_on=['oris','unit'])
-        sumdf.columns= columns
+        sumdf = pd.merge(
+            meandf, maxdf, how="left", left_on=grouplist, right_on=grouplist
+        )
+
+        sumdf = pd.merge(
+            sumdf,
+            optime,
+            how="left",
+            left_on=["oris", "unit"],
+            right_on=["oris", "unit"],
+        )
+        sumdf.columns = columns
         return sumdf
 
     def __str__(self):
-        print('Placeholder for Source Summary String')
+        print("Placeholder for Source Summary String")
 
     def load(self, tdir=None, name=None):
-        if not name: name = self.fname
-        if not tdir: tdir = self.tdir 
+        if not name:
+            name = self.fname
+        if not tdir:
+            tdir = self.tdir
         if os.path.isfile(tdir + name):
-            df = pd.read_csv(tdir + name, header=None)
+            # df = pd.read_csv(tdir + name, header=None)
+            df = pd.read_csv(tdir + name)
         else:
             df = pd.DataFrame()
         return df
 
-    def print(self, tdir='./', name="source_summary.csv"):
+    def print(self, tdir="./", name="source_summary.csv"):
         fname = tdir + name
         self.sumdf.to_csv(fname)
-
 
 
 def df2hash(df, key, value):
@@ -129,12 +185,13 @@ def df2hash(df, key, value):
         in a pandas dataframe. 
     """
     if key not in df.columns:
-       return None 
+        return None
     if value not in df.columns:
-       return None 
+        return None
     dseries = df.set_index(key)
     dseries = dseries[value]
     return dseries.to_dict()
+
 
 class SEmissions(object):
     """This class for running the SO2 HYSPLIT verification.
@@ -147,7 +204,7 @@ class SEmissions(object):
        map  - plots locations of power plants on map
     """
 
-    def __init__(self, dates, area,  tdir="./", source_thresh=100):
+    def __init__(self, dates, area, tdir="./", source_thresh=100):
         """
         self.sources: pandas dataframe
             sources are created from a CEMSEmissions class object in the get_sources method.
@@ -167,13 +224,13 @@ class SEmissions(object):
               considered.
         """
         self.df = pd.DataFrame()
-        self.dfu = pd.DataFrame() 
+        self.dfu = pd.DataFrame()
         # data frame for uncertain emissions.
         # MODC >= 8
-        self.dfu = pd.DataFrame() 
+        self.dfu = pd.DataFrame()
         self.sources = pd.DataFrame()
-  
-      # dates to consider.
+
+        # dates to consider.
         self.d1 = dates[0]
         self.d2 = dates[1]
         # area to consider
@@ -186,7 +243,7 @@ class SEmissions(object):
 
         self.lbs2kg = 0.453592
         self.logfile = "svcems.log.txt"
-        self.meanhash={}
+        self.meanhash = {}
 
     def find(self, testcase=False, byunit=False, verbose=False):
         """find emissions using the CEMS class
@@ -199,17 +256,41 @@ class SEmissions(object):
             efile = "emission_02-28-2018_103721604.csv"
             self.cems.load(efile, verbose=verbose)
         else:
-            data = self.cems.add_data([self.d1, self.d2], area,  verbose=True)
+            data = self.cems.add_data([self.d1, self.d2], area, verbose=True)
+
         source_summary = SourceSummary(data=data)
-        self.meanhash = df2hash(source_summary.sumdf,'ORIS','Max(lbs)')
-        print('MEANHASH')
-        print(self.meanhash)
+        self.meanhash = df2hash(source_summary.sumdf, "ORIS", "Max(lbs)")
+        # print('MEANHASH')
+        # print(self.meanhash)
 
         # remove sources which do not have high enough emissions.
         self.goodoris = source_summary.check_oris(self.ethresh)
-        self.df = data[data['oris'].isin(self.goodoris)]
+        self.df = data[data["oris"].isin(self.goodoris)]
         source_summary.print()
 
+        lathash = df2hash(self.df, "oris", "latitude")
+        lonhash = df2hash(self.df, "oris", "longitude")
+
+        # convert time to utc
+        tzhash = {}
+        for oris in self.df["oris"].unique():
+            # tz = cems_api.get_timezone_offset(lathash[oris], lonhash[oris])
+            tz = get_timezone(lathash[oris], lonhash[oris])
+            tzhash[oris] = datetime.timedelta(hours=tz)
+
+        def loc2utc(local, oris, tzhash):
+            utc = local - tzhash[oris]
+            return utc
+
+        self.df["time"] = self.df.apply(
+            lambda row: loc2utc(row["time local"], row["oris"], tzhash), axis=1
+        )
+
+        # rename 'time utc' to time and drop the time local column
+        # self.df.drop(['time'])
+        # columns = self.df.columns
+        # columns = ['time' if x=='time utc' else x for x in columns]
+        # self.df.columns=columns
 
     def get_so2_sources(self, unit=False):
         sources = self.get_sources(stype="so2_lbs", unit=unit)
@@ -271,11 +352,24 @@ class SEmissions(object):
         if self.df.empty:
             self.find()
         ut = unit
-        sources = cems_api.cemspivot(self.df,
-            (stype), cols=['oris','stackht'], daterange=[self.d1, self.d2], verbose=False)
-        droplist=[]
+        df = obs_util.timefilter(self.df, [self.d1, self.d2])
+        df = self.modc2spnum(df)
+        #dftemp = df[df["spnum"] == 1]
+        #dftemp = df[df["spnum"] == 2]
+        #dftemp = df[df["spnum"] == 3]
+        #print("SP 3", dftemp.SO2MODC.unique())
+        #print("OP TIME", dftemp.OperatingTime.unique())
+        cols = ["oris", "stackht", "spnum"]
+        # cols=['oris']
+        sources = pd.pivot_table(
+            df, index=["time"], values=stype, columns=cols, aggfunc=np.sum
+        )
+        # sources = cems_api.cemspivot(self.df,
+        #    (stype), cols=['oris','stackht'], daterange=[self.d1, self.d2], verbose=False)
+        droplist = []
         cnew = []
-        if verbose: print('----GET SOURCES columns------')
+        #if verbose:
+        #    print("----GET SOURCES columns------")
         columns = list(sources.columns.values)
         # print('----columns------')
         # print(columns) #EXTRA
@@ -289,46 +383,79 @@ class SEmissions(object):
         # lat lon information is added here because they are floats.
         # when creating the pivot table, do not want to have extra columns if
         # floats are slightly different.
-        lonhash = df2hash(self.df, 'oris','latitude')
-        lathash = df2hash(self.df, 'oris','longitude')
+        lathash = df2hash(self.df, "oris", "latitude")
+        lonhash = df2hash(self.df, "oris", "longitude")
         newcolumn = []
-        for val in sources.columns:
+        cols = sources.columns
+        if isinstance(cols, str):
+            cols = [cols]
+        for val in cols:
             lat = lathash[val[0]]
             lon = lonhash[val[0]]
-            newcolumn.append((val[0], val[1], lat, lon))
+            newcolumn.append((val[0], val[1], lat, lon, val[2]))
         sources.columns = newcolumn
         #######################################################################
         #######################################################################
+        #print("SOURCES ", sources.columns)
         return sources
 
     # def create_heatfile(self,edate, schunks=1000, tdir='./', unit=True):
 
+    def read_csv(self, name="cems.csv"):
+        cems = pd.read_csv(name, sep=",")
+        return cems
+
+    def make_csv(self, df):
+        new = []
+        df.fillna(0, inplace=True)
+        for hd in df.columns:
+            try:
+                cstr=hd[0] + ' P' + str(hd[4])
+            except:
+                cstr = hd
+            new.append(cstr)
+        df.columns = new
+        df.to_csv("cems.csv")
+
     def create_emitimes(self, edate, schunks=1000, tdir="./", unit=True):
         """
+        One of the main methods. 
         create emitimes file for CEMS emissions.
-        edate is the date to start the file on.
+        edate: datetime : the date to start the file on.
         Currently, 24 hour cycles are hard-wired.
+
+
+        self.get_so2_sources
         """
         df = self.get_so2_sources(unit=unit)
-        print('CREATE EMITIMES in SVCEMS')
-        print(df[0:72])
-        dfheat = df *0
-        #dfheat = self.get_heat(unit=unit)
-        #if unit:
+        # df = self.get_sources()
+        self.make_csv(df.copy())
+        #print("CREATE EMITIMES in SVCEMS")
+        #print(df[0:72])
+        # placeholder. Will later add routine to get heat for plume rise
+        # calculation.
+
+        dfheat = df * 0
+        # dfheat = self.get_heat(unit=unit)
+        # if unit:
         #    dfstack = self.get_stackvalues(unit=unit)
         locs = df.columns.values
         done = False
         iii = 0
         d1 = edate
+        # loop to create each emittimes file.
         while not done:
             d2 = d1 + datetime.timedelta(hours=schunks - 1)
             dftemp = df.loc[d1:d2]
-            hdf = dfheat[d1:d2]
+            hdf = dfheat.loc[d1:d2]
             if unit:
                 sdf = dfstack[d1:d2]
+            # if no emissions during time period then break.
             if dftemp.empty:
                 break
             self.emit_subroutine(dftemp, hdf, d1, schunks, tdir, unit=unit)
+            # create separate EMIT TIMES file for each unit.
+            # these are named STACKFILE rather than EMIT
             if unit:
                 self.emit_subroutine(
                     dftemp, sdf, d1, schunks, tdir, unit=unit, bname="STACKFILE"
@@ -353,29 +480,60 @@ class SEmissions(object):
         # df = self.get_so2()
         # dfheat = self.get_heat()
         locs = df.columns.values
+        prev_oris = 'none'
+        ehash = {}
+        
+        # get list of oris numbers
+        orislist = []
         for hdr in locs:
+            oris = hdr[0]
+            orislist.append(oris)
+        orislist = list(set(orislist))
+
+        sphash = {1:'MEAS', 2:'EST1', 3:'EST2'}
+
+        # create a dictionary with key oris number and value and EmiTimes
+        # object.
+        for oris in orislist:
+            # output directory is determined by tdir and starting date.
+            # chkdir=True means date2dir will create the directory if
+            # it does not exist already.
+            ename = bname + str(oris)
+            odir = date2dir(tdir, edate, dhour=schunks, chkdir=True)
+            ename = odir + ename + ".txt"
+            ehash[oris] =  emitimes.EmiTimes(filename=ename)
+            ehash[oris].set_species(sphash)
+
+        # now this loop fills the EmitTimes objects
+        for hdr in locs:
+            oris = hdr[0]
             # print('HEADER', hdr)
             d1 = edate  # date to start emitimes file.
             dftemp = df[hdr]
             dfh = dfheat[hdr]
-
-            oris = hdr[0]
-            ename = bname + str(oris)
+            dftemp.fillna(0, inplace=True)
+            dftemp = dftemp[dftemp!=0]
+            #ename = bname + str(oris)
             if unit:
                 sid = hdr[4]
                 ename += "." + str(sid)
             height = hdr[1]
             lat = hdr[2]
             lon = hdr[3]
+            spnum = hdr[4]
             # hardwire 1 hr duraton of emissions.
             record_duration = "0100"
             area = 1
+            # pick which EmitTimes object we are working with.
+            efile = ehash[oris]
             # output directory is determined by tdir and starting date.
             # chkdir=True means date2dir will create the directory if
             # it does not exist already.
-            odir = date2dir(tdir, edate, dhour=schunks, chkdir=True)
-            ename = odir + ename + ".txt"
-            efile = emitimes.EmiTimes(filename=ename)
+            #odir = date2dir(tdir, edate, dhour=schunks, chkdir=True)
+            #ename = odir + ename + ".txt"
+            #efile = emitimes.EmiTimes(filename=ename)
+            # this was creating a special file for a pre-processing program
+            # that would take diameter, temp and velocity to compute plume rise.
             if "STACK" in bname:
                 hstring = efile.header.replace(
                     "HEAT(w)", "DIAMETER(m) TEMP(K) VELOCITY(m/s)"
@@ -385,42 +543,118 @@ class SEmissions(object):
             dt = datetime.timedelta(hours=24)
             efile.add_cycle(d1, "0024")
             for date, rate in dftemp.iteritems():
+                #if spnum!=1: print(date, rate, spnum)
                 if date >= edate:
                     heat = dfh[date]
                     check = efile.add_record(
-                        date, record_duration, lat, lon, height, rate, area, heat
+                        date, record_duration, lat, lon, height, rate, area, heat, spnum
                     )
-                    if not check:
+                    nnn=0
+                    
+                    while not check:
                         d1 = d1 + dt
                         efile.add_cycle(d1, "0024")
-                        check2 = efile.add_record(
-                            date, record_duration, lat, lon, height, rate, area, heat
+                        check = efile.add_record(
+                            date,
+                            record_duration,
+                            lat,
+                            lon,
+                            height,
+                            rate,
+                            area,
+                            heat,
+                            spnum,
                         )
-                        if not check2:
-                            print("sverify WARNING: record not added to EmiTimes")
-                            print(date.strftime("%Y %m %d %H:%M"))
-                            print(str(lat), str(lon), str(rate), str(heat))
-                            break
+                        nnn+=1
+                        if nnn > 10:
+                           break
+                        #if not check2:
+                        #    print("sverify WARNING: record not added to EmiTimes")
+                        #    print(date.strftime("%Y %m %d %H:%M"))
+                        #    print(str(lat), str(lon), str(rate), str(heat))
+                        #    break
+        # here we write the EmitTimes files
+        for efile in ehash.values():
             efile.write_new(ename)
+
+    def modc2spnum(self, dfin):
+        """
+        The modc is a flag which give information about if hte
+        value was measured or estimated.
+        Estimated values will be carried by different particles.
+        spnum will indicate what species the emission will go on. 
+
+        """
+
+        # According to lookups MODC values
+        # 01 primary monitoring system
+        # 02 backup monitoring system
+        # 03 alternative monitoring system
+        # 04 backup monitoring system
+
+        # 06 average hour before/hour after
+        # 07 average hourly
+
+        # 21 negative value replaced with 0.
+        # 08 90th percentile value in Lookback Period
+        # 09 95th precentile value in Lookback Period
+        # etc.
+
+        # it looks like values between 1-4 ok
+        # 6-7 probably ok
+        # higher values should be flagged.
+
+        # when operatingTime is 0, the modc is Nan
+        # these should be flagged as sp1 since 0 emissions is certain.
+
+        df = dfin.copy()
+
+        def sort_modc(x):
+            if x["SO2MODC"] in [1, 2, 3, 4]:
+                return 1
+            if x["SO2MODC"] in [6, 7]:
+                return 2
+            else:
+                if x["OperatingTime"] == 0:
+                    return 1
+                else:
+                    return 3
+
+        df["spnum"] = df.apply(sort_modc, axis=1)
+        return df
 
     def plot(self, save=True, quiet=True, maxfig=10):
         """plot time series of emissions"""
         if self.cems.df.empty:
             self.find()
         sns.set()
-        namehash = cems_api.get_lookuphash(self.df, 'oris', 'facility_name')
-        data1 = cems_api.cemspivot(self.df, 
-            ("so2_lbs"), cols=['oris'], daterange=[self.d1, self.d2], verbose=False)
-        print('SVCEMS plot method')
-        print("*****************")
-        print(data1.columns)
-        print("*****************")
-        for loc in data1.keys():
-            print(loc)
+        namehash = df2hash(self.df, "oris", "facility_name")
+        # ---------------
+        df = obs_util.timefilter(self.df, [self.d1, self.d2])
+        df = self.modc2spnum(df)
+        cols = ["oris", "spnum"]
+        data1 = pd.pivot_table(
+            df, index=["time"], values="so2_lbs", columns=cols, aggfunc=np.sum
+        )
+        # ---------------
+        # data1 = cems_api.cemspivot(self.df,
+        #    ("so2_lbs"), cols=['oris'], daterange=[self.d1, self.d2], verbose=False)
+        #print("SVCEMS plot method")
+        #print("*****************")
+        #print(data1.columns)
+        #print("*****************")
+        clrs = ["b.", "g.", "r."]
+        jjj = 0
+        ploc = 0
+        for ky in data1.keys():
+            loc = ky[0]
+            if loc != ploc:
+                self.fignum += 1
+                jjj = 0
             fig = plt.figure(self.fignum)
             ax = fig.add_subplot(1, 1, 1)
-            data = data1[loc] * self.lbs2kg
-            ax.plot(data, "--b.")
+            data = data1[ky] * self.lbs2kg
+            ax.plot(data, clrs[jjj])
             plt.ylabel("SO2 mass kg")
             plt.title(str(loc) + " " + namehash[loc])
             if save:
@@ -431,35 +665,37 @@ class SEmissions(object):
                     plt.show()
                 plt.close("all")
                 self.fignum = 0
-            print("plotting cems figure " + str(self.fignum))
-            self.fignum += 1
+            ploc = loc
+            jjj += 1
+        plt.show()
+        # self.fignum += 1
 
     def map(self, ax):
         """plot location of emission sources"""
-        #if self.cems.df.empty:
+        # if self.cems.df.empty:
         #    self.find()
         plt.sca(ax)
-        oris = self.df['oris'].unique()
-        print(oris)
-        lonhash = cems_api.get_lookuphash(self.df, 'oris','latitude')
-        lathash = cems_api.get_lookuphash(self.df, 'oris','longitude')
+        oris = self.df["oris"].unique()
+        if isinstance(oris, str):
+            oris = [oris]
+        lathash = df2hash(self.df, "oris", "latitude")
+        lonhash = df2hash(self.df, "oris", "longitude")
         # fig = plt.figure(self.fignum)
         for loc in oris:
-            try: 
+            try:
                 lat = lathash[loc]
             except:
-                loc= None
+                loc = None
             if loc:
                 lat = lathash[loc]
                 lon = lonhash[loc]
                 # print('PLOT', str(lat), str(lon))
                 # plt.text(lon, lat, (str(loc) + ' ' + str(self.meanhash[loc])), fontsize=12, color='red')
-                #pstr = str(loc) + " \n" + str(int(self.meanhash[loc])) + "kg"
-                #if self.meanhash[loc] > self.ethresh:
+                # pstr = str(loc) + " \n" + str(int(self.meanhash[loc])) + "kg"
+                # if self.meanhash[loc] > self.ethresh:
                 if loc in self.goodoris:
-                    #ax.text(lon, lat, pstr, fontsize=12, color="red")
+                    # ax.text(lon, lat, pstr, fontsize=12, color="red")
                     ax.plot(lon, lat, "ko")
                 else:
                     ax.text(lon, lat, str(int(loc)), fontsize=8, color="k")
                     ax.plot(lon, lat, "k.")
-

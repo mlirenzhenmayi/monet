@@ -1,17 +1,16 @@
 import os
-import subprocess
+#import subprocess
 import pandas as pd
 import numpy as np
 import pickle as pickle
-from optparse import OptionParser
 import matplotlib.pyplot as plt
 import datetime
 import sys
 import seaborn as sns
-from monet.obs import cems_mod
-from monet.obs import aqs_mod
+#from monet.obs import cems_mod
+from monet.obs import aqs as aqs_mod
 from monet.obs import airnow
-from monet.obs import ish_mod
+#from monet.obs import ish as ish_mod
 import monet.obs.obs_util as obs_util
 
 # from arlhysplit import runh
@@ -181,6 +180,12 @@ class SObs(object):
         obs = pd.read_csv(name, sep=",", header=hdrs, converters={"time": to_datetime})
         return obs
 
+    def read_met(self):
+        tdir='./'
+        mname=tdir + "met" + self.csvfile
+        met = pd.read_csv(mname, parse_dates=True)
+        return(met)
+
     def create_pickle(self, tdir="./"):
         pickle.dump(self.obs, open(tdir + self.pfile, "wb"))
 
@@ -275,6 +280,8 @@ class SObs(object):
         met_obs.to_csv(tdir + "met" + self.csvfile, header=True, float_format="%g")
 
         # now create a dataframe with data for each site.
+        # get rid of the meteorological (and other) variables in the file.
+        self.obs = self.obs[self.obs["variable"] == "SO2"]
         obs_info = tools.get_info(self.obs)
         print("saving to file ", tdir + "info_" + self.csvfile)
         obs_info.to_csv(tdir + "info_" + self.csvfile, float_format="%g")
@@ -295,11 +302,13 @@ class SObs(object):
         self.ohash = obs_util.get_lhash(self.obs, "siteid")
 
         # get rid of the meteorological variables in the file.
-        self.obs = self.obs[self.obs["variable"] == "SO2"]
+        #self.obs = self.obs[self.obs["variable"] == "SO2"]
         # convert units of SO2
         units = units.upper()
         if units == "UG/M3":
             self.obs = convert_epa_unit(self.obs, obscolumn="obs", unit=units)
+
+
 
     def check(self):
         """

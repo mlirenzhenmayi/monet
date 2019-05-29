@@ -6,10 +6,12 @@ import os
 from os import path, chdir
 from subprocess import call
 import pandas as pd
+import matplotlib.pyplot as plt
 from monet.utilhysplit.statmain import MatchedData
 from monet.util.svcems import SourceSummary
 from monet.util.svcems import df2hash
 from monet.util.svobs import SObs
+from monet.util.svobs import get_tseries
 import seaborn as sns
 from shapely.geometry import Point
 from shapely.geometry import LineString
@@ -27,59 +29,132 @@ def make_gpd(df, latstr, lonstr):
     return gdf
 
 
-def cems2obs(obsfile, cemsfile):
 
-    # read cems csv file.
-    # create the SObs  ojbect.
-    sourcesum = SourceSummary().sumdf  
-    sourcesum = sourcesum.groupby(['ORIS','Name','Stack height (m)',
-                                   'lat','lon']).sum()
-    sourcesum.reset_index(inplace=True)
-    sourcesum = sourcesum[['ORIS','Name','Mean(lbs)','lat','lon']]
+class CemsObs(object):
 
-    sgpd = make_gpd(sourcesum, 'lat', 'lon')
-    #print(sgpd[0:10])
-    print(sgpd[0:10])
-    #sgpd.set_index('ORIS', inplace=True)
-    #print(sgpd[0:10])
+    def __init__(self, obsfile, cemsfile, source_sum_file):
+        """
+        source_sum_file is the name of the  source_summary file.
+        obsfile is the csv file.
+        """
+        self.obsfile = obsfile
+        self.sourcesum = source_sum_file
+        self.cemsfile = cemsfile
+        self.sumdf = gpd.GeoDataFrame() #created by make_sumdf
+        self.obs = None #SObs object
 
-    str1 = obsfile.split('.')
-    dt1 = datetime.datetime.strptime(str1[0], "info_obs%Y%m%d") 
-    dt2 = datetime.datetime.strptime(str1[1], "%Y%m%d") 
-    area=''
-    obs = SObs([dt1, dt2], area)
-    odf = obs.read_csv(obsfile, hdrs=[0])
-    #print('----------------------------------------')
-    osum = odf[['siteid','latitude','longitude']]
-    osum = make_gpd(osum.drop_duplicates(), 'latitude', 'longitude')
-    #print(osum[0:10])
-    #odf = make_gpd(odf, 'latitude', 'longitude')
+    def find_sites(self, oris, dthresh, arange=None):
+        """
+        returns data frame with list of measurements sites within dthresh
+        (meters)  of the power plant
+        """
+        sumdf = gpd.GeoDataFrame() #created by make_sumdf
+        if not self.sumdf.empty:
+            dname = str(oris) + 'dist'
+            aname = str(oris) + 'direction'
+            cnames = ['siteid', 'geometry', dname, aname]
+            sumdf = self.sumdf[cnames]
+            sumdf = sumdf[sumdf[dname] <= dthresh]
+        return sumdf
 
-    orishash = df2hash(sgpd, 'ORIS','geometry')
-    # for each power plant:
+    def generate_obs(self, siteidlist):
+        obsfile = self.obsfile.replace('info_','')
+        odf = self.obs.read_csv(obsfile, hdrs=[0])
+        odf = odf[odf["variable"] == "SO2"]
+        for sid in siteidlist:
+            # gets a time series of observations at sid.
+            ts = get_tseries(odf, sid, var='obs', svar='siteid', convert=False) 
+            yield ts    
 
-    def makeline(p1, p2):
-        br = bearing(p2,p1)
-        return(br)
-        #return LineString([p1,p2])
-        #return p1
 
-    for oris in orishash.keys():
-        cname = str(int(oris)) + 'dist' 
-        pnt = orishash[oris]
-        #pnt = 2
-        #print('ORIS', oris, type(orishash[oris]))
-        osum[cname] = osum.distance(orishash[oris]) 
-        lname = str(int(oris)) + 'direction'
-        osum[lname] = osum.apply(
-                           lambda row: bearing(row['geometry'], pnt),
-                           axis=1)
-    print('  ----------------------------------------')
-    print(osum[osum[cname]<3])
-        #osum[lname] = osum.apply(makeline(pnt, osum['geometry']), axis=1)
-    #print(' ALL DISTANCE ----------------------------------------')
-    #print(osum[0:20])
-    return -1 
+
+    def get_cems(self, oris):
+        cems = pd.read_csv(self.cemsfile, sep=",", index_col=[0],parse_dates=True)
+        new=[]   
+        for hd in cems.columns:
+            temp = hd.split(',')
+            temp = temp[0].replace('(','')
+            try:
+                new.append(int(float(temp)))
+            except:
+                new.append(temp)
+        cems.columns = new
+        #cems.set_index('time', inplace=True)
+        return cems[oris]
+
+    def get_met(self):
+        met = self.obs.read_met()
+        return met
+
+    def make_sumdf(self):
+        """
+        creates a  geopandas dataframe with siteid, site location as POINT, distance and
+        direction to each power plant.
+        """
+        # Needs these two files.
+        obsfile = self.obsfile
+        sourcesumfile = self.sourcesum #not used right now.
+
+        # read cems csv file.
+        sourcesum = SourceSummary().sumdf  #uses default name for file.
+        sourcesum = sourcesum.groupby(['ORIS','Name','Stack height (m)',
+                                       'lat','lon']).sum()
+        sourcesum.reset_index(inplace=True)
+        sourcesum = sourcesum[['ORIS','Name','Mean(lbs)','lat','lon']]
+        sgpd = make_gpd(sourcesum, 'lat', 'lon')
+        orishash = df2hash(sgpd, 'ORIS','geometry')
+
+        # read the obs file.
+        str1 = obsfile.split('.')
+        dt1 = datetime.datetime.strptime(str1[0], "info_obs%Y%m%d") 
+        dt2 = datetime.datetime.strptime(str1[1], "%Y%m%d") 
+        area=''
+        obs = SObs([dt1, dt2], area)
+        self.obs = obs
+        odf = obs.read_csv(obsfile, hdrs=[0])
+        osum = odf[['siteid','latitude','longitude']]
+        osum = make_gpd(osum.drop_duplicates(), 'latitude', 'longitude')
+
+        # loop thru each power plant.
+        for oris in orishash.keys():
+            # location of power plant.
+            pnt = orishash[oris]
+
+            # find distance to power plant from all sites
+            cname = str(int(oris)) + 'dist' 
+            osum[cname] = osum.apply(
+                               lambda row: distance(row['geometry'], pnt),
+                               axis=1)
+
+            # find direction to power plant from all sites
+            lname = str(int(oris)) + 'direction'
+            osum[lname] = osum.apply(
+                               lambda row: bearing(row['geometry'], pnt),
+                               axis=1)
+     
+        #print('  ----------------------------------------')
+        #print(osum[osum[cname]<500])
+        # geopandas dataframe with siteid, site location as POINT, distance and
+        # direction to each power plant.
+        self.sumdf = osum
+        return osum
+
+def distance(p1,p2):
+    """
+    p1 : shapely Point
+    p2 : shapely Point
+
+    x should be longitude
+    y should be latitude
+    """
+    deg2km = 111.111  #
+    a1 = p2.x-p1.x # distance in degrees
+    a2 = p2.y-p1.y # distance in degrees.
+    # change to meters.
+    a2 = a2 * deg2km
+    # estimate using latitude halfway between.
+    a1 = a1 * deg2km * np.cos(np.radians(0.5*(p1.y+p2.y))) 
+    return (a1**2 + a2**2)**0.5
 
 def bearing(p1, p2):
     """

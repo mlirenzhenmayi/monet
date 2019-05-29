@@ -108,9 +108,9 @@ def long_to_wideB(df):
     Returns:
     wpivot :   dataframe 
     """
-    from pandas import Series, merge
-    wpivot = pd.pivot_table(df
-        values='obs', index=['time', 'siteid', 'latitude','longitude'],
+    import pandas as pd
+    wpivot = pd.pivot_table(df,
+        values=['obs'], index=['time', 'siteid', 'latitude','longitude'],
         columns=['variable','units']).reset_index()
     return wpivot
 

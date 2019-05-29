@@ -139,7 +139,6 @@ class EmiTimes(object):
         write a new EmitTimes file to filename.
         filename : str
         """
-        # print('zzz', filename)
         # make sure all cycles have same number of species.
         self.splist = list(range(1, self.findmaxsp() + 1))
         # make sure that there is a name for each species.
@@ -174,9 +173,9 @@ class EmiTimes(object):
             iii = 1
             sphash = {}
             for val in temp:
-                sphash[val] = iii
+                sphash[iii] = val
                 iii += 1
-            self.splist = np.arange(1, iii + 1)
+            self.splist = np.arange(1, iii)
             self.sphash = sphash
         return rval
 
@@ -188,6 +187,9 @@ class EmiTimes(object):
         num_species is used to determine how many species are represented.
         Default is 1.
         if this information is in the header, that will be used instead. 
+
+        Returns False if EmitTimes file is empty
+
         """
         with open(self.filename, "r") as fid:
             lines = fid.readlines()
@@ -195,7 +197,7 @@ class EmiTimes(object):
 
             # check to see if header contains info on particle species
             # if it does not then get the splist from num_species input.
-            if not header2sp():
+            if not self.header2sp():
                 self.splist = np.arange(1, num_species + 1)
             iii = 2
             while iii < len(lines):
@@ -212,7 +214,11 @@ class EmiTimes(object):
                     self.cycle_list.append(ec)
                     self.ncycles += 1
                 iii += nrecs + 1
-
+        if self.ncycles == 0: 
+           return False
+        else: 
+           return True
+    
     def add_cycle(self, sdate, duration):
         """
         Adds information on a cycle to an EmiTimes object.
@@ -249,12 +255,10 @@ class EmiTimes(object):
         """
         # This block determines which cycle the record goes into
         # based on the date.
-        print("adding record")
         cycle_number = -1
         for ccc in self.chash:
             if date >= self.chash[ccc][0] and date < self.chash[ccc][1]:
                 cycle_number = ccc
-        print("adding record", ccc)
         if cycle_number == -1:
             rvalue = False
         else:
@@ -262,7 +266,6 @@ class EmiTimes(object):
                 date, duration, lat, lon, height, rate, area, heat, spnum, nanvalue
             )
             rvalue = True
-            print("added record")
         return rvalue
 
 
@@ -327,9 +330,6 @@ class EmitCycle(object):
         # now need to make sure records match the alist. and fill in ones that
         # don't.
         jjj = 0
-        print("SPLIST", self.splist)
-        for aaa in alist:
-            print("ALIST", aaa)
         new_records = []
         for rc in self.recordra:
             nnn = (rc.date, rc.lat, rc.lon, rc.height)
@@ -379,8 +379,6 @@ class EmitCycle(object):
         """
         write new emittimes file.
         """
-        print("zzz", filename)
-        print(self.splist)
         # if len(self.splist)>1: self.fill_species()
         maxrec = self.nrecs + self.drecs
         datestr = self.sdate.strftime("%Y %m %d %H ")
@@ -392,7 +390,6 @@ class EmitCycle(object):
                 fid.write(str(record))
             for record in self.dummy_recordra:
                 fid.write(str(record))
-        print("END write new")
 
     def parse_record(self, record, spnum=1):
         """
@@ -516,7 +513,7 @@ class EmitCycle(object):
             # parse record returns EmitLine object.
             recordra.append(self.parse_record(temp, spnum=jjj))
             jjj += 1
-            if jjj > len(splist):
+            if jjj > len(self.splist):
                 jjj = 1
         self.recordra.extend(recordra)
         return check

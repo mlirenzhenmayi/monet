@@ -94,6 +94,11 @@ class ConcGrid(object):
         sampletype=0,
         interval=(-1, -1),
     ):
+
+        # self.name, self.levels, self.centerlat, self.centerlon,
+        # self.latdiff, self.londiff, self.latspan, self.lonspan,
+        # self.outdir, self.outfile, self.nlev, self.sample_start,
+        # self.sample_stop, self.sampletype, self.interval
         """
         Parameters
         ----------
@@ -129,6 +134,13 @@ class ConcGrid(object):
         self.interval = interval
         self.get_nlev()
         self.annotate = False
+
+    def copy(self):
+        return ConcGrid(
+              self.name, self.levels, self.centerlat, self.centerlon,
+              self.latdiff, self.londiff, self.latspan, self.lonspan,
+              self.outdir, self.outfile, self.nlev, self.sample_start,
+              self.sample_stop, self.sampletype, self.interval)
 
     def set_annotate(self, on=True):
         """
@@ -383,6 +395,12 @@ class Species(object):
         self.resuspension = resuspension
         Species.total += 1
         self.datestr = "00 00 00 00 00"
+
+
+    def copy(self):
+        return Species(self.name, self.psize, self.rate, self.duration,
+                       self.density, self.shape, self.date, self.wetdep,
+                       self.vel, self.decay, self.resuspension) 
 
     def definition(self, lines):
         """input 3 lines from HYSPLIT CONTROL file which define a
@@ -760,6 +778,7 @@ class HycsControl(object):
         """set the species array to empty
         """
         self.species = []
+        self.num_sp = 0  
 
     def add_species(self, species):
         """add new species.

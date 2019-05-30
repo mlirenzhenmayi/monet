@@ -214,11 +214,11 @@ class EmiTimes(object):
                     self.cycle_list.append(ec)
                     self.ncycles += 1
                 iii += nrecs + 1
-        if self.ncycles == 0: 
-           return False
-        else: 
-           return True
-    
+        if self.ncycles == 0:
+            return False
+        else:
+            return True
+
     def add_cycle(self, sdate, duration):
         """
         Adds information on a cycle to an EmiTimes object.

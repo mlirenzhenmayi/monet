@@ -3,11 +3,9 @@ import os
 import datetime
 import sys
 import pandas as pd
-import numpy as np
+#import numpy as np
 import requests
-import pytz
-
-# import json
+#import pytz
 import seaborn as sns
 import monet.obs.obs_util as obs_util
 
@@ -20,28 +18,26 @@ Python 3
 The key and url for the epa api should be stored in a file called
 .epaapirc in the $HOME directory.
 The contents should be
-
 key: apikey
 url: https://api.epa.gov/FACT/1.0/
 
 TO DO
 -----
 Date is in local time (not daylight savings)
-Need to convert to UTC.
+Need to convert to UTC. This will require an extra package or api.
 
 Classes:
 ----------
-EpaApiObject
-EmissionsCall
-FacilitiesData
-MonitoringPlan
+EpaApiObject - Base class
+   EmissionsCall
+   FacilitiesData
+   MonitoringPlan
 
 Emissions
 CEMS
 
 Functions:
 ----------
-
 addquarter
 get_datelist
 findquarter
@@ -52,12 +48,16 @@ getkey
 
 
 def get_filename(fname, prompt):
+    """
+    determines if file exists. If prompt is True then will prompt for
+    new filename if file does not exist.
+    """
     if fname:
         done = False
         while not done:
             if os.path.isfile(fname):
                 done = True
-            elif prompt == True:
+            elif prompt:
                 istr = "\n" + fname + " is not a valid name for Facilities Data \n"
                 istr += "Please enter a new filename \n"
                 istr += "enter None to load from the api \n"
@@ -75,35 +75,35 @@ def get_filename(fname, prompt):
     return fname
 
 
-def get_timezone_offset(latitude, longitude):
-    """
-    uses geonames API 
-    must store username in the $HOME/.epaapirc file
-    geousername: username
-    """
-    username = getkey()
-    print(username)
-    username = username["geousername"]
-    url = "http://api.geonames.org/timezoneJSON?lat="
-    request = url + str(latitude)
-    request += "&lng="
-    request += str(longitude)
-    request += "&username="
-    request += username
-    try:
-        data = requests.get(request)
-    except BaseException:
-        data = -99
-
-    jobject = data.json()
-    print(jobject)
-    print(data)
-    # raw offset should give standard time offset.
-    if data == -99:
-        return 0
-    else:
-        offset = jobject["rawOffset"]
-        return offset
+# def get_timezone_offset(latitude, longitude):
+#    """
+#    uses geonames API
+#    must store username in the $HOME/.epaapirc file
+#    geousername: username
+#    """
+#    username = getkey()
+#    print(username)
+#    username = username["geousername"]
+#    url = "http://api.geonames.org/timezoneJSON?lat="
+#    request = url + str(latitude)
+#    request += "&lng="
+#    request += str(longitude)
+#    request += "&username="
+#    request += username
+#    try:
+#        data = requests.get(request)
+#    except BaseException:
+#        data = -99
+#
+#    jobject = data.json()
+#    print(jobject)
+#    print(data)
+#    # raw offset should give standard time offset.
+#    if data == -99:
+#        return 0
+#    else:
+#        offset = jobject["rawOffset"]
+#        return offset
 
 
 def getkey():
@@ -119,12 +119,11 @@ def getkey():
         for temp in lines:
             temp = temp.split(" ")
             dhash[temp[0].strip().replace(":", "")] = temp[1].strip()
-        return dhash
     else:
         dhash["key"] = None
         dhash["url"] = None
         dhash["geousername"] = None
-        return dhash
+    return dhash
 
 
 def sendrequest(rqq, key=None, url=None):
@@ -151,7 +150,7 @@ def sendrequest(rqq, key=None, url=None):
         if data.status_code == 429:
             print("Too many requests Please Wait before trying again.")
             sys.exit()
-        return data
+    return data
 
 
 def get_lookups():
@@ -252,10 +251,10 @@ def keepcols(df, keeplist):
     klist = []
     for ttt in keeplist:
         if ttt in tcols:
-        #if ttt not in tcols:
-        #    print("NOT IN ", ttt)
-        #    print('Available', tcols)
-        #else:
+            # if ttt not in tcols:
+            #    print("NOT IN ", ttt)
+            #    print('Available', tcols)
+            # else:
             klist.append(ttt)
     tempdf = df[klist]
     return tempdf
@@ -286,10 +285,16 @@ def get_so2(df):
     return keepcols(df, keep)
 
 
-class EpaApiObject(object):
+class EpaApiObject:
     def __init__(self, fname=None, save=True, prompt=False):
-        # fname is name of file that data would be saved to.
+        """
+        Base class for all classes that send request to EpaApi.
+        to avoid sending repeat requests to the api, the default option
+        is to save the data in a file - specified by fname.
+        """
 
+        # fname is name of file that data would be saved to.
+        self.status_code = None
         self.df = pd.DataFrame()
         self.fname = fname
         # returns None if filename does not exist.
@@ -315,7 +320,11 @@ class EpaApiObject(object):
 
     def load(self):
         chash = {"mid": str, "oris": str}
-        df = pd.read_csv(self.fname, index_col=[0], converters=chash, parse_dates=True)
+        df = pd.read_csv(
+            self.fname,
+            index_col=[0],
+            converters=chash,
+            parse_dates=True)
         # df = pd.read_csv(self.fname, index_col=[0])
         return df, True
 
@@ -332,7 +341,9 @@ class EpaApiObject(object):
                 fid.write("no data")
 
     def create_getstr(self):
-        return "placeholder"
+        # each derived class should have
+        # its own create_getstr method.
+        return "placeholder" + self.fname
 
     def printall(self):
         data = sendrequest(self.getstr)
@@ -350,14 +361,17 @@ class EpaApiObject(object):
 
     def get(self):
         data = self.get_raw_data()
+        self.status_code = data.status_code
         try:
             jobject = data.json()
-        except:
+        except BaseException:
             return data
         df = self.unpack(jobject)
         return df
 
     def unpack(self, data):
+        # each derived class should have
+        # its own unpack method.
         return pd.DataFrame()
 
 
@@ -367,7 +381,15 @@ class EmissionsCall(EpaApiObject):
     Attributes
     """
 
-    def __init__(self, oris, mid, year, quarter, fname=None, save=True, prompt=False):
+    def __init__(
+            self,
+            oris,
+            mid,
+            year,
+            quarter,
+            fname=None,
+            save=True,
+            prompt=False):
         self.oris = oris  # oris code of facility
         self.mid = mid  # monitoring location id.
         self.year = str(year)
@@ -392,9 +414,13 @@ class EmissionsCall(EpaApiObject):
     def load(self):
         datefmt = "%Y %m %d %H:%M"
         chash = {"mid": str, "oris": str, "unit": str}
-        df = pd.read_csv(self.fname, index_col=[0], converters=chash, parse_dates=False)
+        df = pd.read_csv(
+            self.fname,
+            index_col=[0],
+            converters=chash,
+            parse_dates=False)
         convert = True
-        #print(df[0:10])
+        # print(df[0:10])
         # if not df.empty:
         if convert and not df.empty:
 
@@ -477,7 +503,7 @@ class EmissionsCall(EpaApiObject):
         return df
 
     # ----------------------------------------------------------------------------------------------
-
+    @static
     def manage_date(self, df):
         """DateHour field is originally in string form 4/1/2016 02:00:00 PM
            Here, change to a datetime object.
@@ -510,13 +536,13 @@ class EmissionsCall(EpaApiObject):
                         operate report 0.00.
         """
 
-        ## three different ways to convert columns
-        def toint(xxx):
-            try:
-                rt = int(xxx)
-            except BaseException:
-                rt = -99
-            return rt
+        # three different ways to convert columns
+        # def toint(xxx):
+        #    try:
+        #        rt = int(xxx)
+        #    except BaseException:
+        #        rt = -99
+        #    return rt
 
         def tostr(xxx):
             try:
@@ -555,26 +581,32 @@ class EmissionsCall(EpaApiObject):
         # if operating time is zero then map to 0 (it is '' in file)
         optime = "OperatingTime"
         cname = self.so2name
-        df["so2_lbs"] = df.apply(lambda row: getmass(row[optime], row[cname]), axis=1)
-
+        df["so2_lbs"] = df.apply(
+            lambda row: getmass(
+                row[optime],
+                row[cname]),
+            axis=1)
+        # -------------------------------------------------------------
+        # these were checks to see what values the fields were holding.
         # temp is values that are not valid
-        #temp = df[df["so2_lbs"].isin([-999])]
-        #temp = temp[temp["OperatingTime"] > 0]
-        #print("Values that cannot be converted to float")
-        #print(temp[cname].unique())
-        #print("MODC ", temp["SO2MODC"].unique())
-        #ky = "MATSSstartupshutdownflat"
-        #if ky in temp.keys():
+        # temp = df[df["so2_lbs"].isin([-999])]
+        # temp = temp[temp["OperatingTime"] > 0]
+        # print("Values that cannot be converted to float")
+        # print(temp[cname].unique())
+        # print("MODC ", temp["SO2MODC"].unique())
+        # ky = "MATSSstartupshutdownflat"
+        # if ky in temp.keys():
         #    print("MATSSstartupshutdownflat", temp["MATSStartupShutdownFlag"].unique())
         # print(temp['date'].unique())
 
-        #ky = "Operating Time"
-        #if ky in temp.keys():
+        # ky = "Operating Time"
+        # if ky in temp.keys():
         #    print("Operating Time", temp["OperatingTime"].unique())
-        #if ky in df.keys():
+        # if ky in df.keys():
         #    print("All op times", df["OperatingTime"].unique())
         # for line in temp.iterrows():
         #    print(line)
+        # -------------------------------------------------------------
         return df
 
 
@@ -590,7 +622,7 @@ class Emissions:
 
     see
     https://www.epa.gov/airmarkets/field-audit-checklist-tool-fact-field-references#EMISSION
-     
+
     class that represents data returned by facilities call to the restapi.
     # NOTES
     # BAF - bias adjustment factor
@@ -606,7 +638,7 @@ class Emissions:
     # bias.
 
     # It looks like MassRate is calculated from concentration of SO2 and flow
-    # rate. So flow rate should be rate of all gasses coming out of stack. 
+    # rate. So flow rate should be rate of all gasses coming out of stack.
 
     """
 
@@ -624,13 +656,8 @@ class Emissions:
         locationID,
         year,
         quarter,
-        ifile="efile.txt",
-        verbose=False,
-        # data2add=None,
-        # stackht=None,
-        # facname=None,
         logfile="warnings.emit.txt",
-    ):
+        ):
         """
         oris : int
         locationID : str
@@ -657,7 +684,6 @@ class Emissions:
         if int(quarter) > 4:
             print("Warning: quarter greater than 4")
             sys.exit()
-        tra = []
 
         # for locationID in unitra:
         locationID = str(locationID)
@@ -669,7 +695,7 @@ class Emissions:
         else:
             self.df = self.df.append(df)
         # self.df.to_csv(efile)
-        # return data.status_code
+        return ec.status_code
 
     def save(self):
         efile = "efile.txt"
@@ -702,12 +728,13 @@ class Emissions:
             plt.plot(temp["date"], temp["so2_lbs"], label=str(unit))
             print("UNIT", str(unit))
             print(temp["SO2MODC"].unique())
-        for unit in df["unit"].unique():
-            temp = temp1[temp1["unit"] == unit]
-            temp = temp[temp["SO2MODC"].isin(["01", "02", "03", "04"]) == False]
-            plt.plot(temp["date"], temp["so2_lbs"], label="bad " + str(unit))
-            print("UNIT", str(unit))
-            print(temp["SO2MODC"].unique())
+        # for unit in df["unit"].unique():
+        #    temp = temp1[temp1["unit"] == unit]
+        #    temp = temp[temp["SO2MODC"].isin(
+        #        ["01", "02", "03", "04"]) == False]
+        #    plt.plot(temp["date"], temp["so2_lbs"], label="bad " + str(unit))
+        #    print("UNIT", str(unit))
+        #    print(temp["SO2MODC"].unique())
         ax = plt.gca()
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles, labels)
@@ -722,7 +749,7 @@ class Emissions:
 
 
 class MonitoringPlan(EpaApiObject):
-    """ 
+    """
     Stack height is converted to meters.
     Request to get monitoring plans for oris code and locationID.
     locationIDs for an oris code can be found in
@@ -737,7 +764,14 @@ class MonitoringPlan(EpaApiObject):
 
     """
 
-    def __init__(self, oris, mid, date, fname="Mplans.csv", save=True, prompt=False):
+    def __init__(
+            self,
+            oris,
+            mid,
+            date,
+            fname="Mplans.csv",
+            save=True,
+            prompt=False):
         self.oris = oris  # oris code of facility
         self.mid = mid  # monitoring location id.
         self.date = date  # date
@@ -763,7 +797,7 @@ class MonitoringPlan(EpaApiObject):
         # do not want to overwrite other mplans in the file.
         try:
             self.load()
-        except:
+        except BaseException:
             pass
         if not self.dfall.empty:
             df = pd.concat([self.dfall, self.df])
@@ -803,10 +837,10 @@ class MonitoringPlan(EpaApiObject):
                 # dhash = {}
                 dhash["stackname"] = stackname
                 # dhash["unit"] = self.mid
-                dhash["stackht"] = att["stackHeight"] * 0.3048  # int
+                dhash["stackht"] = att["stackHeight"] * ft2meters
                 dhash["stackht unit"] = "m"  # int
-                dhash["crossAreaExit"] = att["crossAreaExit"]  # int
-                dhash["crossAreaFlow"] = att["crossAreaFlow"]  # int
+                dhash["crossAreaExit"] = att["crossAreaExit"]
+                dhash["crossAreaFlow"] = att["crossAreaFlow"]
                 dhash["locID"] = att["locId"]
                 # dhash["isunit"] = att["isUnit"]
                 # dlist.append(dhash)
@@ -1045,7 +1079,7 @@ def unpack_response(dhash, deep=100, pid=0):
     return rstr
 
 
-class CEMS(object):
+class CEMS:
     """
     Class for data from continuous emission monitoring systems (CEMS).
     Data from power plants can be downloaded from
@@ -1079,13 +1113,6 @@ class CEMS(object):
         self.emit = Emissions()
         self.orislist = []
 
-        # self.filehash = {}
-        # self.filehash{'facilities'} = 'Fac.csv'
-        # self.filehash{'monitoring'} = 'Mon.csv'
-
-    def add_facilities_file(self, fname):
-        self.filehash["facilities"] = fname
-
     def add_data(self, rdate, area, verbose=True):
         """
         INPUTS:
@@ -1112,7 +1139,7 @@ class CEMS(object):
 
         TODO - what is the flow rate?
 
-        
+
 
         """
         # 1. get list of oris codes within the area of interest
@@ -1155,7 +1182,8 @@ class CEMS(object):
                                   Monitoring location for this unit\n"
                             )
                             for val in mhash:
-                                print("unit " + val["name"] + " oris " + str(oris))
+                                print(
+                                    "unit " + val["name"] + " oris " + str(oris))
                             sys.exit()
                         else:
                             mhash = mhash[0]
@@ -1171,9 +1199,6 @@ class CEMS(object):
                         mid,
                         ndate.year,
                         quarter,
-                        # facname=facname,
-                        # stackht=stackht,
-                        verbose=False,
                     )
                     if status == 200:
                         self.orislist.append((oris, mid))
@@ -1249,41 +1274,3 @@ def latlon2str(lat, lon):
     latstr = "{:.4}".format(lat)
     lonstr = "{:.4}".format(lon)
     return (latstr, lonstr)
-
-
-def get_var(df, varname, orisp=None, daterange=None, unitid=-99, verbose=True):
-    """
-           returns time series with variable indicated by varname.
-           returns data frame where rows are date and columns are the
-           values of cmatch for each fac_id.
-
-           routine looks for column which contains all strings in varname.
-           Currently not case sensitive.
-
-           loc and ORISPL CODES.
-           unitid is a unit_id
-
-           if a particular unitid is specified then will return values for that
-            unit.
-        Parameters
-        ----------
-        varname : string or iteratable of strings
-            varname may be string or list of strings.
-        loc : type
-            Description of parameter `loc`.
-        daterange : type
-            Description of parameter `daterange`.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-        """
-    if unitid == -99:
-        ui = False
-    temp = cemspivot(df, varname, daterange, unitid=ui)
-    if not ui:
-        returnval = temp[orisp]
-    else:
-        returnval = temp[orisp, unitid]
-    return returnval

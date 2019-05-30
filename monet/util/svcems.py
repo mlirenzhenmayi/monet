@@ -55,11 +55,12 @@ def get_timezone(lat, lon):
     tz = tf.closest_timezone_at(lng=lon, lat=lat)
     #print("TZ-------------", tz, lat, lon)
     dtest = datetime.datetime(2010, 2, 1, 0)
-    t1 = pd.Timestamp(dtest).tz_localize(tz)
-    t2 = t1.tz_convert("utc")
+    t1 = pd.Timestamp(dtest).tz_localize(tz) # local time
+    t2 = t1.tz_convert("utc")                # utc time
 
     t1 = t1.tz_localize(None)
     t2 = t2.tz_localize(None)
+    # returns hours. must add this to local time to get utc.
     return (t2 - t1).seconds / 3600.0
 
 
@@ -279,7 +280,7 @@ class SEmissions(object):
             tzhash[oris] = datetime.timedelta(hours=tz)
 
         def loc2utc(local, oris, tzhash):
-            utc = local - tzhash[oris]
+            utc = local + tzhash[oris]
             return utc
 
         self.df["time"] = self.df.apply(

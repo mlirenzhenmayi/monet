@@ -45,7 +45,7 @@ def writelanduse(landusedir, working_directory="./"):
         fid.write(landusedir + "/bdyfiles/ \n")
 
 
-class ConcGrid(object):
+class ConcGrid:
     """concentration grid as defined by 10 lines in the HYSPLIT concentration
       CONTROL file.
     Methods
@@ -77,23 +77,23 @@ class ConcGrid(object):
     """
 
     def __init__(
-        self,
-        name,
-        levels=None,
-        centerlat=0.0,
-        centerlon=0.0,
-        latdiff=-1.0,
-        londiff=-1.0,
-        latspan=90.0,
-        lonspan=360.0,
-        outdir="./",
-        outfile="cdump",
-        nlev=-1,
-        sample_start="00 00 00 00 00",
-        sample_stop="00 00 00 00 00",
-        sampletype=0,
-        interval=(-1, -1),
-    ):
+            self,
+            name,
+            levels=None,
+            centerlat=0.0,
+            centerlon=0.0,
+            latdiff=-1.0,
+            londiff=-1.0,
+            latspan=90.0,
+            lonspan=360.0,
+            outdir="./",
+            outfile="cdump",
+            nlev=-1,
+            sample_start="00 00 00 00 00",
+            sample_stop="00 00 00 00 00",
+            sampletype=0,
+            interval=(-1, -1),
+        ):
 
         # self.name, self.levels, self.centerlat, self.centerlon,
         # self.latdiff, self.londiff, self.latspan, self.lonspan,
@@ -174,7 +174,8 @@ class ConcGrid(object):
         note = ""
         if pnotes:
             note = "  #Concentration Grid Center (latitude longitude)"
-        returnstr = str(self.centerlat) + " " + str(self.centerlon) + note + "\n"
+        returnstr = str(self.centerlat) + " " + \
+            str(self.centerlon) + note + "\n"
         if pnotes:
             note = "  #Concentration grid spacing (degrees latitude longitude)"
         returnstr += str(self.latdiff) + " " + str(self.londiff) + note + "\n"
@@ -232,9 +233,8 @@ class ConcGrid(object):
             + str(self.londiff)
             + "\n"
         )
-        returnstr += (
-            "Span (deg Lat, Lon: " + str(self.latspan) + " " + str(self.lonspan) + "\n"
-        )
+        returnstr += ("Span (deg Lat, Lon: " +
+                      str(self.latspan) + " " + str(self.lonspan) + "\n")
         returnstr += "Output grid directory: " + self.outdir + "\n"
         returnstr += "Output grid file name: " + self.outfile + "\n"
         returnstr += "Num of vertical levels: " + str(self.nlev) + "\n"
@@ -242,8 +242,10 @@ class ConcGrid(object):
         for lev in self.levels:
             returnstr += str(lev) + " "
         returnstr += "\n"
-        returnstr += "Sampling start (yy mm dd hh min) : " + self.sample_start + "\n"
-        returnstr += "Sampling stop (yy mm dd hh min) : " + self.sample_stop + "\n"
+        returnstr += "Sampling start (yy mm dd hh min) : " + \
+            self.sample_start + "\n"
+        returnstr += "Sampling stop (yy mm dd hh min) : " + \
+            self.sample_stop + "\n"
         # returnstr +=  self.typstr() + ' ' + str(self.sampletype) + ' '
         returnstr += (
             "Interval (hh min) "
@@ -257,7 +259,8 @@ class ConcGrid(object):
     def typestr(self):
         """returns a string describing what kind of sampling interval is used"""
         print(self.interval[0], self.interval[1])
-        tmstr = str(self.interval[0]).zfill(2) + ":" + str(self.interval[1]).zfill(2)
+        tmstr = str(self.interval[0]).zfill(2) + \
+            ":" + str(self.interval[1]).zfill(2)
         if self.sampletype == 0:
             returnstr = "Average over  " + tmstr + " with output every " + tmstr
         elif self.sampletype == 1:
@@ -358,7 +361,7 @@ class ConcGrid(object):
         return ret
 
 
-class Species(object):
+class Species:
     """Class which contains information to define a species or pollutant
        in a HYSPLIT control file.
        Methods
@@ -379,19 +382,19 @@ class Species(object):
         return Species.total
 
     def __init__(
-        self,
-        name,
-        psize=0,
-        rate="1",
-        duration=-1,
-        density=2.5,
-        shape=1,
-        date="00 00 00 00 00",
-        wetdepstr="0.0 0.0 0.0",
-        vel="0.0 0.0 0.0 0.0 0.0",
-        decay="0.0",
-        resuspension="0.0",
-    ):
+            self,
+            name,
+            psize=0,
+            rate="1",
+            duration=-1,
+            density=2.5,
+            shape=1,
+            date="00 00 00 00 00",
+            wetdepstr="0.0 0.0 0.0",
+            vel="0.0 0.0 0.0 0.0 0.0",
+            decay="0.0",
+            resuspension="0.0",
+        ):
 
         self.name = name
         self.rate = rate
@@ -400,7 +403,7 @@ class Species(object):
         self.density = density
         self.shape = shape
         self.date = date
-        #self.wetdep = wetdep
+        # self.wetdep = wetdep
         self.wetdepstr = wetdepstr
         self.vel = vel
         self.decay = decay
@@ -426,7 +429,7 @@ class Species(object):
     def definition(self, lines):
         """input 3 lines from HYSPLIT CONTROL file which define a
         pollutant/species.
-        
+
         This will overwrite
         self.rate
         self.date
@@ -487,7 +490,7 @@ class Species(object):
         # To do - read these in as floats
         self.vel = lines[1].strip()
         self.wetdepstr = lines[2].strip()
-        #self.wetdep = 1
+        # self.wetdep = 1
         self.decay = lines[3].strip()
         self.resuspension = lines[4].strip()
         return -1
@@ -516,7 +519,7 @@ class Species(object):
            wstr : string
         """
         self.wetdepstr = wstr
-        #self.wetdep = 1
+        # self.wetdep = 1
 
     def strdep(self, annotate=True):
         """Prints out five lines which define deposition
@@ -530,7 +533,8 @@ class Species(object):
             if self.shape >= 0:
                 shapstr = "Stokes Formulation"
             shapstr = ""
-            note = spc + "#Particle diameter(um)   Density (g/cc),  Shape " + shapstr
+            note = spc + \
+                "#Particle diameter(um)   Density (g/cc),  Shape " + shapstr
         returnval = (
             "%05.1f" % self.psize
             + " "
@@ -545,13 +549,13 @@ class Species(object):
         returnval += self.vel + note + "\n"
         if annotate:
             note = spc + "#Wet deposition parameters"
-        #if self.wetdep == 1:
+        # if self.wetdep == 1:
         if self.wetdepstr == "":
-        #    returnval += "0.0 4.0E+04 5.0E-06" + note + "\n"
+            #    returnval += "0.0 4.0E+04 5.0E-06" + note + "\n"
             returnval += "0.0 0.0 0.0" + note + "\n"
         else:
             returnval += self.wetdepstr + note + "\n"
-        #else:
+        # else:
         #    returnval += "0.0 0.0 0.0" + note + "\n"
         if annotate:
             note = spc + "#radioactive decay parameters"
@@ -564,7 +568,7 @@ class Species(object):
         return returnval
 
 
-class NameList(object):
+class NameList:
     """class which represents HYSPLIT SETUP.CFG file,
        This class can also be used to write GENPARM.CFG file for hycs_gem.
        In write method set gem=True"""
@@ -688,9 +692,8 @@ class NameList(object):
                 try:
                     fid.write(key.lower() + "=" + self.nlist[key] + ",\n")
                 except BaseException:
-                    print(
-                        "WARNING: " + str(key) + " " + str(self.nlist[key]) + " not str"
-                    )
+                    print("WARNING: " + str(key) + " " +
+                          str(self.nlist[key]) + " not str")
                     kstr = False
                 if not kstr:
                     fid.write(str(key) + "=" + str(self.nlist[key]) + ",\n")
@@ -707,7 +710,8 @@ class ControlLoc(object):
         """number of ControlLoc objects"""
         return ControlLoc.total
 
-    def __init__(self, line=False, latlon=(-1, -1), alt=10.0, rate=False, area=False):
+    def __init__(self, line=False, latlon=(-1, -1),
+                 alt=10.0, rate=False, area=False):
         """ Can either input a string (line from HYSPLIT CONTROL file) or can enter
             latlon = tuple (default(-1,-1))
             altitude= real (default (10.0))
@@ -777,7 +781,11 @@ class HycsControl(object):
        control file and all the information in it
     """
 
-    def __init__(self, fname="CONTROL", working_directory="./", rtype="dispersion"):
+    def __init__(
+            self,
+            fname="CONTROL",
+            working_directory="./",
+            rtype="dispersion"):
         self.fname = fname
         if working_directory[-1] != "/":
             working_directory += "/"
@@ -833,7 +841,15 @@ class HycsControl(object):
         self.num_grids += 1
         self.concgrids.append(cgrid)
 
-    def add_location(self, line=False, latlon=(0, 0), alt=10.0, rate=False, area=False):
+    def add_location(
+            self,
+            line=False,
+            latlon=(
+                0,
+                0),
+            alt=10.0,
+            rate=False,
+            area=False):
         """add new emission location
            line: boolean
            latlon : tuple of floats
@@ -1121,21 +1137,25 @@ def roundtime(dto):
 
 
 def getmetfiles(
-    sdate, runtime, mfmt, warn_file="MetFileWarning.txt", mdir="./", verbose=False
-):
+        sdate,
+        runtime,
+        mfmt,
+        warn_file="MetFileWarning.txt",
+        mdir="./",
+        ):
     """
        INPUTS:
        sdate : start date (datetime object)
        runtime : int (hours)
        mdir : str directory where files are to be found
-       mft  : str filename format such as 
-       verbose : boolean print out extra messages if True
+       mft  : str filename format such as
 
        OUTPUT:
-       mfiles : list strings  
+       mfiles : list strings
        names of files that cover the time from sdate to sdate + runtime.
     """
-    dt = datetime.timedelta(days=1)  # step throgh file names one day at a time.
+    dt = datetime.timedelta(
+        days=1)  # step throgh file names one day at a time.
     mfiles = []
     edate = sdate
     end_date = sdate + datetime.timedelta(hours=runtime)
@@ -1147,8 +1167,10 @@ def getmetfiles(
         if not path.isfile(mdir + temp):
             with open(warn_file, "a") as fid:
                 fid.write(
-                    "WARNING " + mdir + temp + " meteorological file does not exist\n"
-                )
+                    "WARNING " +
+                    mdir +
+                    temp +
+                    " meteorological file does not exist\n")
         else:
             mfiles.append(temp)
         edate = edate + dt

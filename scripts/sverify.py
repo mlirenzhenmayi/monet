@@ -2,6 +2,7 @@ from optparse import OptionParser
 import datetime
 import seaborn as sns
 import matplotlib.pyplot as plt
+import os
 
 # imported in create_map
 # import cartopy.crs as ccrs
@@ -124,6 +125,13 @@ parser.add_option(
                         groups of 10, \
                         1 only show maps, \
                         2 show no graphs",
+)
+parser.add_option(
+    "-s",
+    action="store_false",
+    dest="spnum",
+    default=True,
+    help="Create different species dependent on MODC flag values.",
 )
 parser.add_option(
     "-u",
@@ -286,6 +294,8 @@ if options.create_runs:
 if options.results:
     from monet.util.svhy import create_runlist
     from monet.util.svresults import results
+    from monet.util.svresults import CemsObs
+    from monet.util.svresults import gpd2csv
 
     runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
     results("outfile.txt", runlist)
@@ -294,7 +304,7 @@ rfignum = 1
 if options.cems:
     from monet.util.svcems import SEmissions
 
-    ef = SEmissions([d1, d2], area,  tdir=options.tdir)
+    ef = SEmissions([d1, d2], area,  tdir=options.tdir, spnum=options.spnum)
     ef.find()
     #ef.print_source_summary(options.tdir)
     ef.plot(save=True, quiet=options.quiet)
@@ -325,9 +335,25 @@ if options.obs:
     try:
         obs.check()
     except BaseException:
-        print("OBS CHECK failed")
+        print("No met data for stations.")
     # sys.exit()
     obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir)
+
+
+    # output file with distances and directons from power plants to aqs sites.
+    obsfile = obs.csvfile
+    sumfile = 'source_summary.csv'
+    cemsfile = 'cems.csv'
+    t1 = os.path.isfile(obsfile)
+    t2 = os.path.isfile(sumfile)
+    t3 = os.path.isfile(cemsfile)
+    if t1 and t2 and t3:
+          from monet.util.svresults import CemsObs
+          from monet.util.svresults import gpd2csv
+          cando = CemsObs(obsfile, cemsfile, sumfile)
+          osum, gsum = cando.make_sumdf()
+          gpd2csv(osum, 'geometry.csv')
+
     obs.plot(save=True, quiet=options.quiet)
     fignum = obs.fignum
     if options.quiet == 1:
@@ -342,6 +368,8 @@ if options.obs:
     plt.savefig(options.tdir + "map.jpg")
     if options.quiet < 2:
         plt.show()
+
+
 
 
 ##------------------------------------------------------##

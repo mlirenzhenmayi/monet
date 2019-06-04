@@ -17,8 +17,35 @@ from shapely.geometry import Point
 from shapely.geometry import LineString
 import geopandas as gpd
 
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeRegressor
+from sklearn import tree
+
 """
 """
+
+
+def make_dataset(df):
+    """
+    df should be a dataset with the appropriate variables.
+    """
+    # remove the target variable (so2 concentration measurement
+
+    target = df.pop('so2').values
+
+    dtrain = df['so2_lbs', 'wspd', 'wdir','time']
+
+ 
+    #dtrain = df[['so2_lbs']].copy()
+    dtree = DecisionTreeRegressor()
+    fitted = dtree.fit(dtrain, target)
+    dt2 = dtree(dtrain)
+
+    pred = dtree.predict(dtrain)
+   
+    tree.plot_tree(fitted)
+    plt.show()
+
 
 def make_gpd(df, latstr, lonstr):
     
@@ -58,15 +85,18 @@ class CemsObs(object):
         return sumdf
 
     def generate_obs(self, siteidlist):
-        obsfile = self.obsfile.replace('info_','')
+        #obsfile = self.obsfile.replace('info_','')
+        obsfile = self.obsfile
+        if not os.path.isfile(obsfile):
+           print(obsfile + ' does not exist')
         odf = self.obs.read_csv(obsfile, hdrs=[0])
+        print('HERE', odf[0:1])
+        print(odf.columns)
         odf = odf[odf["variable"] == "SO2"]
         for sid in siteidlist:
             # gets a time series of observations at sid.
             ts = get_tseries(odf, sid, var='obs', svar='siteid', convert=False) 
             yield ts    
-
-
 
     def get_cems(self, oris):
         cems = pd.read_csv(self.cemsfile, sep=",", index_col=[0],parse_dates=True)
@@ -93,6 +123,7 @@ class CemsObs(object):
         """
         # Needs these two files.
         obsfile = self.obsfile
+        #obsfile = self.obsfile.replace('info_','')
         sourcesumfile = self.sourcesum #not used right now.
 
         # read cems csv file.
@@ -106,14 +137,31 @@ class CemsObs(object):
 
         # read the obs file.
         str1 = obsfile.split('.')
-        dt1 = datetime.datetime.strptime(str1[0], "info_obs%Y%m%d") 
+        dt1 = datetime.datetime.strptime(str1[0], "obs%Y%m%d") 
         dt2 = datetime.datetime.strptime(str1[1], "%Y%m%d") 
         area=''
         obs = SObs([dt1, dt2], area)
         self.obs = obs
+        if not os.path.isfile(obsfile): print('not file ' + obsfile)
         odf = obs.read_csv(obsfile, hdrs=[0])
         osum = odf[['siteid','latitude','longitude']]
         osum = make_gpd(osum.drop_duplicates(), 'latitude', 'longitude')
+        siteidhash = df2hash(osum,'siteid','geometry')
+ 
+        # loop thru each measurement stations.
+        for site in siteidhash.keys(): 
+            #location of site
+            pnt = siteidhash[site]
+            # find distance  to site from all power plants
+            cname = str(int(site)) + 'dist' 
+            sgpd[cname] = sgpd.apply(
+                               lambda row: distance(row['geometry'], pnt),
+                               axis=1)
+            # find direction to site from all power plants
+            lname = str(int(site)) + 'direction'
+            sgpd[lname] = sgpd.apply(
+                               lambda row: bearing(row['geometry'], pnt),
+                               axis=1)
 
         # loop thru each power plant.
         for oris in orishash.keys():
@@ -137,7 +185,14 @@ class CemsObs(object):
         # geopandas dataframe with siteid, site location as POINT, distance and
         # direction to each power plant.
         self.sumdf = osum
-        return osum
+        return osum, sgpd
+
+def gpd2csv(gpd, outfile, names={'x':'longitude','y':'latitude'}):
+    df = gpd.drop('geometry', axis=1)
+    df[names['x']] = gpd.geometry.apply(lambda p:p.x)
+    df[names['y']] = gpd.geometry.apply(lambda p:p.y)
+    df.to_csv(outfile, float_format='%g', index=False)
+
 
 def distance(p1,p2):
     """
@@ -191,10 +246,18 @@ def results(dfile, runlist, xmeas=1):
     df = pd.DataFrame()
     nnn = 0
     # read output from c2datem in each subdirectory.
+    dlist=[]
     for run in runlist:
-        fname = run.directory + "/dataA.txt"
+        dlist.append(run.directory)
+
+    dlist =  list(set(dlist))
+
+    #for run in runlist:
+    for rdir in dlist:
+        fname = rdir + "/dataA.txt"
         print(fname)
         tempdf = read_dataA(fname)
+        print(tempdf[0:10])
         if nnn == 0 and not tempdf.empty:
             df = tempdf.copy()
             nnn += 1

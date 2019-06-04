@@ -387,7 +387,7 @@ class Species(object):
         density=2.5,
         shape=1,
         date="00 00 00 00 00",
-        wetdep=1,
+        wetdepstr="0.0 0.0 0.0",
         vel="0.0 0.0 0.0 0.0 0.0",
         decay="0.0",
         resuspension="0.0",
@@ -400,8 +400,8 @@ class Species(object):
         self.density = density
         self.shape = shape
         self.date = date
-        self.wetdep = wetdep
-        self.wetdepstr = ""
+        #self.wetdep = wetdep
+        self.wetdepstr = wetdepstr
         self.vel = vel
         self.decay = decay
         self.resuspension = resuspension
@@ -417,7 +417,7 @@ class Species(object):
             self.density,
             self.shape,
             self.date,
-            self.wetdep,
+            self.wetdepstr,
             self.vel,
             self.decay,
             self.resuspension,
@@ -425,7 +425,14 @@ class Species(object):
 
     def definition(self, lines):
         """input 3 lines from HYSPLIT CONTROL file which define a
-        pollutant/species"""
+        pollutant/species.
+        
+        This will overwrite
+        self.rate
+        self.date
+        self.duration
+        self.datestr
+        """
         try:
             self.rate = float(lines[0])
         except BaseException:
@@ -454,7 +461,16 @@ class Species(object):
 
     def define_dep(self, lines):
         """input list of 5 lines in CONTROL file that define deposition for
-        pollutant"""
+        pollutant
+        This will overwrite
+        self.psize
+        self.density
+        self.shape
+        self.vel
+        self.wetdepstr
+        self.decay
+        self.resuspension
+        """
         temp = lines[0].strip().split()
         try:
             self.psize = float(temp[0])
@@ -471,7 +487,7 @@ class Species(object):
         # To do - read these in as floats
         self.vel = lines[1].strip()
         self.wetdepstr = lines[2].strip()
-        self.wetdep = 1
+        #self.wetdep = 1
         self.decay = lines[3].strip()
         self.resuspension = lines[4].strip()
         return -1
@@ -500,6 +516,7 @@ class Species(object):
            wstr : string
         """
         self.wetdepstr = wstr
+        #self.wetdep = 1
 
     def strdep(self, annotate=True):
         """Prints out five lines which define deposition
@@ -528,13 +545,14 @@ class Species(object):
         returnval += self.vel + note + "\n"
         if annotate:
             note = spc + "#Wet deposition parameters"
-        if self.wetdep == 1:
-            if self.wetdepstr == "":
-                returnval += "0.0 4.0E+04 5.0E-06" + note + "\n"
-            else:
-                returnval += self.wetdepstr + note + "\n"
-        else:
+        #if self.wetdep == 1:
+        if self.wetdepstr == "":
+        #    returnval += "0.0 4.0E+04 5.0E-06" + note + "\n"
             returnval += "0.0 0.0 0.0" + note + "\n"
+        else:
+            returnval += self.wetdepstr + note + "\n"
+        #else:
+        #    returnval += "0.0 0.0 0.0" + note + "\n"
         if annotate:
             note = spc + "#radioactive decay parameters"
         # line for radioactive decay half life

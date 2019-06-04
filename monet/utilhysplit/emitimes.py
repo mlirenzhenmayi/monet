@@ -617,6 +617,6 @@ class EmitLine(object):
             # returnstr += " \n"
         except BaseException:
             returnstr += str(self.heat)
-            # returnstr += '\n'
-        returnstr += " " + str(self.spnum) + "\n"
+            returnstr += '\n'
+        #returnstr += " " + str(self.spnum) + "\n"
         return returnstr

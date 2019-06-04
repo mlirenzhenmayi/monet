@@ -205,7 +205,7 @@ class SEmissions(object):
        map  - plots locations of power plants on map
     """
 
-    def __init__(self, dates, area, tdir="./", source_thresh=100):
+    def __init__(self, dates, area, tdir="./", source_thresh=100, spnum=False):
         """
         self.sources: pandas dataframe
             sources are created from a CEMSEmissions class object in the get_sources method.
@@ -223,6 +223,11 @@ class SEmissions(object):
               sources which do not have a maximum value above this in the time
               period specifed by dateswill not be
               considered.
+
+        spnum : boolean
+              True - sort emissions onto different species depending on MODC
+              flag value. (see modc2spnum method)
+              False - ignore MODC flag value.
         """
         self.df = pd.DataFrame()
         self.dfu = pd.DataFrame()
@@ -245,6 +250,9 @@ class SEmissions(object):
         self.lbs2kg = 0.453592
         self.logfile = "svcems.log.txt"
         self.meanhash = {}
+        # CONTROLS whether emissions are put on different species
+        # according to SO2MODC flag.
+        self.use_spnum= spnum
 
     def find(self, testcase=False, byunit=False, verbose=False):
         """find emissions using the CEMS class
@@ -266,7 +274,7 @@ class SEmissions(object):
 
         # remove sources which do not have high enough emissions.
         self.goodoris = source_summary.check_oris(self.ethresh)
-        self.df = data[data["oris"].isin(self.goodoris)]
+        self.df = data[data["oris"].isin(self.goodoris)].copy()
         source_summary.print()
 
         lathash = df2hash(self.df, "oris", "latitude")
@@ -283,15 +291,11 @@ class SEmissions(object):
             utc = local + tzhash[oris]
             return utc
 
+        # all these copy statements are to avoid the warning - a value is trying
+        # to be set ona copy of a dataframe.
         self.df["time"] = self.df.apply(
             lambda row: loc2utc(row["time local"], row["oris"], tzhash), axis=1
         )
-
-        # rename 'time utc' to time and drop the time local column
-        # self.df.drop(['time'])
-        # columns = self.df.columns
-        # columns = ['time' if x=='time utc' else x for x in columns]
-        # self.df.columns=columns
 
     def get_so2_sources(self, unit=False):
         sources = self.get_sources(stype="so2_lbs", unit=unit)
@@ -360,6 +364,9 @@ class SEmissions(object):
         #dftemp = df[df["spnum"] == 3]
         #print("SP 3", dftemp.SO2MODC.unique())
         #print("OP TIME", dftemp.OperatingTime.unique())
+        if not self.use_spnum:
+           # set all species numbers to 1
+           df['spnum'] = 1
         cols = ["oris", "stackht", "spnum"]
         # cols=['oris']
         sources = pd.pivot_table(
@@ -518,7 +525,8 @@ class SEmissions(object):
             if unit:
                 sid = hdr[4]
                 ename += "." + str(sid)
-            height = hdr[1]
+            #height = hdr[1]
+            height = 182.88
             lat = hdr[2]
             lon = hdr[3]
             spnum = hdr[4]
@@ -580,12 +588,10 @@ class SEmissions(object):
 
     def modc2spnum(self, dfin):
         """
-        The modc is a flag which give information about if hte
+        The modc is a flag which give information about if the
         value was measured or estimated.
         Estimated values will be carried by different particles.
         spnum will indicate what species the emission will go on. 
-
-        """
 
         # According to lookups MODC values
         # 01 primary monitoring system
@@ -601,13 +607,13 @@ class SEmissions(object):
         # 09 95th precentile value in Lookback Period
         # etc.
 
-        # it looks like values between 1-4 ok
-        # 6-7 probably ok
-        # higher values should be flagged.
+        # values between 1-4  - Species 1 (high certainty)
+        # 6-7  - Species 2  (medium certainty)
+        # higher values - Species 3 (high uncertainty)
 
         # when operatingTime is 0, the modc is Nan
-        # these should be flagged as sp1 since 0 emissions is certain.
-
+        # these are set as Species 1 since 0 emissions is certain.
+        """
         df = dfin.copy()
 
         def sort_modc(x):
@@ -620,8 +626,11 @@ class SEmissions(object):
                     return 1
                 else:
                     return 3
-
+        
         df["spnum"] = df.apply(sort_modc, axis=1)
+        #print(df.columns)
+        #temp = df[df['so2_lbs']>0]
+        #print(temp[['time','SO2MODC','spnum','so2_lbs']][0:10]) 
         return df
 
     def plot(self, save=True, quiet=True, maxfig=10):

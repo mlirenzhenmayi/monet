@@ -361,7 +361,10 @@ class EpaApiObject:
 
     def get(self):
         data = self.get_raw_data()
-        self.status_code = data.status_code
+        try:
+            self.status_code = data.status_code
+        except:
+            self.status_code = 'None'
         try:
             jobject = data.json()
         except BaseException:
@@ -434,6 +437,10 @@ class EmissionsCall(EpaApiObject):
 
     def get(self):
         data = self.get_raw_data()
+        try:
+            self.status_code = data.status_code
+        except:
+            self.status_code = None
         if data:
             df = self.unpack(data)
         else:
@@ -503,7 +510,6 @@ class EmissionsCall(EpaApiObject):
         return df
 
     # ----------------------------------------------------------------------------------------------
-    @static
     def manage_date(self, df):
         """DateHour field is originally in string form 4/1/2016 02:00:00 PM
            Here, change to a datetime object.
@@ -779,7 +785,10 @@ class MonitoringPlan(EpaApiObject):
         super().__init__(fname, save, prompt)
 
     def to_dict(self):
-        mhash = self.df.reset_index().to_dict("records")
+        try:
+            mhash = self.df.reset_index().to_dict("records")
+        except:
+            mhash = None
         return mhash
 
     def load(self):
@@ -800,7 +809,7 @@ class MonitoringPlan(EpaApiObject):
         except BaseException:
             pass
         if not self.dfall.empty:
-            df = pd.concat([self.dfall, self.df])
+            df = pd.concat([self.dfall, self.df],sort=True )
             df = df.drop_duplicates(subset=["oris", "mid"])
             df.to_csv(self.fname)
         else:
@@ -1203,6 +1212,9 @@ class CEMS:
                     if status == 200:
                         self.orislist.append((oris, mid))
                     write_status_message(status, oris, mid, quarter, "log.txt")
+                else:
+                    write_status_message(plan.status_code, oris, 'no mp ' +
+                                         str(mid), quarter, "log.txt")
         # merge stack height data into the facilities information data frame.
         tempdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])
         # facdf contains latitutde longitude information.

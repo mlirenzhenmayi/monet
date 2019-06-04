@@ -525,8 +525,7 @@ class SEmissions(object):
             if unit:
                 sid = hdr[4]
                 ename += "." + str(sid)
-            #height = hdr[1]
-            height = 182.88
+            height = hdr[1]
             lat = hdr[2]
             lon = hdr[3]
             spnum = hdr[4]

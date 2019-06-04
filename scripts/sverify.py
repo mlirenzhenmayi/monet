@@ -91,9 +91,9 @@ def create_map(fignum):
 
 
 parser = OptionParser()
-parser.add_option(
-    "-a", type="string", dest="state", default="ND", help="two letter state code (ND)"
-)
+#parser.add_option(
+#    "-a", type="string", dest="state", default="ND", help="two letter state code (ND)"
+#)
 parser.add_option(
     "-b",
     type="string",
@@ -226,11 +226,11 @@ if options.test and options.cems:
     lonur = -100
     area = (latll, lonll, latur, lonur)
 
-states = []
-if options.state:
-    temp = options.state.split(":")
-    for tt in temp:
-        states.append(tt.lower())
+#states = []
+#if options.state:
+#    temp = options.state.split(":")
+#    for tt in temp:
+#        states.append(tt.lower())
 
 # TO DO should tie numpar to the emissions amount during that time period
 # as well as the resolution.
@@ -329,7 +329,7 @@ if options.obs:
     import sys
     from monet.util.svobs import SObs
 
-    obs = SObs([d1, d2], area, states, tdir=options.tdir)
+    obs = SObs([d1, d2], area,  tdir=options.tdir)
     obs.fignum = rfignum
     obs.find(pload=True, tdir=options.tdir, test=options.test, units=options.units)
     try:

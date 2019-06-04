@@ -69,7 +69,7 @@ class SObs(object):
        check
     """
 
-    def __init__(self, dates, area, states=["nd"], tdir="./"):
+    def __init__(self, dates, area, tdir="./"):
         """
         area is a tuple or list of four floats
         states : list of strings
@@ -81,7 +81,7 @@ class SObs(object):
         self.d1 = dates[0]
         self.d2 = dates[1]
         # not used
-        self.states = states
+        #self.states = states
 
         # top level directory for outputs
         self.tdir = tdir

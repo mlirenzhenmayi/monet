@@ -84,7 +84,7 @@ def default_setup(setupname="SETUP.CFG", wdir="./", units="PPB"):
     namelist["numpar"] = "24000"  # number of particles/puffs to release
     # per emission cycle.
     namelist["maxpar"] = "400000"  # maximum number of particles/puffs to simulate
-    namelist["khmax"] = 72  # maximum time to allow particles to
+    namelist["khmax"] = '72'  # maximum time to allow particles to
     # live
 
     ##The pardump file can be used to restart HYSPLIT if it crashes. Although the runs
@@ -192,7 +192,8 @@ def getmetfiles(
     return list(zip(mdirlist, mfiles))
 
 
-def default_control(name, tdirpath, runtime, sdate, cpack=1, area=None):
+def default_control(name, tdirpath, runtime, sdate, cpack=1, 
+                   area=None, sphash={1:'so2a'}):
     lat = 47
     lon = -101
     if cpack == 1:
@@ -248,10 +249,17 @@ def default_control(name, tdirpath, runtime, sdate, cpack=1, area=None):
     control.add_cgrid(cgrid)
     ##TO DO check webdep for so2
     vel = "0.0 64.0 0.0 1.9 1.24e5"  # this is dry deposition parameters
-    particle = Species(
-        "so2a", psize=0, rate=1, duration=1, wetdep=0, vel=vel, density=0, shape=0
-    )
-    control.add_species(particle)
+ 
+    klist = list(sphash.keys())
+    klist.sort()
+    # BAMS VOG - use Henry's constant of 1.24 molarity
+    wetdepstr = "1.24 0.0 0.0"
+    for ky in  klist:
+        particle = Species(
+           sphash[ky] , psize=0, rate=1, duration=1, wetdepstr=wetdepstr, vel=vel, density=0, shape=0
+        )
+        #particle.add_wetdep(wetdepstr)
+        control.add_species(particle)
     control.add_location(latlon=(46, -105), alt=200, rate=0, area=0)
     control.write()
     print("WROTE " + tdirpath + name)
@@ -299,7 +307,7 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks, bg=True):
                 # print(dirpath, dirnames, filenames)
                 # print(fl)
                 et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
-                et.read_file()
+                if not et.read_file(): break
                 # print('NRECS', nrecs)
                 # sys.exit()
                 sdate = et.cycle_list[0].sdate
@@ -429,11 +437,16 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, units="ppb"):
                         suffix += "." + temp[1]
                     wdir = dirpath
 
-                    ##read emitfile and modify number of locations
+                    # read emitfile and modify number of locations
                     et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
-                    et.read_file()
-                    # print(str(et.ncycles))
-                    nrecs = et.cycle_list[0].nrecs
+                    # if the emittimes file is empty move to the next one.
+                    if not et.read_file() : break
+                    
+
+                    # number of locations is number of records
+                    # in the emitimes file divided by number of speciess.
+                    nrecs = et.cycle_list[0].nrecs / len(et.splist)
+
                     # print('NRECS', nrecs)
                     # sys.exit()
                     sdate = et.cycle_list[0].sdate
@@ -461,6 +474,19 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, units="ppb"):
                     control = HycsControl(fname="CONTROL.0", working_directory=tdirpath)
                     control.read()
                     control.date = sdate
+                    # remove species and add new with same
+                    # attributes but different names
+                    if et.splist.size > 0:
+                       sp = control.species[0]
+                       control.remove_species()
+                       for spec in et.splist:
+                           spnew = sp.copy()
+                           #print('Adding species', spec)
+                           spnew.name = et.sphash[spec]
+                           #print(spnew.strpollutant())
+                           control.add_species(spnew)  
+
+
                     ##remove all the locations first and then add
                     ##locations that correspond to emittimes file.
                     control.remove_locations()

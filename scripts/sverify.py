@@ -2,6 +2,7 @@ from optparse import OptionParser
 import datetime
 import seaborn as sns
 import matplotlib.pyplot as plt
+import os
 
 # imported in create_map
 # import cartopy.crs as ccrs
@@ -90,9 +91,9 @@ def create_map(fignum):
 
 
 parser = OptionParser()
-parser.add_option(
-    "-a", type="string", dest="state", default="ND", help="two letter state code (ND)"
-)
+#parser.add_option(
+#    "-a", type="string", dest="state", default="ND", help="two letter state code (ND)"
+#)
 parser.add_option(
     "-b",
     type="string",
@@ -124,6 +125,13 @@ parser.add_option(
                         groups of 10, \
                         1 only show maps, \
                         2 show no graphs",
+)
+parser.add_option(
+    "-s",
+    action="store_false",
+    dest="spnum",
+    default=True,
+    help="Create different species dependent on MODC flag values.",
 )
 parser.add_option(
     "-u",
@@ -218,11 +226,11 @@ if options.test and options.cems:
     lonur = -100
     area = (latll, lonll, latur, lonur)
 
-states = []
-if options.state:
-    temp = options.state.split(":")
-    for tt in temp:
-        states.append(tt.lower())
+#states = []
+#if options.state:
+#    temp = options.state.split(":")
+#    for tt in temp:
+#        states.append(tt.lower())
 
 # TO DO should tie numpar to the emissions amount during that time period
 # as well as the resolution.
@@ -286,6 +294,8 @@ if options.create_runs:
 if options.results:
     from monet.util.svhy import create_runlist
     from monet.util.svresults import results
+    from monet.util.svresults import CemsObs
+    from monet.util.svresults import gpd2csv
 
     runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
     results("outfile.txt", runlist)
@@ -294,9 +304,9 @@ rfignum = 1
 if options.cems:
     from monet.util.svcems import SEmissions
 
-    ef = SEmissions([d1, d2], area, states, tdir=options.tdir)
+    ef = SEmissions([d1, d2], area,  tdir=options.tdir, spnum=options.spnum)
     ef.find()
-    ef.print_source_summary(options.tdir)
+    #ef.print_source_summary(options.tdir)
     ef.plot(save=True, quiet=options.quiet)
     ef.create_emitimes(
         ef.d1, schunks=source_chunks, tdir=options.tdir, unit=options.unit
@@ -319,15 +329,31 @@ if options.obs:
     import sys
     from monet.util.svobs import SObs
 
-    obs = SObs([d1, d2], area, states, tdir=options.tdir)
+    obs = SObs([d1, d2], area,  tdir=options.tdir)
     obs.fignum = rfignum
     obs.find(pload=True, tdir=options.tdir, test=options.test, units=options.units)
     try:
         obs.check()
     except BaseException:
-        print("OBS CHECK failed")
+        print("No met data for stations.")
     # sys.exit()
     obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir)
+
+
+    # output file with distances and directons from power plants to aqs sites.
+    obsfile = obs.csvfile
+    sumfile = 'source_summary.csv'
+    cemsfile = 'cems.csv'
+    t1 = os.path.isfile(obsfile)
+    t2 = os.path.isfile(sumfile)
+    t3 = os.path.isfile(cemsfile)
+    if t1 and t2 and t3:
+          from monet.util.svresults import CemsObs
+          from monet.util.svresults import gpd2csv
+          cando = CemsObs(obsfile, cemsfile, sumfile)
+          osum, gsum = cando.make_sumdf()
+          gpd2csv(osum, 'geometry.csv')
+
     obs.plot(save=True, quiet=options.quiet)
     fignum = obs.fignum
     if options.quiet == 1:
@@ -342,6 +368,8 @@ if options.obs:
     plt.savefig(options.tdir + "map.jpg")
     if options.quiet < 2:
         plt.show()
+
+
 
 
 ##------------------------------------------------------##

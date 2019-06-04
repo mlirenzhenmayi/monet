@@ -1183,25 +1183,28 @@ class CEMS:
                 # requested for the first date in the list.
                 plan = MonitoringPlan(str(oris), str(mid), datelist[0])
                 mhash = plan.to_dict()
-                for ndate in datelist:
-                    if mhash:
-                        if len(mhash) > 1:
-                            print(
-                                "CEMS class WARNING: more than one \
-                                  Monitoring location for this unit\n"
-                            )
-                            for val in mhash:
-                                print(
-                                    "unit " + val["name"] + " oris " + str(oris))
-                            sys.exit()
-                        else:
-                            mhash = mhash[0]
-                            stackht = float(mhash["stackht"])
+                if mhash:
+                    if len(mhash) > 1:
+                        print(
+                            "CEMS class WARNING: more than one \
+                              Monitoring location for this unit\n"
+                        )
+                        print(str(oris) + ' ' +  str(mid) + '---')
+                        for val in mhash.keys():
+                            print(val, mhash[val])
+                        print('-------------------------------')
+                            #print(
+                            #    "unit " + val["name"] + " oris " + str(oris))
+                        sys.exit()
                     else:
-                        stackht = None
-                    dflist.append((oris, mid, stackht))
-                    # 5. Call to the Emissions class to add each monitoring location
-                    #    to the dataframe.
+                        mhash = mhash[0]
+                        stackht = float(mhash["stackht"])
+                else:
+                    stackht = None
+                dflist.append((oris, mid, stackht))
+                # 5. Call to the Emissions class to add each monitoring location
+                #    to the dataframe for each quarter in the time period.
+                for ndate in datelist:
                     quarter = findquarter(ndate)
                     status = self.emit.add(
                         oris,
@@ -1211,9 +1214,9 @@ class CEMS:
                     )
                     if status == 200:
                         self.orislist.append((oris, mid))
-                    write_status_message(status, oris, mid, quarter, "log.txt")
-                else:
-                    write_status_message(plan.status_code, oris, 'no mp ' +
+                        write_status_message(status, oris, mid, quarter, "log.txt")
+                    else:
+                        write_status_message(plan.status_code, oris, 'no mp ' +
                                          str(mid), quarter, "log.txt")
         # merge stack height data into the facilities information data frame.
         tempdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])

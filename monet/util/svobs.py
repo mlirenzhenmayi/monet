@@ -9,9 +9,9 @@ import datetime
 import sys
 import seaborn as sns
 from monet.obs import cems_mod
-from monet.obs import aqs_mod
 from monet.obs import airnow
-from monet.obs import ish_mod
+from monet.obs import aqs as aqs_mod
+from monet.obs import ish
 import monet.obs.obs_util as obs_util
 
 # from arlhysplit import runh
@@ -211,9 +211,9 @@ class SObs(object):
             basedir = os.path.abspath(os.path.dirname(__file__))[:-4]
             fn = "testaqs.csv"
             fname = os.path.join(basedir, "data", fn)
-            df = aqs.load_aqs_file(fname, None)
-            self.obs = aqs.add_data2(df)
-            print("--------------TEST1--------------------------------")
+            df = aqs_mod.load_aqs_file(fname, None)
+            self.obs = aqs_mod.add_data2(df) 
+            print("--------------TEST1--------------------------------") 
             print(self.obs[0:10])
             rt = datetime.timedelta(hours=72)
             self.obs = obs_util.timefilter(self.obs, [self.d1, self.d2 + rt])
@@ -246,13 +246,14 @@ class SObs(object):
                 aq.add_data([self.d1, self.d2], download=True)
             else:
                 aq = aqs_mod.AQS()
-                aq.add_data(
+                self.obs = aq.add_data(
                     [self.d1, self.d2],
                     param=["SO2", "WIND", "TEMP", "RHDP"],
                     download=False,
                 )
-                # aq.add_data([self.d1, self.d2], param=['SO2','WIND','TEMP'], download=False)
-            self.obs = aq.df.copy()
+            # aq.add_data([self.d1, self.d2], param=['SO2','WIND','TEMP'], download=False)
+            #self.obs = aq.df.copy()
+       
         print("HEAD", self.obs.columns.values)
         # filter by area.
         if area:

@@ -13,6 +13,28 @@ import seaborn as sns
 """
 
 
+def obs_cems(obscsv):
+    """
+    # Read csv file of emissions.
+    
+    # Loop through power plants.
+ 
+    #     For each station within certain distance of power plant.
+
+         # Read csv file of emissions.
+         # Loop thru each measurement stations.
+         # Create MatchedData object for measurements / Power plant emissions.
+         # calculate lagged autocorrelations. 
+    """
+
+    str1 = obscsv.split('.')
+    dt1 = str1[0].strptime("metobs%Y%m%d") 
+    dt2 = str1[1].strptime("%Y%m%d") 
+    area=''
+    obs = SObs([dt1, dt2], area)
+
+
+
 def results(dfile, runlist, xmeas=1):
     """
     reads file output by datem.

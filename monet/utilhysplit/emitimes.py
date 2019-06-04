@@ -33,7 +33,7 @@ class EmiTimes(object):
     and then adding records
     efile.add_record(date, duraction, lat, lon, height, rate, area, heat, spnum)
     The spnum indicates which species the record is for. Default is 1.
-    The spnum indicates the position in the CONTROL file of the species. 
+    The spnum indicates the position in the CONTROL file of the species.
     1 is the first species type defined. 2 is the second species type defined
     etc.
 
@@ -68,7 +68,8 @@ class EmiTimes(object):
         self.nanvalue = nanvalue  # if NaN shows up, what value to use.
         # if None, will throw and error if there a Nan
         self.splist = [1]  # list of species in the file
-        self.sphash = {1: "P001"}  # val - name of species. key - position (1 to..)
+        # val - name of species. key - position (1 to..)
+        self.sphash = {1: "P001"}
         self.header = self.header_str()
 
     def header_str(self):
@@ -108,7 +109,7 @@ class EmiTimes(object):
 
     def findmaxsp(self):
         """
-        find cycle with the most species. 
+        find cycle with the most species.
         """
         maxsp = 1
         for ec in self.cycle_list:
@@ -186,7 +187,7 @@ class EmiTimes(object):
 
         num_species is used to determine how many species are represented.
         Default is 1.
-        if this information is in the header, that will be used instead. 
+        if this information is in the header, that will be used instead.
 
         Returns False if EmitTimes file is empty
 
@@ -207,7 +208,7 @@ class EmiTimes(object):
                 ec = EmitCycle(splist=self.splist)
                 # the third line (0,1,2) is the cycle header line.
                 nrecs = ec.parse_header(lines[iii])
-                check = ec.read_cycle(lines[iii + 1 : iii + nrecs + 1])
+                check = ec.read_cycle(lines[iii + 1: iii + nrecs + 1])
                 if not check:
                     break
                 else:
@@ -245,8 +246,17 @@ class EmiTimes(object):
             ec.filter_records(llcrnr, urcrnr)
 
     def add_record(
-        self, date, duration, lat, lon, height, rate, area, heat, spnum=1, nanvalue=0
-    ):
+            self,
+            date,
+            duration,
+            lat,
+            lon,
+            height,
+            rate,
+            area,
+            heat,
+            spnum=1,
+            nanvalue=0):
         """
         adds a record to a cycle based on the date of the record.
         Returns:
@@ -263,8 +273,7 @@ class EmiTimes(object):
             rvalue = False
         else:
             self.cycle_list[cycle_number].add_record(
-                date, duration, lat, lon, height, rate, area, heat, spnum, nanvalue
-            )
+                date, duration, lat, lon, height, rate, area, heat, spnum, nanvalue)
             rvalue = True
         return rvalue
 
@@ -299,7 +308,13 @@ class EmitCycle(object):
         # then lat, lon and height.
         # this sort order will allow line sources to be specified properly.
         #
-        self.recordra.sort(key=lambda x: (x.date, x.spnum, x.lat, x.lon, x.height))
+        self.recordra.sort(
+            key=lambda x: (
+                x.date,
+                x.spnum,
+                x.lat,
+                x.lon,
+                x.height))
         return -1
 
     def fill_species(self):
@@ -316,9 +331,8 @@ class EmitCycle(object):
             nlist.append((rc.date, rc.lat, rc.lon, rc.height))
             slist.append(rc.spnum)
         # list of all date, lat, lon height locations
-        nlist = list(set(nlist))
+        nlist = sorted(set(nlist))
         # nlist = sorted(nlist, key=itemgetter(0))
-        nlist.sort()
         # list of all species numbers.
         slist = list(set(slist))
         alist = []
@@ -341,7 +355,17 @@ class EmitCycle(object):
                 lon = alist[jjj][0][2]
                 ht = alist[jjj][0][3]
                 spnum = alist[jjj][1]
-                new_records.append(EmitLine(date, "0100", lat, lon, 0, 0, 0, 0, spnum))
+                new_records.append(
+                    EmitLine(
+                        date,
+                        "0100",
+                        lat,
+                        lon,
+                        0,
+                        0,
+                        0,
+                        0,
+                        spnum))
                 jjj += 1
             jjj += 1
 
@@ -351,7 +375,17 @@ class EmitCycle(object):
             lon = alist[iii][0][2]
             ht = alist[iii][0][3]
             spnum = alist[iii][1]
-            new_records.append(EmitLine(date, "0100", lat, lon, 0, 0, 0, 0, spnum))
+            new_records.append(
+                EmitLine(
+                    date,
+                    "0100",
+                    lat,
+                    lon,
+                    0,
+                    0,
+                    0,
+                    0,
+                    spnum))
 
         for rec in new_records:
             self.add_emitline(rec)
@@ -396,8 +430,8 @@ class EmitCycle(object):
         Takes a string which is a line in an EMITTIMES file
         specifying an emission and turn it into an EmitLine object.
         record : string
-        spnum : int 
-               indicates species number 
+        spnum : int
+               indicates species number
                (position in CONTROL file starting with 1)
         RETURNS
         EmitLine object.
@@ -447,8 +481,17 @@ class EmitCycle(object):
         self.nrecs += 1
 
     def add_record(
-        self, sdate, duration, lat, lon, ht, rate, area, heat, spnum=1, nanvalue=0
-    ):
+            self,
+            sdate,
+            duration,
+            lat,
+            lon,
+            ht,
+            rate,
+            area,
+            heat,
+            spnum=1,
+            nanvalue=0):
         """Inputs
         sdate
         duration

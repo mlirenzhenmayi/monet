@@ -16,6 +16,11 @@ pycall=python
 # BOUNDS (Lower left lat, lon,  Upper Right lat, lon)
 bounds=35.5:-80.5:36.5:-79.5
 
+# make directory for outputs from api requests to go.
+# outputs are saved to files to reduce number of requests.
+mkdir -p apifiles
+
+
 ##--cems option finds emissions data
 #        writes emittimes files in subdirectories.
 #  default is to write emissions with different MODC flags to different species.
@@ -36,8 +41,8 @@ bounds=35.5:-80.5:36.5:-79.5
 #$pycall ${sdir}sverify.py --cems --obs -b$bounds -d$dr  -o$outdir -y$hdir --unit PPB
 #$pycall ${sdir}sverify.py -q 2 --obs -b$bounds -d$dr - -o$outdir -y$hdir --unit PPB
 #$pycall ${sdir}sverify.py  -q 2 --cems  -b$bounds -d$dr  -o$outdir -y$hdir --unit PPB
-#$pycall ${sdir}sverify.py -q 2 --def -d$dr -a$state -b$bounds -o$outdir -y$hdir --unit PPB
-#$pycall ${sdir}sverify.py --run ${year}run.sh -d$dr -a$state -o$outdir -y$hdir --unit PPB
+#$pycall ${sdir}sverify.py -q 2 --def -d$dr -b$bounds -o$outdir -y$hdir --unit PPB
+#$pycall ${sdir}sverify.py --run ${year}run.sh -d$dr  -o$outdir -y$hdir --unit PPB
 ##run results after running the script created by test.sh
 
 #dr=2016:1:01:2016:11:30

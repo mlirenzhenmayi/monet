@@ -288,7 +288,11 @@ class SEmissions(object):
             tzhash[oris] = datetime.timedelta(hours=tz)
 
         def loc2utc(local, oris, tzhash):
-            utc = local + tzhash[oris]
+            if isinstance(local, str): 
+                print('NOT DATE', local)
+                utc = local
+            else:
+                utc = local + tzhash[oris]
             return utc
 
         # all these copy statements are to avoid the warning - a value is trying
@@ -657,13 +661,18 @@ class SEmissions(object):
         ploc = 0
         for ky in data1.keys():
             loc = ky[0]
+            spnum = ky[1]
+            if spnum==1: clr = "b."
+            elif spnum==2: clr = "g."
+            elif spnum==3: clr = "r."
+            else: clr = 'k.'
             if loc != ploc:
                 self.fignum += 1
                 jjj = 0
             fig = plt.figure(self.fignum)
             ax = fig.add_subplot(1, 1, 1)
             data = data1[ky] * self.lbs2kg
-            ax.plot(data, clrs[jjj])
+            ax.plot(data, clr)
             plt.ylabel("SO2 mass kg")
             plt.title(str(loc) + " " + namehash[loc])
             if save:

@@ -24,6 +24,26 @@ check method looks at correlation of wind with SO2
 
 """
 
+def generate_obs(siteidlist, obsfile):
+    """
+    yields a time series of measurements for each site in the siteidlist.
+    """
+    #obsfile = self.obsfile.replace('info_','')
+    str1 = obsfile.split('.')
+    dt1 = datetime.datetime.strptime(str1[0], "obs%Y%m%d") 
+    dt2 = datetime.datetime.strptime(str1[1], "%Y%m%d") 
+    area=''
+    obs = SObs([dt1, dt2], area)
+    if not os.path.isfile(obsfile):
+       print(obsfile + ' does not exist')
+    odf = obs.read_csv(obsfile, hdrs=[0])
+    print('HERE', odf[0:1])
+    print(odf.columns)
+    odf = odf[odf["variable"] == "SO2"]
+    for sid in siteidlist:
+        # gets a time series of observations at sid.
+        ts = get_tseries(odf, sid, var='obs', svar='siteid', convert=False) 
+        yield ts
 
 def get_tseries(df, siteid, var="obs", svar="siteid", convert=False):
     qqq = df["siteid"].unique()
@@ -34,26 +54,6 @@ def get_tseries(df, siteid, var="obs", svar="siteid", convert=False):
         mult = 1 / 2.6178
     series = df[var] * mult
     return series
-
-
-def getdirection(p1, p2):
-    """
-
-    """
-    deg2met = 111.0  # meters in one degree
-    dlat = (p1[0] - p2[0]) * deg2met
-    dlon = (p1[1] - p2[1]) * deg2met
-    theta = np.arctan(dlon / dlat) * 180 / np.pi
-    if dlon > 0 and dlat > 0:
-        theta = theta
-    elif dlat < 0:
-        theta = 180 + theta
-    elif dlon < 0 and dlat > 0:
-        theta = 360 + theta
-
-    distance = (dlat ** 2 + dlon ** 2) ** 0.5
-    return theta, distance
-
 
 class SObs(object):
     """This class for running the SO2 HYSPLIT verification.

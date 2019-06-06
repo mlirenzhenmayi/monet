@@ -298,7 +298,7 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks, bg=True):
 
     iii = 0
     for (dirpath, dirnames, filenames) in walk(tdirpath):
-        # print(dirpath, dirnames, filenames)
+        #print(dirpath, dirnames, filenames)
         for fl in filenames:
             if iii == 0:
                 firstdirpath = dirpath
@@ -307,7 +307,7 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks, bg=True):
                 # print(dirpath, dirnames, filenames)
                 # print(fl)
                 et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
-                if not et.read_file(): break
+                if not et.read_file(): continue
                 # print('NRECS', nrecs)
                 # sys.exit()
                 sdate = et.cycle_list[0].sdate
@@ -315,8 +315,8 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks, bg=True):
                     continue
                 suffix = fl[4:8]
                 temp = fl.split(".")
-                # print(temp)
-                # print('************')
+                print(temp)
+                print('************')
                 if temp[1] != "txt":
                     suffix += "." + temp[1]
                 wdir = dirpath
@@ -423,24 +423,25 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, units="ppb"):
         print(dirpath)
         for (d1, dirnames, filenames) in walk(dirpath):
             for fl in filenames:
-                # print(dirpath, dirnames, fl)
                 if iii == 0:
                     firstdirpath = dirpath
                 if "EMIT" in fl:
                     # print(dirpath, dirnames, filenames)
-                    # print(fl)
                     suffix = fl[4:8]
                     temp = fl.split(".")
                     # print(temp)
                     # print('************')
                     if temp[1] != "txt":
                         suffix += "." + temp[1]
+                    else:
+                        suffix = temp[0].replace('EMIT','')
                     wdir = dirpath
+                    print(fl, suffix)
 
                     # read emitfile and modify number of locations
                     et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
                     # if the emittimes file is empty move to the next one.
-                    if not et.read_file() : break
+                    if not et.read_file() : continue
                     
 
                     # number of locations is number of records

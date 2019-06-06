@@ -20,7 +20,7 @@ from monet.utilhysplit import emitimes
 from shapely.geometry import Point
 import geopandas as gpd
 import pandas as pd
-
+import warnings
 # from monet.obs.epa_util import convert_epa_unit
 
 """
@@ -371,8 +371,11 @@ class SEmissions(object):
         if not self.use_spnum:
            # set all species numbers to 1
            df['spnum'] = 1
+        print('UNIT value', unit)
         cols = ["oris", "stackht", "spnum"]
+        if unit: cols.append('unit')
         # cols=['oris']
+        print('BEFORE PIVOT',  df.columns)
         sources = pd.pivot_table(
             df, index=["time"], values=stype, columns=cols, aggfunc=np.sum
         )
@@ -404,7 +407,10 @@ class SEmissions(object):
         for val in cols:
             lat = lathash[val[0]]
             lon = lonhash[val[0]]
-            newcolumn.append((val[0], val[1], lat, lon, val[2]))
+            tp = (val[0], val[1], lat, lon, val[2])
+            if unit: tp = (val[0], val[1], lat, lon, val[2], val[3])
+            newcolumn.append(tp)
+           
         sources.columns = newcolumn
         #######################################################################
         #######################################################################
@@ -442,7 +448,7 @@ class SEmissions(object):
         df = self.get_so2_sources(unit=unit)
         # df = self.get_sources()
         self.make_csv(df.copy())
-        #print("CREATE EMITIMES in SVCEMS")
+        print("CREATE EMITIMES in SVCEMS")
         #print(df[0:72])
         # placeholder. Will later add routine to get heat for plume rise
         # calculation.
@@ -460,18 +466,18 @@ class SEmissions(object):
             d2 = d1 + datetime.timedelta(hours=schunks - 1)
             dftemp = df.loc[d1:d2]
             hdf = dfheat.loc[d1:d2]
-            if unit:
-                sdf = dfstack[d1:d2]
+            #if unit:
+            #    sdf = dfstack[d1:d2]
             # if no emissions during time period then break.
             if dftemp.empty:
                 break
             self.emit_subroutine(dftemp, hdf, d1, schunks, tdir, unit=unit)
             # create separate EMIT TIMES file for each unit.
             # these are named STACKFILE rather than EMIT
-            if unit:
-                self.emit_subroutine(
-                    dftemp, sdf, d1, schunks, tdir, unit=unit, bname="STACKFILE"
-                )
+            #if unit:
+            #    self.emit_subroutine(
+            #        dftemp, sdf, d1, schunks, tdir, unit=unit, bname="STACKFILE"
+            #    )
             d1 = d2 + datetime.timedelta(hours=1)
             iii += 1
             if iii > 1000:
@@ -497,47 +503,67 @@ class SEmissions(object):
         
         # get list of oris numbers
         orislist = []
+        unithash = {}
         for hdr in locs:
             oris = hdr[0]
             orislist.append(oris)
+            unithash[oris] = []
+ 
+        for hdr in locs:
+            oris = hdr[0]
+            print(hdr)
+            if unit:  mid = hdr[5]
+            else: mid='None'
+            unithash[oris].append(mid) 
+              
         orislist = list(set(orislist))
-
         sphash = {1:'MEAS', 2:'EST1', 3:'EST2'}
 
         # create a dictionary with key oris number and value and EmiTimes
         # object.
+
+
         for oris in orislist:
-            # output directory is determined by tdir and starting date.
-            # chkdir=True means date2dir will create the directory if
-            # it does not exist already.
-            ename = bname + str(oris)
-            odir = date2dir(tdir, edate, dhour=schunks, chkdir=True)
-            ename = odir + ename + ".txt"
-            ehash[oris] =  emitimes.EmiTimes(filename=ename)
-            ehash[oris].set_species(sphash)
+            for mid in unithash[oris]:
+                # output directory is determined by tdir and starting date.
+                # chkdir=True means date2dir will create the directory if
+                # it does not exist already.
+                ename = bname + str(oris)
+                if unit: ename = ename + '_' + str(mid)
+                odir = date2dir(tdir, edate, dhour=schunks, chkdir=True)
+                ename = odir + ename + ".txt"
+                if unit: key = str(oris) + str(mid)
+                else: key = oris
+                ehash[key] =  emitimes.EmiTimes(filename=ename)
+                ehash[key].set_species(sphash)
+
+
 
         # now this loop fills the EmitTimes objects
         for hdr in locs:
             oris = hdr[0]
-            # print('HEADER', hdr)
             d1 = edate  # date to start emitimes file.
             dftemp = df[hdr]
             dfh = dfheat[hdr]
             dftemp.fillna(0, inplace=True)
             dftemp = dftemp[dftemp!=0]
             #ename = bname + str(oris)
-            if unit:
-                sid = hdr[4]
-                ename += "." + str(sid)
+            #if unit:
+            #    sid = hdr[4]
+            #   ename += "." + str(sid)
             height = hdr[1]
             lat = hdr[2]
             lon = hdr[3]
             spnum = hdr[4]
+            key = oris
+            if unit: 
+               mid = hdr[5]
+               key += str(mid)
             # hardwire 1 hr duraton of emissions.
             record_duration = "0100"
             area = 1
             # pick which EmitTimes object we are working with.
-            efile = ehash[oris]
+            efile = ehash[key]
             # output directory is determined by tdir and starting date.
             # chkdir=True means date2dir will create the directory if
             # it does not exist already.
@@ -578,7 +604,7 @@ class SEmissions(object):
                             spnum,
                         )
                         nnn+=1
-                        if nnn > 10:
+                        if nnn > 20:
                            break
                         #if not check2:
                         #    print("sverify WARNING: record not added to EmiTimes")
@@ -586,8 +612,8 @@ class SEmissions(object):
                         #    print(str(lat), str(lon), str(rate), str(heat))
                         #    break
         # here we write the EmitTimes files
-        for efile in ehash.values():
-            efile.write_new(ename)
+        for ef in ehash.values():
+            ef.write_new(ef.filename)
 
     def modc2spnum(self, dfin):
         """
@@ -635,6 +661,12 @@ class SEmissions(object):
         #temp = df[df['so2_lbs']>0]
         #print(temp[['time','SO2MODC','spnum','so2_lbs']][0:10]) 
         return df
+
+
+    def nowarning_plot(self, save=True, quiet=True, maxfig=10):
+        with warnings.catch_warnings():
+             warnings.simplefilter("ignore")
+             self.plot(save, quiet, maxfig)
 
     def plot(self, save=True, quiet=True, maxfig=10):
         """plot time series of emissions"""

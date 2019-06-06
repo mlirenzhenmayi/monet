@@ -27,6 +27,7 @@ from sklearn import tree
 
 def make_dataset(df):
     """
+    # NOT WORKING - possibly for machine learning????
     df should be a dataset with the appropriate variables.
     """
     # remove the target variable (so2 concentration measurement
@@ -55,6 +56,37 @@ def make_gpd(df, latstr, lonstr):
     gdf = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
     return gdf
 
+def generate_cems(cemsfile, orislist, spnum='P1'):
+    """
+    return time series of measurements.
+    """
+    cems = pd.read_csv(cemsfile, sep=",", index_col=[0],parse_dates=True)
+    new=[]   
+    for hd in cems.columns:
+        
+        temp = hd.split(',')
+        temp = temp[0].replace('(','')
+        try:
+            new.append(int(float(temp)))
+        except:
+            new.append(temp)
+    cems.columns = new
+    print(new)
+    for col in cems.columns:
+        for oris in orislist:
+            if str(oris) in col and  spnum in col:
+               yield cems[col]
+    #cems.set_index('time', inplace=True)
+
+
+
+
+        #step 1 get the cems data.
+        #step 2 get the measurement data.
+        #step 3 filter measurement data when cems on
+        #step 4 filter measurement data when cems off
+        #step 5 create cdf for each
+        #step 6 compare the cdfs
 
 
 class CemsObs(object):
@@ -70,6 +102,12 @@ class CemsObs(object):
         self.sumdf = gpd.GeoDataFrame() #created by make_sumdf
         self.obs = None #SObs object
 
+    def match(self):
+        #cems = 
+        return 1 
+
+
+
     def find_sites(self, oris, dthresh, arange=None):
         """
         returns data frame with list of measurements sites within dthresh
@@ -83,34 +121,6 @@ class CemsObs(object):
             sumdf = self.sumdf[cnames]
             sumdf = sumdf[sumdf[dname] <= dthresh]
         return sumdf
-
-    def generate_obs(self, siteidlist):
-        #obsfile = self.obsfile.replace('info_','')
-        obsfile = self.obsfile
-        if not os.path.isfile(obsfile):
-           print(obsfile + ' does not exist')
-        odf = self.obs.read_csv(obsfile, hdrs=[0])
-        print('HERE', odf[0:1])
-        print(odf.columns)
-        odf = odf[odf["variable"] == "SO2"]
-        for sid in siteidlist:
-            # gets a time series of observations at sid.
-            ts = get_tseries(odf, sid, var='obs', svar='siteid', convert=False) 
-            yield ts    
-
-    def get_cems(self, oris):
-        cems = pd.read_csv(self.cemsfile, sep=",", index_col=[0],parse_dates=True)
-        new=[]   
-        for hd in cems.columns:
-            temp = hd.split(',')
-            temp = temp[0].replace('(','')
-            try:
-                new.append(int(float(temp)))
-            except:
-                new.append(temp)
-        cems.columns = new
-        #cems.set_index('time', inplace=True)
-        return cems[oris]
 
     def get_met(self):
         met = self.obs.read_met()

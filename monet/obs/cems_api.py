@@ -308,20 +308,23 @@ class EpaApiObject:
         if self.fdir[-1] != '/' : self.fdir += '/'
         # returns None if filename does not exist.
         # if prompt True then will ask for new filename if does not exist.
-        fname = get_filename(self.fdir + fname, prompt)
+        fname2 = get_filename(self.fdir + fname, prompt)
         self.getstr = self.create_getstr()
         # if the file exists load data from it.
         getboolean = True
-        if fname:
+        if fname2:
             print("Loading from file ", self.fdir + self.fname)
-            self.fname =  fname
+            self.fname =  fname2
             self.df, getboolean = self.load()
+        elif fname:
+            self.fname = self.fdir + fname
         # if it doesn't load then get it from the api.
         # if save is True then save.
         if self.df.empty and getboolean:
             # get sends request to api and processes data received.
             self.df = self.get()
             if save:
+                #if self.fdir: self.fname = self.fdir + self.fname
                 self.save()
 
     def set_filename(self, fname):

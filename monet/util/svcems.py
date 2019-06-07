@@ -431,11 +431,15 @@ class SEmissions(object):
                 cstr=hd[0] + ' P' + str(hd[4])
             except:
                 cstr = hd
+            try:
+                cstr += ' U' + str(hd[5])
+            except:
+                pass
             new.append(cstr)
         df.columns = new
         df.to_csv("cems.csv")
 
-    def create_emitimes(self, edate, schunks=1000, tdir="./", unit=True):
+    def create_emitimes(self, edate, schunks=1000, tdir="./", unit=True, heat=0):
         """
         One of the main methods. 
         create emitimes file for CEMS emissions.
@@ -453,7 +457,7 @@ class SEmissions(object):
         # placeholder. Will later add routine to get heat for plume rise
         # calculation.
 
-        dfheat = df * 0
+        dfheat = df * 0 + heat
         # dfheat = self.get_heat(unit=unit)
         # if unit:
         #    dfstack = self.get_stackvalues(unit=unit)
@@ -511,7 +515,7 @@ class SEmissions(object):
  
         for hdr in locs:
             oris = hdr[0]
-            print(hdr)
+            #print(hdr)
             if unit:  mid = hdr[5]
             else: mid='None'
             unithash[oris].append(mid) 

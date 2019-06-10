@@ -324,7 +324,6 @@ class EpaApiObject:
             # get sends request to api and processes data received.
             self.df = self.get()
             if save:
-                #if self.fdir: self.fname = self.fdir + self.fname
                 self.save()
 
     def set_filename(self, fname):
@@ -833,7 +832,7 @@ class MonitoringPlan(EpaApiObject):
         except BaseException:
             pass
         if not self.dfall.empty:
-            df = pd.concat([self.dfall, self.df],sort=True )
+            df = pd.concat([self.dfall, self.df], sort=True)
             df = df.drop_duplicates(subset=["oris", "mid"])
             df.to_csv(self.fname)
         else:

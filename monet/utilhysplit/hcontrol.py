@@ -630,20 +630,20 @@ class NameList:
         )
         self.descrip["kmix0"] = "mixing depth. 250 minimum"
         self.descrip["kzmis"] = (
-            "Vertical mixing profile.",
-            " 0:No adjustments.",
-            " 1: vertical diffusivity in PBL single",
-            " average value",
+            "Vertical mixing profile." +
+            " 0:No adjustments." + 
+            " 1: vertical diffusivity in PBL single" +
+            " average value"
         )
         self.descrip["kbls"] = (
-            "Stability computed by" "(1) Heat and momentum fluxes,",
-            " 2: Wind and temperature profiles",
+            "Stability computed by" "(1) Heat and momentum fluxes,"+
+            " 2: Wind and temperature profiles"+
         )
         self.descrip["kblt"] = (
-            "Flag to set vertical turbulence computational",
-            "method. 1:Beljaars/Holtslag",
-            "(2):Kanthar/Clayson ",
-            " 3:TKE field 4:Velocity Variances",
+            "Flag to set vertical turbulence computational"+
+            "method. 1:Beljaars/Holtslag"+
+            "(2):Kanthar/Clayson "+
+            " 3:TKE field 4:Velocity Variances"
         )
         self.descrip["initd"] = "defines particle or puff mode"
 

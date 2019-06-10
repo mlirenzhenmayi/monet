@@ -106,7 +106,7 @@ class ConfigFile(NameList):
           self.runtest = False
 
           self.bounds = None
-          self.drange = "2106:1:1:2016:2:1",
+          self.drange = "2106:1:1:2016:2:1"
           self.hdir = './'
           self.tdir = './'
           self.quiet = 0           
@@ -114,6 +114,7 @@ class ConfigFile(NameList):
           # attributes for CEMS data
           self.cems = True
           self.heat = 0
+          self.emit_area = 0
           self.chunks = 5        # number of days in each emittimes file
           self.spnum = True      # different species for MODC flags
           self.byunit = True     # split emittimes by unit
@@ -123,15 +124,18 @@ class ConfigFile(NameList):
           self.obs = True
 
           self.tag = 'test_run'         
+     
+          self.write_scripts = None
  
           self.create_runs = False
           self.defaults = False
           self.results = False
-          
-          self.read(case_sensitive=False)
-          self.hash2att()
-
-          
+          if os.path.isfile(fname):      
+              self.read(case_sensitive=False)
+              self.hash2att()
+              self.fileread=True
+          else:
+              self.fileread=False 
 
     def _load_descrip(self):
         lorder = []
@@ -177,6 +181,10 @@ class ConfigFile(NameList):
         hstr="value to use in heat field for EMITIMES file"
         self.descrip['heat'] = hstr
         lorder.append('heat')
+
+        hstr="value to use in area field for EMITIMES file"
+        self.descrip['EmitArea'] = hstr
+        lorder.append('EmitArea')
 
         hstr="(True) or False). Create EMITIMES for each unit."
         self.descrip['ByUnit'] = hstr
@@ -236,6 +244,8 @@ class ConfigFile(NameList):
         self.drange = self.test('drange', self.drange)
         self.tag = self.test('tag',self.tag)
 
+        self.emit_area = self.test('emitarea', self.emit_area)
+        self.emit_area = float(self.emit_area)
         self.heat = self.test('heat', self.heat)
         self.heat = float(self.heat)
         self.cunits = self.test('unit',self.cunits)
@@ -248,6 +258,8 @@ class ConfigFile(NameList):
         self.chunks = self.test('emitdays', self.chunks)
         self.chunks = int(self.chunks)
 
+        self.write_scripts = self.test('scripts', self.write_scripts)
+       
         # booleans
         self.byunit = self.str2bool(self.test('ByUnit', self.byunit))
         self.spnum = self.str2bool(self.test('Species', self.spnum))
@@ -255,6 +267,7 @@ class ConfigFile(NameList):
         self.obs = self.str2bool(self.test('obs', self.obs))
         self.create_runs = self.str2bool(self.test('run', self.create_runs))
         self.results = self.str2bool(self.test('results', self.results))
+        self.defaults = self.str2bool(self.test('defaults', self.results))
 
 
 #options = ConfigFile('CONFIG.S')
@@ -283,8 +296,16 @@ parser.add_option(
 options = ConfigFile(opts.configfile)
 
 if opts.print_help:
+   print('-------------------------------------------------------------')
+   print('Configuration file options (key words are not case sensitive)')
+   print('-------------------------------------------------------------')
    print(options.print_help(order=options.lorder))
    sys.exit()
+
+if not options.fileread:
+   print('configuration file ' + opts.configfile + ' not found.\ngoodbye')
+   sys.exit()
+
 
 temp = options.drange.split(":")
 try:
@@ -320,7 +341,6 @@ if options.runtest and options.cems:
     lonur = -100
     area = (latll, lonll, latur, lonur)
 
-print('AREA in sverify', area)
 
 #states = []
 #if options.state:
@@ -370,22 +390,10 @@ ncycle = source_chunks
 if options.defaults:
     from monet.util.svhy import default_setup
     from monet.util.svhy import default_control
-
+    print('writing control and setup')
     # if units='ppb' then ichem=6 is set to output mixing ratios.
     default_setup("SETUP.0", options.tdir, units=options.cunits)
     default_control("CONTROL.0", options.tdir, run_duration, d1, area=area)
-
-if options.create_runs:
-    from monet.util.svhy import create_controls
-    from monet.util.svhy import create_script
-
-    runlist = create_controls(
-        options.tdir, options.hdir, d1, d2, source_chunks, units=options.cunits
-    )
-    create_script(
-        runlist, options.tdir, options.tag, units=options.cunits, write=True
-    )
-    # runhandler(runlist, 5, options.tdir)
 
 if options.results:
     from monet.util.svhy import create_runlist
@@ -400,13 +408,14 @@ rfignum = 1
 if options.cems:
     from monet.util.svcems import SEmissions
 
-    ef = SEmissions([d1, d2], area,  tdir=options.tdir, spnum=options.spnum)
+    ef = SEmissions([d1, d2], area,  tdir=options.tdir, spnum=options.spnum,
+                    tag = options.tag)
     ef.find()
     if options.quiet ==0: 
         ef.nowarning_plot(save=True, quiet=False)
     ef.create_emitimes(
         ef.d1, schunks=source_chunks, tdir=options.tdir, unit=options.byunit,
-                       heat=options.heat
+                       heat=options.heat, emit_area=options.emit_area
     )
     rfignum = ef.fignum
     if options.quiet == 1:
@@ -467,6 +476,25 @@ if options.obs:
     if options.quiet < 2:
         plt.show()
 
+
+if options.create_runs:
+    from monet.util.svhy import create_controls
+    from monet.util.svhy import create_script
+
+    runlist = create_controls(
+        options.tdir, options.hdir, d1, d2, source_chunks, units=options.cunits
+    )
+    create_script(
+        runlist, options.tdir, options.tag+'.sh', units=options.cunits, write=True
+    )
+if options.write_scripts:
+    from monet.util.svhy import create_runlist
+    from monet.util.svhy import create_script
+    runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
+    create_script(
+        runlist, options.tdir, options.tag+'.sh', units=options.cunits, write=True
+    )
+    # runhandler(runlist, 5, options.tdir)
 
 
 

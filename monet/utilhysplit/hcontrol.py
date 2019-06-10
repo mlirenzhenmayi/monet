@@ -174,8 +174,8 @@ class ConcGrid:
         note = ""
         if pnotes:
             note = "  #Concentration Grid Center (latitude longitude)"
-        returnstr = str(self.centerlat) + " " + \
-            str(self.centerlon) + note + "\n"
+        returnstr = "{:.4f}".format(self.centerlat) + " " + \
+            "{:.4f}".format(self.centerlon) + note + "\n"
         if pnotes:
             note = "  #Concentration grid spacing (degrees latitude longitude)"
         returnstr += str(self.latdiff) + " " + str(self.londiff) + note + "\n"

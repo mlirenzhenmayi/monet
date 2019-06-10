@@ -118,7 +118,7 @@ class SourceSummary:
             "Max(lbs)",
             "OperatingTime",
         ]
-        print(data1.columns)
+        #print(data1.columns)
         optime = self.operatingtime(data1)
         # only average when plant was operating.
         # data0 = data1.copy()
@@ -205,7 +205,8 @@ class SEmissions(object):
        map  - plots locations of power plants on map
     """
 
-    def __init__(self, dates, area, tdir="./", source_thresh=100, spnum=False):
+    def __init__(self, dates, area, tdir="./", source_thresh=100, spnum=False,
+                  tag=None):
         """
         self.sources: pandas dataframe
             sources are created from a CEMSEmissions class object in the get_sources method.
@@ -229,6 +230,7 @@ class SEmissions(object):
               flag value. (see modc2spnum method)
               False - ignore MODC flag value.
         """
+        self.tag = tag
         self.df = pd.DataFrame()
         self.dfu = pd.DataFrame()
         # data frame for uncertain emissions.
@@ -371,11 +373,9 @@ class SEmissions(object):
         if not self.use_spnum:
            # set all species numbers to 1
            df['spnum'] = 1
-        print('UNIT value', unit)
         cols = ["oris", "stackht", "spnum"]
         if unit: cols.append('unit')
         # cols=['oris']
-        print('BEFORE PIVOT',  df.columns)
         sources = pd.pivot_table(
             df, index=["time"], values=stype, columns=cols, aggfunc=np.sum
         )
@@ -423,7 +423,7 @@ class SEmissions(object):
         cems = pd.read_csv(name, sep=",")
         return cems
 
-    def make_csv(self, df):
+    def make_csv(self, df, cname='cems.csv'):
         new = []
         df.fillna(0, inplace=True)
         for hd in df.columns:
@@ -437,9 +437,11 @@ class SEmissions(object):
                 pass
             new.append(cstr)
         df.columns = new
-        df.to_csv("cems.csv")
+        if self.tag: cname = str(tag) + '.cems.csv'
+        df.to_csv(cname)
 
-    def create_emitimes(self, edate, schunks=1000, tdir="./", unit=True, heat=0):
+    def create_emitimes(self, edate, schunks=1000, tdir="./", unit=True, heat=0,
+                         emit_area=0):
         """
         One of the main methods. 
         create emitimes file for CEMS emissions.
@@ -475,7 +477,8 @@ class SEmissions(object):
             # if no emissions during time period then break.
             if dftemp.empty:
                 break
-            self.emit_subroutine(dftemp, hdf, d1, schunks, tdir, unit=unit)
+            self.emit_subroutine(dftemp, hdf, d1, schunks, tdir, unit=unit,
+                                  emit_area=emit_area)
             # create separate EMIT TIMES file for each unit.
             # these are named STACKFILE rather than EMIT
             #if unit:
@@ -492,8 +495,8 @@ class SEmissions(object):
     # def emit_subroutine(self, df, dfheat):
 
     def emit_subroutine(
-        self, df, dfheat, edate, schunks, tdir="./", unit=True, bname="EMIT"
-    ):
+        self, df, dfheat, edate, schunks, tdir="./", unit=True, bname="EMIT",
+        emit_area=0):
         """
         create emitimes file for CEMS emissions.
         edate is the date to start the file on.
@@ -565,7 +568,6 @@ class SEmissions(object):
                key += str(mid)
             # hardwire 1 hr duraton of emissions.
             record_duration = "0100"
-            area = 1
             # pick which EmitTimes object we are working with.
             efile = ehash[key]
             # output directory is determined by tdir and starting date.
@@ -589,7 +591,7 @@ class SEmissions(object):
                 if date >= edate:
                     heat = dfh[date]
                     check = efile.add_record(
-                        date, record_duration, lat, lon, height, rate, area, heat, spnum
+                        date, record_duration, lat, lon, height, rate, emit_area, heat, spnum
                     )
                     nnn=0
                     
@@ -603,7 +605,7 @@ class SEmissions(object):
                             lon,
                             height,
                             rate,
-                            area,
+                            emit_area,
                             heat,
                             spnum,
                         )

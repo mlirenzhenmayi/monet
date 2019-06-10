@@ -206,23 +206,22 @@ def default_control(name, tdirpath, runtime, sdate, cpack=1,
         londiff = 2  # sector spacing in km.
         latspan = 360.0
         lonspan = 200  # downwind distance in km.
-    print("AREA", area)
     if area:
         lat1 = area[0]
         lon1 = area[1]
         lat2 = area[2]
         lon2 = area[3]
-        if lat1 < 0:
-            lat = (lat2 - lat1) * 0.5 + lat2
+        if lat2 < lat1:
+            lat = (lat1 - lat2) * 0.5 + lat2
         else:
             lat = (lat2 - lat1) * 0.5 + lat1
-        if lon1 < 0:
-            lon = (lon2 - lon1) * 0.5 + lon2
+        if lon2 < lon1:
+            lon = (lon1 - lon2) * 0.5 + lon2
         else:
             lon = (lon2 - lon1) * 0.5 + lon1
         if cpack == 1:
-            latspan = np.ceil(np.abs(lat2 - lat1))
-            lonspan = np.ceil(np.abs(lon2 - lon1))
+            latspan = np.ceil(np.abs(lat2 - lat1)) + 1
+            lonspan = np.ceil(np.abs(lon2 - lon1)) + 1
 
     sample_start = "00 00 00 00"
     ztop = 10000
@@ -262,10 +261,9 @@ def default_control(name, tdirpath, runtime, sdate, cpack=1,
         control.add_species(particle)
     control.add_location(latlon=(46, -105), alt=200, rate=0, area=0)
     control.write()
-    print("WROTE " + tdirpath + name)
 
 
-def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks, bg=True):
+def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
     """
     read the base control file in tdirpath CONTROL.0
     read the base SETUP.0 file in tdirpath
@@ -315,8 +313,6 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks, bg=True):
                     continue
                 suffix = fl[4:8]
                 temp = fl.split(".")
-                print(temp)
-                print('************')
                 if temp[1] != "txt":
                     suffix += "." + temp[1]
                 wdir = dirpath
@@ -436,7 +432,6 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, units="ppb"):
                     else:
                         suffix = temp[0].replace('EMIT','')
                     wdir = dirpath
-                    print(fl, suffix)
 
                     # read emitfile and modify number of locations
                     et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
@@ -550,14 +545,16 @@ def unit_mult(units="ug/m3"):
     return rstr
 
 
-def statmainstr():
+def statmainstr(suffix=None):
     """returns string to create_script for
        running conmerge, c2datem and statmain.
     """
+
+    
     csum = "cdump.sum"
     datem = "datem.txt"
     model = "model.txt"
-    rstr = "ls cdump.???? > mergefile \n"
+    rstr = "ls cdump.* > mergefile \n"
     rstr += "$MDL/conmerge -imergefile -o" + csum + "\n"
     rstr += (
         "$MDL/c2datem -i" + csum + " -m" + datem + " -o" + model + " -xi -z1 -c$mult \n"

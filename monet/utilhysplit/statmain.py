@@ -28,6 +28,84 @@ find_stats_function
 """
 ######following methods create and analyze an obsra. Which is a pandas dataframe with matched observations and forecasts by date.
 
+def stepfunction(xstep, ystep, iii):
+    """
+    f(xstep) = ystep
+    where xtep, ystep define a step function 
+    (for instance output of cdf)
+
+    input iii  (float)
+    returns f(iii) (float)
+    """
+    zzz = zip(xstep, ystep)
+    jjj=0
+    for val in zzz:
+        if iii >= val[0]: jjj=val[1]
+        if iii < val[0]: break
+    return  jjj 
+
+
+def get_ds(n1, n2):
+    # Note that for the time series data 
+    # the measurements are not independent.
+    # N1 and N2 should be number of independent measurments
+
+    # Supposedly ds should be increasing with alpha?
+    # so that a large value would be needed to reject null
+    # hypothesis at 100% than 50%? 
+    # but this function seems to be decreasing.
+    alpha = np.arange(1,100,1) / 100.0
+    ds = 0.5 * (1./n1 + 1./n2) * np.log(alpha/2)
+    ds = (-1 * ds) **0.5
+    return alpha, ds
+
+
+def kstest(data1, data2):
+    # see page 154 of Wilks
+    # two sample K-S test. Compare two batches of data to one another
+    # under the null hypotheses that they were drawn from the same (but
+    # unspecified) distribution. 
+
+    # Ds = max|FN(x1) - Fm(x2|
+
+    # Null hypothesis at the a *100% level is rejected if
+
+    # DS > (-0.5 * (1/n1 + 1/n2) ln(a/2) ^ 0.5
+
+    # n1 = size of sample1
+    # n2 = size of sample2
+
+    cx1, cy1 = cdf(data1)  
+    cx2, cy2 = cdf(data2) 
+
+    n1 = len(cx1) 
+    n2 = len(cx2) 
+
+    difflist = []
+    for xxx in cx1:
+        val1 = stepfunction(cx1, cy1, xxx)
+        val2 = stepfunction(cx2, cy2, xxx)
+        difflist.append(val2 - val1) 
+
+    difflist2 = []
+    for xxx in cx2:
+        val1 = stepfunction(cx1, cy1, xxx)
+        val2 = stepfunction(cx2, cy2, xxx)
+        difflist2.append(val2 - val1) 
+
+    return difflist, difflist2
+
+
+
+def cdf(data):
+    sdata = np.sort(data)
+    y = 1. * np.arange(sdata.size) / float(sdata.size-1)
+    return sdata, y
+
+def plot_cdf(sdata, y, ax):
+    ax.step(sdata, y, '-r')
+
+
 class MatchedData(object):
 
     #def create_obsra(obs, fc):
@@ -112,6 +190,10 @@ class MatchedData(object):
         corr1 = self.obsra.corr()
         return corr1.at['fc','obs']
 
+    def compare_cdfs(self):
+        x1, y1  = cdf(self.obsra['obs'])
+        x2, y2 = cdf(self.fcra['fc'])
+         
     def plotseries(self, ax, clrs, obs=True, lbl='forecast', mult=1):
         """
         plots the obsra
@@ -119,7 +201,6 @@ class MatchedData(object):
         time = self.obsra.index.tolist()
         if obs: ax.plot(time, self.obsra['obs'], clrs[0], label='observations', linewidth=2)
         ax.plot(time, self.obsra['fc']*mult, clrs[1], label=lbl)
-
 
     def plotscatter(self, ax):
         """

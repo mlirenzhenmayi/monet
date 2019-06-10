@@ -67,7 +67,12 @@ class MONETAccessor(object):
         out = resample_stratify(self.obj, levels, vertical, axis=1)
         return out
 
-    def window(self, lat_min=None, lon_min=None, lat_max=None, lon_max=None):
+    def window(self,
+               lat_min=None,
+               lon_min=None,
+               lat_max=None,
+               lon_max=None,
+               rectilinear=False):
         """Function to window, ie select a specific region, given the lower left
         latitude and longitude and the upper right latitude and longitude
 
@@ -81,6 +86,8 @@ class MONETAccessor(object):
             upper right latitude.
         lon_max : float
             upper right longitude.
+        rectilinear : bool
+            flag if this is a rectilinear lat lon grid
 
         Returns
         -------
@@ -97,7 +104,26 @@ class MONETAccessor(object):
         except ImportError:
             has_pyresample = False
         try:
-            if has_pyresample:
+            if rectilinear:
+                lat = dset.latitude.isel(x=0).values
+                lon = dset.longitude.isel(y=0).values
+                dset['x'] = lon
+                dset['y'] = lat
+                dset = dset.drop(['latitude', 'longitude'])
+                # check if latitude is in the correct order
+                if dset.latitude.isel(x=0).values[0] > dset.latitude.isel(
+                        x=0).values[-1]:
+                    lat_min_copy = lat_min
+                    lat_min = lat_max
+                    lat_max = lat_min_copy
+                d = dset.sel(
+                    x=slice(lon_min, lon_max), y=slice(lat_min, lat_max))
+                return monet.coards_to_netcdf(
+                    d.rename({
+                        'x': 'lon',
+                        'y': 'lat'
+                    }))
+            elif has_pyresample:
                 lons, lats = utils.check_and_wrap(self.obj.longitude.values,
                                                   self.obj.latitude.values)
                 swath = llsd(longitude=lons, latitude=lats)
@@ -130,7 +156,10 @@ class MONETAccessor(object):
             else:
                 raise ImportError
         except ImportError:
-            print('Window functionality is unavailable without pyresample')
+            print(
+                """If this is a rectilinear grid and you don't have pyresample
+                  please add the rectilinear=True to the call.  Otherwise the window
+                  functionality is unavailable without pyresample""")
 
     def interp_constant_lat(self, lat=None, **kwargs):
         """Interpolates the data array to constant longitude.
@@ -290,7 +319,6 @@ class MONETAccessor(object):
         import cartopy.crs as ccrs
         import seaborn as sns
         sns.set_context('notebook', font_scale=1.2)
-        # sns.set_context('talk', font_scale=.9)
         if 'crs' not in map_kwarg:
             if ~center:
                 central_longitude = float(

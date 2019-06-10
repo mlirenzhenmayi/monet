@@ -313,8 +313,10 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
                     continue
                 suffix = fl[4:8]
                 temp = fl.split(".")
-                if temp[1] != "txt":
-                    suffix += "." + temp[1]
+                #if temp[1] != "txt":
+                #    suffix += "." + temp[1]
+                temp = fl.replace('EMIT','')
+                suffix = temp.replace('.txt','')
                 wdir = dirpath
                 if dirpath == firstdirpath:
                     parinit = (None, None, None)
@@ -568,6 +570,8 @@ def create_script(runlist, tdirpath, scriptname, units="ppb", nice=True, write=T
     Creates bash script which will 
     1. Copy pardump files for use as parinit files
     2. run HYSPLIT
+
+
     3. run conmerge merge cdump files from different power plants
     4. run c2datem to extract concentrations at stations
     5. run statmain to create file with concentrations and obs. 
@@ -600,6 +604,7 @@ def create_script(runlist, tdirpath, scriptname, units="ppb", nice=True, write=T
             rstr += "cp " + run.parinit_directory + run.parinitA
             rstr += " " + run.parinitB + "\n"
         if nice: rstr += 'nice '
+        print('SUFFIX', run.suffix)
         rstr += "${MDL}" + run.hysplit_version + " " + run.suffix
         rstr += " & \n"
         prev_directory = run.directory

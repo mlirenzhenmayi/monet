@@ -408,7 +408,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, units="ppb"):
     met_type = "wrf27"
     mdir = "/pub/archives/wrf27km/"
 
-    runlist = []
+    runlist = []  #list of RunDescriptor Objects
     hysplitdir = hdirpath + "/exec/"
     landusedir = hdirpath + "/bdyfiles/"
 
@@ -535,7 +535,8 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, units="ppb"):
 
 
 def unit_mult(units="ug/m3"):
-    rstr = "#emission in kg (mult by 1e9)" + "\n"
+    rstr = ""
+    #rstr = "#emission in kg (mult by 1e9)" + "\n"
     if units.lower().strip() == "ppb":
         rstr += "#convert to volume mixing ratio"
         rstr += "#(mult by 0.4522)" + "\n"
@@ -547,31 +548,85 @@ def unit_mult(units="ug/m3"):
     return rstr
 
 
-def statmainstr(suffix=None):
-    """returns string to create_script for
+def statmainstr(suffixlist=None, model=None, pstr=None):
+    """
+       suffixlist : list of strings
+       model : string. name of output file from c2datem.
+       returns string to create_script for
        running conmerge, c2datem and statmain.
     """
-
-    
     csum = "cdump.sum"
+    mergestr =  "$MDL/conmerge -imergefile -o" + csum + "\n"
     datem = "datem.txt"
-    model = "model.txt"
-    rstr = "ls cdump.* > mergefile \n"
-    rstr += "$MDL/conmerge -imergefile -o" + csum + "\n"
-    rstr += (
-        "$MDL/c2datem -i" + csum + " -m" + datem + " -o" + model + " -xi -z1 -c$mult \n"
-    )
+    if not pstr: pstr= ''
+    # all cdump files in the directory are merged 
+    if not suffixlist:
+       cdumpstr = 'ls cdump.* > mergefile \n' 
+    # only certain cdump files in the directory are merged 
+    elif len(suffixlist)> 1:
+       cdumpstr = 'rm -f mergefile \n'
+       for suffix in suffixlist:
+           cdumpstr += 'ls cdump.' + suffix + ' >> mergefile \n'
+    # datem run on only one cdump file in the directory.
+    else:
+       csum = 'cdump.' + suffixlist[0]
+       cdumpstr = ''
+       mergestr = ''        
+       if not model: model = 'model.' + suffixlist[0] + '.txt'  
+
+    if not model: model = 'model.txt'
+ 
+    rstr = cdumpstr
+    rstr += mergestr
+    rstr +=  "$MDL/c2datem -i" + csum + " -m" + datem + " -o" 
+    rstr +=  model + " -xi -z1 -c$mult "
+    rstr += pstr
+    rstr += "\n"
     rstr += "$MDL/statmain -d" + datem + " -r" + model + " -o\n\n"
     return rstr
 
 
-def create_script(runlist, tdirpath, scriptname, units="ppb", nice=True, write=True):
+
+class RunScriptClass:
+
+    def __init__(self, name, runlist, tdirpath):
+        self.scriptname = name 
+        self.tdirpath = tdirpath
+        #self.runlist = sorted(runlist)
+        self.runlist = runlist
+        self.main()
+
+    def make_hstr(self):
+        return ""
+
+    def main(self):
+        rstr = self.make_hstr()
+        rstr += "MDL=" + self.runlist[0].hysplitdir + "\n"
+        #rstr += unit_mult(units=units)
+        iii=0
+        for runstr in self.mainstr_generator():
+            rstr += runstr
+        with open(self.tdirpath + "/" + self.scriptname, "w") as fid:
+            fid.write(rstr)
+
+    def mainstr_generator(self):
+        iii = 0
+        prev_directory = ' '
+        for run in runlist:
+            if run.directory != prev_directory:
+               dstr += "cd " + run.directory + "\n\n"
+            dstr += self.mstr(run)
+            prev_directory = run.directory
+            iii += 1
+            yield '# bash script output'
+       
+
+    def mstr(self, run):
+        return run.directory
+
+class DatemScript(RunScriptClass):
     """
     Creates bash script which will 
-    1. Copy pardump files for use as parinit files
-    2. run HYSPLIT
-
-
     3. run conmerge merge cdump files from different power plants
     4. run c2datem to extract concentrations at stations
     5. run statmain to create file with concentrations and obs. 
@@ -580,44 +635,72 @@ def create_script(runlist, tdirpath, scriptname, units="ppb", nice=True, write=T
                top directory path.
 
     """
-    scr = scriptname
-    logfile = tdirpath + "runlogfile.txt"
-    iii = 0
-    prev_directory = "None"
-    rstr = ""
-    rstr = "MDL=" + runlist[0].hysplitdir + "\n"
-    rstr += unit_mult(units=units)
-    dstr = rstr
-    for run in runlist:
-        if run.directory != prev_directory:
-            if iii != 0:
-                rstr += "wait" + "\n\n"
-                rstr += 'echo "Finished ' + prev_directory + '"  >> ' + logfile
-                rstr += "\n\n"
-                dstr += statmainstr()
-                rstr += "#-----------------------------------------\n"
-            rstr += "cd " + run.directory + "\n\n"
-            dstr += "cd " + run.directory + "\n\n"
-        ##add line to copy PARDUMP file from one directory to PARINIT file
-        ##in working directory
-        if run.parinitA != "None":
-            rstr += "cp " + run.parinit_directory + run.parinitA
-            rstr += " " + run.parinitB + "\n"
-        if nice: rstr += 'nice '
-        print('SUFFIX', run.suffix)
-        rstr += "${MDL}" + run.hysplit_version + " " + run.suffix
-        rstr += " & \n"
-        prev_directory = run.directory
-        iii += 1
-    rstr += statmainstr()
-    dstr += statmainstr()
-    if write:
-        with open(tdirpath + "/" + scr, "w") as fid:
-            fid.write(rstr)
-        with open(tdirpath + "/datem_" + scr, "w") as fid:
-            fid.write(dstr)
-    return rstr
+    def __init__(self, name, runlist, tdirpath, unit, poll=0):
+        self.unit = unit
+        self.pstr = '-p' + str(poll)
+        super().__init__(name, runlist, tdirpath)
 
+    def make_hstr(self):
+        return unit_mult(self.unit)
+
+    def mainstr_generator(self):
+        iii = 0
+        prev_directory = ' '
+        prev_oris = ' '
+        suffixlist = []
+        for run in self.runlist:
+            dstr=''
+            if run.directory != prev_directory:
+               dstr += "cd " + run.directory + "\n\n"
+               #dstr += statmainstr()
+               prev_directory = run.directory
+            oris = run.get_oris()
+            if oris != prev_oris and iii!=0: 
+                dstr += statmainstr(suffixlist=suffixlist, model=model,
+                         pstr=self.pstr)
+                suffixlist = []
+            model = 'model_' + oris + '.txt'
+            suffixlist.append(run.suffix)           
+            prev_oris = oris
+            iii+=1 
+            yield dstr
+
+
+class RunScript(RunScriptClass):
+    """
+    Creates bash script which will 
+    1. Copy pardump files for use as parinit files
+    2. run HYSPLIT
+    """
+
+    def __init__(self, name, runlist, tdirpath):
+        self.logfile = 'runlogfile.txt'
+        super().__init__(name, runlist, tdirpath)
+
+    def mainstr_generator(self):
+        iii = 0
+        nice=True
+        prev_directory = ' '
+        for run in self.runlist:
+            rstr = ''
+            if run.directory != prev_directory:
+                if iii != 0:
+                    rstr += "wait" + "\n\n"
+                    rstr += 'echo "Finished ' + prev_directory + '"  >> ' 
+                    rstr += self.logfile
+                    rstr += "\n\n"
+                    rstr += "#-----------------------------------------\n"
+                rstr += "cd " + run.directory + "\n\n"
+            if run.parinitA != "None":
+                rstr += "cp " + run.parinit_directory + run.parinitA
+                rstr += " " + run.parinitB + "\n"
+            if nice: rstr += 'nice '
+            rstr += "${MDL}" + run.hysplit_version + " " + run.suffix
+            rstr += " & \n"
+            prev_directory = run.directory
+            iii += 1
+            yield rstr
+        ##add line to copy PARDUMP file from one directory to PARINIT file
 
 class RunDescriptor(object):
     def __init__(
@@ -638,6 +721,34 @@ class RunDescriptor(object):
             parinit[0]
         )  # parinit file associated with the run.
         # should be full path.
+
+    def __lt__(self, other):
+        """
+        lt and eq so runlist can be sorted according to
+        directory and then to suffix.
+        """
+        if self.directory == other.directory:
+           t1 = self.suffix < other.suffix
+        else:
+           t1 = self.directory < other.directory
+        return t1
+
+    def __eq__(self, other):
+        t1 = self.directory == other.directory
+        t2 = self.suffix == other.suffix
+        return t1 and t2
+
+    def get_oris(self):
+        oris = self.suffix.split('_')[0]
+        return oris
+
+    def get_unit(self):
+        try:
+            unit = self.suffix.split('_')[1]
+        except:
+            unit = 'None'
+        return unit
+
 
     def check_parinit(self):
         """

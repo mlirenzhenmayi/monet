@@ -194,9 +194,10 @@ el.
 
 def read_dataA(fname):
     """
-    reads merged data file output by statmain
+    reads merged data file output by statmain.
+    outputs a  dataframe with columns
+    date, sid, lat, lon, obs, model
     """
-    dtp = {"year": int, "month": int, "day": int, "hour": int}
     colra = ["Num", "sid", "lat", "lon", "year", "month", "day", "hour", "obs", "model"]
     dtp = {"year": int, "month": int, "day": int, "hour": int}
     datem = pd.read_csv(

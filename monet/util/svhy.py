@@ -14,6 +14,7 @@ from monet.utilhysplit.hcontrol import Species
 from monet.utilhysplit.hcontrol import ConcGrid
 from monet.utilhysplit.hcontrol import NameList
 from monet.utilhysplit.hcontrol import writelanduse
+from monet.utilhysplit.metfiles import MetFiles
 
 """
 NAME: svhy.py
@@ -111,85 +112,6 @@ def roundtime(dto):
     """rounds input datetime to day at 00 H"""
     # return datetime.datetime(dto.year, dto.month, dto.day, 0, 0)
     return datetime.datetime(dto.year, dto.month, dto.day, 0, 0)
-
-
-def getmetfiles(
-    sdate,
-    runtime,
-    verbose=False,
-    warn_file="MetFileWarning.txt",
-    met_type="wrf27",
-    mdir="./",
-    altdir="./",
-):
-    """Input start date and run time and returns list of tuples - (meteorological file directory, meteorological files)
-       to use for HYSPLIT run.
-       INPUTS:
-       sdate : start date (datetime object)
-       runtime : in hours
-       verbose : print out extra messages if True
-       met_type : always WRF for this project
-       mdir : directory where met files should be accessed from
-       altdir : directory where met files may be stored. If they do not exist in mdir, then the routine will look in
-                the altdir and copy them to the mdir.
-
-       OUTPUT:
-       List of tuples with (met dir, met filename)    
-       If the met files cannot be found in the mdir or the altdir then
-    """
-    verbose = False
-    mdirbase = mdir.strip()
-    if mdirbase[-1] != "/":
-        mdirbase += "/"
-    dt = datetime.timedelta(days=1)
-    mfiles = []
-    mdirlist = []
-    sdate = sdate.replace(tzinfo=None)
-    if runtime < 0:
-        runtime = abs(runtime)
-        end_date = sdate
-        sdate = end_date - datetime.timedelta(hours=runtime)
-    else:
-        end_date = sdate + datetime.timedelta(hours=runtime)
-    edate = sdate
-    notdone = True
-    if verbose:
-        print("GETMET", sdate, edate, end_date, runtime)
-    zzz = 0
-    while notdone:
-        yr = edate.strftime("%Y")
-        if met_type == "ERA5":
-            fmt = "ERA5_%Y%m.ARL"
-            temp = edate.strftime(fmt)
-            edate = edate + datetime.timedelta(hours=24)
-        elif met_type == "wrf27":
-            fmt = "wrfout_d01_%Y%m%d.ARL"
-            temp = edate.strftime(fmt)
-            mdir = mdirbase + yr + "/"
-            edate = edate + datetime.timedelta(hours=24)
-        else:
-            temp = "none"
-        if not path.isfile(mdir + temp):
-            print("WARNING", mdir + temp, " meteorological file does not exist")
-            with open(warn_file, "a") as fid:
-                fid.write(
-                    "WARNING " + mdir + temp + " meteorological file does not exist\n"
-                )
-        else:
-            mfiles.append(temp)
-            mdirlist.append(mdir)
-            if verbose:
-                print("Adding", temp, " meteorological file")
-        if verbose:
-            print(edate, end_date)
-        if edate > end_date:
-            notdone = False
-        if zzz > 12:
-            notdone = False
-            print("WARNING: more than 12 met files")
-        zzz += 1
-    # return mdir, mfiles
-    return list(zip(mdirlist, mfiles))
 
 
 def default_control(name, tdirpath, runtime, sdate, cpack=1, 
@@ -292,7 +214,8 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
     ##determines meteorological files to use.
 
     runlist = []
-    hysplitdir = hdirpath + "/exec/"
+    if hdirpath[-1] != '/': hdirpath += '/'
+    hysplitdir = hdirpath + "exec/"
 
     iii = 0
     for (dirpath, dirnames, filenames) in walk(tdirpath):
@@ -358,7 +281,8 @@ def find_numpar(emitfile, controlfile):
     return np.ceil(numpar)
 
 
-def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, units="ppb"):
+def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units="ppb",
+                    ):
     """
     read the base control file in tdirpath CONTROL.0
     read the base SETUP.0 file in tdirpath
@@ -402,11 +326,11 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, units="ppb"):
     from monet.util.svdir import dirtree
     from monet.util.svdir import date2dir
 
+
     dstart = sdate
     dend = edate
     ##determines meteorological files to use.
-    met_type = "wrf27"
-    mdir = "/pub/archives/wrf27km/"
+    met_files = MetFiles(metfmt) 
 
     runlist = []  #list of RunDescriptor Objects
     hysplitdir = hdirpath + "/exec/"
@@ -498,9 +422,11 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, units="ppb"):
                     control.rename("CONTROL." + suffix, working_directory=wdir)
                     control.remove_metfile(rall=True)
                     ###Add the met files.
-                    mfiles = getmetfiles(
-                        control.date, timechunks, met_type=met_type, mdir=mdir
-                    )
+                    
+                    #mfiles = getmetfiles(
+                    #    control.date, timechunks, met_type=met_type, mdir=mdir
+                    #)
+                    mfiles = met_files.get_files(control.date, timechunks)
                     for mf in mfiles:
                         if os.path.isfile(mf[0] + mf[1]):
                             control.add_metfile(mf[0], mf[1])
@@ -575,6 +501,9 @@ def statmainstr(suffixlist=None, model=None, pstr=None):
        if not model: model = 'model.' + suffixlist[0] + '.txt'  
 
     if not model: model = 'model.txt'
+
+    suffix = model.replace('.txt','')
+    suffix = suffix.replace('model','')
  
     rstr = cdumpstr
     rstr += mergestr
@@ -582,7 +511,9 @@ def statmainstr(suffixlist=None, model=None, pstr=None):
     rstr +=  model + " -xi -z1 -c$mult "
     rstr += pstr
     rstr += "\n"
-    rstr += "$MDL/statmain -d" + datem + " -r" + model + " -o\n\n"
+    rstr += "$MDL/statmain -d" + datem + " -r" + model + " -o\n"
+    if suffix: rstr += "mv dataA.txt dataA" + suffix + ".txt \n"
+    rstr += "\n"
     return rstr
 
 
@@ -635,7 +566,8 @@ class DatemScript(RunScriptClass):
                top directory path.
 
     """
-    def __init__(self, name, runlist, tdirpath, unit, poll=0):
+    def __init__(self, name, runlist, tdirpath, unit, poll=1):
+        # note that poll>=1 (input to c2datem)
         self.unit = unit
         self.pstr = '-p' + str(poll)
         super().__init__(name, runlist, tdirpath)
@@ -782,3 +714,12 @@ class RunDescriptor(object):
         if nice: rstr += 'nice '
         rstr += self.hysplitdir + self.hysplit_version + " " + self.suffix
         return rstr
+
+
+def pick_format(mtype='wrf'): 
+    fmt=''
+    if mtype == 'wrf':
+       fmt = "/pub/archives/wrf27km/%Y/wrfout_d01_%Y%m%d.ARL"
+       hours = 24
+    return fmt, hours
+

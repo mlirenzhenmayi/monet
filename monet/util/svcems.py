@@ -437,7 +437,7 @@ class SEmissions(object):
                 pass
             new.append(cstr)
         df.columns = new
-        if self.tag: cname = str(tag) + '.cems.csv'
+        if self.tag: cname = str(self.tag) + '.cems.csv'
         df.to_csv(cname)
 
     def create_emitimes(self, edate, schunks=1000, tdir="./", unit=True, heat=0,

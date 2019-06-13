@@ -24,6 +24,9 @@ from sklearn import tree
 """
 """
 
+        
+
+
 
 def make_dataset(df):
     """
@@ -77,9 +80,6 @@ def generate_cems(cemsfile, orislist, spnum='P1'):
             if str(oris) in col and  spnum in col:
                yield cems[col]
     #cems.set_index('time', inplace=True)
-
-
-
 
         #step 1 get the cems data.
         #step 2 get the measurement data.

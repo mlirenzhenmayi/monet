@@ -124,6 +124,7 @@ class ConfigFile(NameList):
           self.obs = True
 
           self.tag = 'test_run'         
+          self.metfmt = '/pub/archives/wrf27km/%Y/wrfout_d01_%Y%m%d.ARL'
      
           self.write_scripts = None
  
@@ -214,6 +215,16 @@ class ConfigFile(NameList):
         self.descrip['RUN'] = hstr
         lorder.append('RUN')
 
+        hstr="Meteorological files to use.\n"
+        hstr += sp10 + "Format should use python datetime formatting symbols."
+        hstr += sp10 + "Examples:"
+        hstr += sp10 + '/TopLevelDirectory/wrf27km/%Y/wrfout_d01_%Y%m%d.ARL'
+        hstr += sp10 + '/TopLevelDirectory/gdas1/gdas1.%b%y.week'
+        hstr += sp10 + 'use the word "week" to indicate when files are by week'
+        hstr += sp10 + 'week will be replaced by w1, w2, w3... as appropriate.'
+        self.descrip['METFILE'] = hstr
+        lorder.append('METFILE')
+
         hstr="(False) or True. The bash scripts for running HYSPLIT and then \n"
         hstr += sp10 + "c2datem must be run first.\n" 
         hstr+=sp10 + "reads datem output and creates graphs."
@@ -259,6 +270,7 @@ class ConfigFile(NameList):
         self.chunks = int(self.chunks)
 
         self.write_scripts = self.test('scripts', self.write_scripts)
+        self.metfmt = self.test('metfile', self.metfmt)
        
         # booleans
         self.byunit = self.str2bool(self.test('ByUnit', self.byunit))
@@ -396,13 +408,21 @@ if options.defaults:
     default_control("CONTROL.0", options.tdir, run_duration, d1, area=area)
 
 if options.results:
-    from monet.util.svhy import create_runlist
-    from monet.util.svresults import results
-    from monet.util.svresults import CemsObs
-    from monet.util.svresults import gpd2csv
+    #from monet.util.svhy import create_runlist
+    #from monet.util.svresults import results
+    #from monet.util.svresults import CemsObs
+    from monet.util.svresults2 import SVresults
+    from monet.util.svcems import SourceSummary 
 
-    runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
-    results("outfile.txt", runlist)
+    sss = SourceSummary()
+    df = sss.load()
+    orislist = sss.check_oris(10)
+    svr = SVresults(options.tdir, orislist=orislist)
+    #svr.fill_hash()
+    svr.writedatem('DATEM.txt')
+    #svr.plotall()
+    #runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
+    #results("outfile.txt", runlist)
 
 rfignum = 1
 if options.cems:
@@ -476,25 +496,23 @@ if options.obs:
     if options.quiet < 2:
         plt.show()
 
-
+runlist = []
 if options.create_runs:
     from monet.util.svhy import create_controls
-    from monet.util.svhy import create_script
+    from monet.util.svhy import RunScript
 
     runlist = create_controls(
-        options.tdir, options.hdir, d1, d2, source_chunks, units=options.cunits
+        options.tdir, options.hdir, d1, d2, source_chunks, options.metfmt, units=options.cunits
     )
-    create_script(
-        runlist, options.tdir, options.tag+'.sh', units=options.cunits, write=True
-    )
+    rs = RunScript(options.tag + '.sh', runlist, options.tdir)
+
 if options.write_scripts:
-    from monet.util.svhy import create_runlist
-    from monet.util.svhy import create_script
-    runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
-    create_script(
-        runlist, options.tdir, options.tag+'.sh', units=options.cunits, write=True
-    )
-    # runhandler(runlist, 5, options.tdir)
+    from monet.util.svhy import DatemScript
+    if not runlist: 
+        from monet.util.svhy import create_runlist
+        runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
+    rs = DatemScript('datem_' + options.tag + '.sh', runlist, options.tdir,
+                      options.cunits)
 
 
 

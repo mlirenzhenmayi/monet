@@ -216,14 +216,14 @@ class ConfigFile(NameList):
         lorder.append('RUN')
 
         hstr="Meteorological files to use.\n"
-        hstr += sp10 + "Format should use python datetime formatting symbols."
-        hstr += sp10 + "Examples:"
-        hstr += sp10 + '/TopLevelDirectory/wrf27km/%Y/wrfout_d01_%Y%m%d.ARL'
-        hstr += sp10 + '/TopLevelDirectory/gdas1/gdas1.%b%y.week'
-        hstr += sp10 + 'use the word "week" to indicate when files are by week'
-        hstr += sp10 + 'week will be replaced by w1, w2, w3... as appropriate.'
-        self.descrip['METFILE'] = hstr
-        lorder.append('METFILE')
+        hstr += sp10 + "Format should use python datetime formatting symbols.\n"
+        hstr += sp10 + "Examples:\n"
+        hstr += sp10 + '/TopLevelDirectory/wrf27km/%Y/wrfout_d01_%Y%m%d.ARL\n'
+        hstr += sp10 + '/TopLevelDirectory/gdas1/gdas1.%b%y.week\n'
+        hstr += sp10 + 'use the word "week" to indicate when files are by week\n'
+        hstr += sp10 + 'week will be replaced by w1, w2, w3... as appropriate.\n'
+        self.descrip['metfile'] = hstr
+        lorder.append('metfile')
 
         hstr="(False) or True. The bash scripts for running HYSPLIT and then \n"
         hstr += sp10 + "c2datem must be run first.\n" 

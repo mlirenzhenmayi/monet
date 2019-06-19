@@ -417,10 +417,12 @@ if options.results:
     sss = SourceSummary()
     df = sss.load()
     orislist = sss.check_oris(10)
-    svr = SVresults(options.tdir, orislist=orislist)
+    svr = SVresults(options.tdir, orislist=orislist, daterange=[d1,d2])
     #svr.fill_hash()
-    svr.writedatem('DATEM.txt')
-    #svr.plotall()
+    datemfile = options.tag + 'DATEM.txt'
+    svr.writedatem(datemfile)
+    svr.fill_hash()
+    svr.plotall()
     #runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
     #results("outfile.txt", runlist)
 
@@ -511,8 +513,13 @@ if options.write_scripts:
     if not runlist: 
         from monet.util.svhy import create_runlist
         runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
-    rs = DatemScript('datem_' + options.tag + '.sh', runlist, options.tdir,
-                      options.cunits)
+    rs = DatemScript('p1datem_' + options.tag + '.sh', runlist, options.tdir,
+                      options.cunits, poll=1)
+    rs = DatemScript('p2datem_' + options.tag + '.sh', runlist, options.tdir,
+                      options.cunits, poll=2)
+    rs = DatemScript('p3datem_' + options.tag + '.sh', runlist, options.tdir,
+                      options.cunits, poll=3)
+
 
 
 

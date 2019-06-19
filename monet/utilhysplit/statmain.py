@@ -61,6 +61,14 @@ def get_ds(n1, n2):
 
 
 def kstest(data1, data2):
+    """
+    data1 : list of data
+    dtata1 :  list of data
+
+    creates cdf for data1 and data2 and finds different
+    between them assuming each are a step function.
+   
+    """
     # see page 154 of Wilks
     # two sample K-S test. Compare two batches of data to one another
     # under the null hypotheses that they were drawn from the same (but
@@ -92,12 +100,16 @@ def kstest(data1, data2):
         val1 = stepfunction(cx1, cy1, xxx)
         val2 = stepfunction(cx2, cy2, xxx)
         difflist2.append(val2 - val1) 
-
     return difflist, difflist2
 
-
+def kstest_answer(data1, data2):
+    d1, d2 = kstest(data1, data2)
+    return np.max([np.max(d1), np.max(d2)])
 
 def cdf(data):
+    """
+    data should be a list of data.
+    """
     sdata = np.sort(data)
     y = 1. * np.arange(sdata.size) / float(sdata.size-1)
     return sdata, y

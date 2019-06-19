@@ -504,6 +504,7 @@ def statmainstr(suffixlist=None, model=None, pstr=None):
 
     suffix = model.replace('.txt','')
     suffix = suffix.replace('model','')
+    suffix = suffix + '.' + pstr.replace('-','')
  
     rstr = cdumpstr
     rstr += mergestr
@@ -569,7 +570,8 @@ class DatemScript(RunScriptClass):
     def __init__(self, name, runlist, tdirpath, unit, poll=1):
         # note that poll>=1 (input to c2datem)
         self.unit = unit
-        self.pstr = '-p' + str(poll)
+        if poll: self.pstr = '-p' + str(poll)
+        else: self.pstr = ''
         super().__init__(name, runlist, tdirpath)
 
     def make_hstr(self):

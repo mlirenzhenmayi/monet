@@ -150,6 +150,15 @@ def sendrequest(rqq, key=None, url=None):
         if data.status_code == 429:
             print("Too many requests Please Wait before trying again.")
             sys.exit()
+    else:
+        print('WARNING: your api key for EPA data was not found')
+        print('Please obtain a key from')
+        print('https://www.epa.gov/airmarkets/field-audit-checklist_tool-fact-api')
+        print('The key should be placed in $HOME/.epaapirc')
+        print('Contents of the file should be as follows')
+        print('key: apikey')
+        print('url: https://api.epa.gov/FACT/1.0/')
+        sys.exit()
     return data
 
 

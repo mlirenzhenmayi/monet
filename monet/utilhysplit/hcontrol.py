@@ -630,20 +630,20 @@ class NameList:
         )
         self.descrip["kmix0"] = "mixing depth. 250 minimum"
         self.descrip["kzmis"] = (
-            "Vertical mixing profile." +
-            " 0:No adjustments." + 
-            " 1: vertical diffusivity in PBL single" +
-            " average value"
+            "Vertical mixing profile.",
+            " 0:No adjustments.",
+            " 1: vertical diffusivity in PBL single",
+            " average value",
         )
         self.descrip["kbls"] = (
-            "Stability computed by" "(1) Heat and momentum fluxes,"+
-            " 2: Wind and temperature profiles"
+            "Stability computed by" "(1) Heat and momentum fluxes,",
+            " 2: Wind and temperature profiles",
         )
         self.descrip["kblt"] = (
-            "Flag to set vertical turbulence computational"+
-            "method. 1:Beljaars/Holtslag"+
-            "(2):Kanthar/Clayson "+
-            " 3:TKE field 4:Velocity Variances"
+            "Flag to set vertical turbulence computational",
+            "method. 1:Beljaars/Holtslag",
+            "(2):Kanthar/Clayson ",
+            " 3:TKE field 4:Velocity Variances",
         )
         self.descrip["initd"] = "defines particle or puff mode"
 
@@ -739,6 +739,10 @@ class ControlLoc(object):
             self.area = area
         ControlLoc.total += 1
 
+    def copy(self):
+        return ControlLoc(False, self.latlon, self.alt,
+               self.rate, self.area)
+
     def definition(self, line):
         """
         line : string
@@ -778,10 +782,10 @@ class ControlLoc(object):
         returnstr += "{:.4f}".format(self.latlon[1])
         returnstr += spc
         returnstr += "{:.1f}".format(self.alt)
-        if self.rate != -999:
-            returnstr += spc
-            returnstr += "{:.0f}".format(self.rate)
-        if self.rate != -999 and self.area != -999:
+        if self.rate != -999 and self.rate != False:
+                returnstr += spc
+                returnstr += "{:.0f}".format(self.rate)
+        if self.rate != -999 and self.area != -999 and self.rate != False:
             returnstr += spc
             returnstr += "{:.2E}".format(self.area)
         return returnstr
@@ -852,6 +856,12 @@ class HycsControl(object):
          """
         self.num_grids += 1
         self.concgrids.append(cgrid)
+
+    def add_dummy_location(self):
+        newloc = self.locs[0].copy()
+        self.locs.append(newloc)
+        self.nlocs += 1 
+        
 
     def add_location(
             self,
@@ -935,7 +945,7 @@ class HycsControl(object):
         note = ""
         sp28 = " " * 28
         with open(self.wdir + self.fname, "w") as fid:
-            fid.write(self.date.strftime("%y %m %d %H"))
+            fid.write(self.date.strftime("%y %m %d %H %M"))
             if annotate:
                 note = " " * 18 + "#Start date of simulation"
             fid.write(note + "\n")

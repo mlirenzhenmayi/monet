@@ -1,9 +1,10 @@
-from . import grids, models, monet_accessor, obs, plots, profile, sat, util
+from . import (grids, models, monet_accessor, obs, plots, profile, sat, util,
+                utilhysplit)
 from .plots import savefig
 
 __all__ = [
     'models', 'obs', 'plots', 'sat', 'util', 'monet_accessor', 'grids',
-    'profile'
+    'profile', 'utilhysplit'
 ]
 
 

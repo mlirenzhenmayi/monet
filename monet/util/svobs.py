@@ -5,7 +5,7 @@ import numpy as np
 import pickle as pickle
 import matplotlib.pyplot as plt
 import datetime
-import sys
+#import sys
 import seaborn as sns
 from monet.obs import aqs as aqs_mod
 from monet.obs import airnow
@@ -23,6 +23,13 @@ WORKING ON:
 check method looks at correlation of wind with SO2
 
 """
+def read_csv(name, hdrs=[0]):
+    # print('in subroutine read_csv', name)
+    def to_datetime(d):
+        return datetime.datetime.strptime(d, "%Y-%m-%d %H:%M:%S")
+
+    obs = pd.read_csv(name, sep=",", header=hdrs, converters={"time": to_datetime})
+    return obs
 
 def generate_obs(siteidlist, obsfile):
     """
@@ -36,7 +43,7 @@ def generate_obs(siteidlist, obsfile):
     obs = SObs([dt1, dt2], area)
     if not os.path.isfile(obsfile):
        print(obsfile + ' does not exist')
-    odf = obs.read_csv(obsfile, hdrs=[0])
+    odf = read_csv(obsfile, hdrs=[0])
     print('HERE', odf[0:1])
     print(odf.columns)
     odf = odf[odf["variable"] == "SO2"]
@@ -63,7 +70,6 @@ class SObs(object):
        find
        plot
        save (saves to a csv file)
-       read_csv (reads from csv file)
        check
     """
 
@@ -170,18 +176,13 @@ class SObs(object):
         fname = tdir + name
         self.obs.to_csv(fname)
 
-    def read_csv(self, name, hdrs=[0]):
-        # print('in subroutine read_csv', name)
-        def to_datetime(d):
-            return datetime.datetime.strptime(d, "%Y-%m-%d %H:%M:%S")
-
-        obs = pd.read_csv(name, sep=",", header=hdrs, converters={"time": to_datetime})
-        return obs
-
     def read_met(self):
         tdir='./'
         mname=tdir + "met" + self.csvfile
-        met = pd.read_csv(mname, parse_dates=True)
+        if(os.path.isfile(mname)):
+            met = pd.read_csv(mname, parse_dates=True)
+        else:
+            met = pd.DataFrame()
         return(met)
 
     def create_pickle(self, tdir="./"):
@@ -227,12 +228,12 @@ class SObs(object):
             try:
                 print("trying to load file")
                 print(tdir + self.csvfile)
-                self.obs = self.read_csv(tdir + self.csvfile, hdrs=[0])
+                self.obs = read_csv(tdir + self.csvfile, hdrs=[0])
             except BaseException:
                 pload = False
             mload = True
             try:
-                met_obs = self.read_csv(tdir + "met" + self.csvfile, hdrs=[0, 1])
+                met_obs = read_csv(tdir + "met" + self.csvfile, hdrs=[0, 1])
             except BaseException:
                 mload = False
                 print("did not load metobs from file")
@@ -306,7 +307,6 @@ class SObs(object):
         units = units.upper()
         if units == "UG/M3":
             self.obs = convert_epa_unit(self.obs, obscolumn="obs", unit=units)
-
 
 
     def check(self):

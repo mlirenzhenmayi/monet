@@ -312,6 +312,7 @@ class EpaApiObject:
         self.status_code = None
         self.df = pd.DataFrame()
         self.fname = fname
+        self.datefmt = "%Y %m %d %H:%M"
         if fdir: self.fdir=fdir
         else: self.fdir = './apifiles/'
         if self.fdir[-1] != '/' : self.fdir += '/'
@@ -352,10 +353,9 @@ class EpaApiObject:
         """
         save to a csv file.
         """
-        datefmt = "%Y %m %d %H:%M"
         print("saving here", self.fname)
         if not self.df.empty:
-            self.df.to_csv(self.fname, date_format=datefmt)
+            self.df.to_csv(self.fname, date_format=self.datefmt)
         else:
             with open(self.fname, "w") as fid:
                 fid.write("no data")
@@ -435,7 +435,8 @@ class EmissionsCall(EpaApiObject):
         return getstr
 
     def load(self):
-        datefmt = "%Y %m %d %H:%M"
+        #datefmt = "%Y %m %d %H:%M"
+        datefmt =  self.datefmt
         chash = {"mid": str, "oris": str, "unit": str}
         df = pd.read_csv(
             self.fname,
@@ -453,13 +454,22 @@ class EmissionsCall(EpaApiObject):
                 rval = x["time local"]
                 rval = rval.replace('-',' ')
                 rval = rval.strip()
+                fail=0
                 try: 
-                   rval = datetime.datetime.strptime(rval,datefmt2)
+                   rval = datetime.datetime.strptime(rval,datefmt)
                 except:
-                   print(self.fname)
-                   print('Could not parse date ' + rval)
-                   sys.exit()
-                return rval
+                   fail = 1
+                if fail == 1: 
+                    try: 
+                       rval = datetime.datetime.strptime(rval,datefmt2)
+                    except:
+                       fail = 2
+                       print(self.fname)
+                   #print(df)
+                       print('WARNING: Could not parse date ' + rval)
+                   #sys.exit()
+                   # return values try to get from request.
+                       return pd.DataFrame(), False
 
             df["time local"] = df.apply(newdate, axis=1)
             if 'DateHour' in df.columns:

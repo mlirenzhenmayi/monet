@@ -431,7 +431,7 @@ if options.cems:
     from monet.util.svcems import SEmissions
 
     ef = SEmissions([d1, d2], area,  tdir=options.tdir, spnum=options.spnum,
-                    tag = options.tag)
+                    tag = options.tag, spnum=options.spnum)
     ef.find()
     if options.quiet ==0: 
         ef.nowarning_plot(save=True, quiet=False)

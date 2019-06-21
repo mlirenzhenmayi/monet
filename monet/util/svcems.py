@@ -294,7 +294,13 @@ class SEmissions(object):
                 print('NOT DATE', local)
                 utc = local
             else:
-                utc = local + tzhash[oris]
+                try:
+                    utc = local + tzhash[oris]
+                except:
+                    #print('LOCAL', local)
+                    #print('oris', oris)
+                    #print('tzhash', tzhash)
+                    utc = 'None'
             return utc
 
         # all these copy statements are to avoid the warning - a value is trying
@@ -302,6 +308,10 @@ class SEmissions(object):
         self.df["time"] = self.df.apply(
             lambda row: loc2utc(row["time local"], row["oris"], tzhash), axis=1
         )
+        temp = self.df[self.df.time == 'None']
+        print(temp[0:20])
+        self.df = self.df[self.df.time != 'None'] 
+         
 
     def get_so2_sources(self, unit=False):
         sources = self.get_sources(stype="so2_lbs", unit=unit)
@@ -370,9 +380,9 @@ class SEmissions(object):
         #dftemp = df[df["spnum"] == 3]
         #print("SP 3", dftemp.SO2MODC.unique())
         #print("OP TIME", dftemp.OperatingTime.unique())
-        if not self.use_spnum:
+        #if not self.use_spnum:
            # set all species numbers to 1
-           df['spnum'] = 1
+        #   df['spnum'] = 1
         cols = ["oris", "stackht", "spnum"]
         if unit: cols.append('unit')
         # cols=['oris']
@@ -590,6 +600,7 @@ class SEmissions(object):
                 #if spnum!=1: print(date, rate, spnum)
                 if date >= edate:
                     heat = dfh[date]
+                    print(spnum)
                     check = efile.add_record(
                         date, record_duration, lat, lon, height, rate, emit_area, heat, spnum
                     )
@@ -661,8 +672,11 @@ class SEmissions(object):
                     return 1
                 else:
                     return 3
-        
-        df["spnum"] = df.apply(sort_modc, axis=1)
+        print('USE SPNUM', self.use_spnum)
+        if self.use_spnum: 
+            df["spnum"] = df.apply(sort_modc, axis=1)
+        else: 
+            df["spnum"] = 1
         #print(df.columns)
         #temp = df[df['so2_lbs']>0]
         #print(temp[['time','SO2MODC','spnum','so2_lbs']][0:10]) 

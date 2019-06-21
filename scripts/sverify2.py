@@ -273,8 +273,8 @@ class ConfigFile(NameList):
         self.metfmt = self.test('metfile', self.metfmt)
        
         # booleans
-        self.byunit = self.str2bool(self.test('ByUnit', self.byunit))
-        self.spnum = self.str2bool(self.test('Species', self.spnum))
+        self.byunit = self.str2bool(self.test('byunit', self.byunit))
+        self.spnum = self.str2bool(self.test('species', self.spnum))
         self.cems = self.str2bool(self.test('cems', self.cems))
         self.obs = self.str2bool(self.test('obs', self.obs))
         self.create_runs = self.str2bool(self.test('run', self.create_runs))
@@ -431,7 +431,7 @@ if options.cems:
     from monet.util.svcems import SEmissions
 
     ef = SEmissions([d1, d2], area,  tdir=options.tdir, spnum=options.spnum,
-                    tag = options.tag, spnum=options.spnum)
+                    tag = options.tag)
     ef.find()
     if options.quiet ==0: 
         ef.nowarning_plot(save=True, quiet=False)

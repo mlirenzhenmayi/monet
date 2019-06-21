@@ -469,7 +469,7 @@ class EmissionsCall(EpaApiObject):
                        print('WARNING: Could not parse date ' + rval)
                    #sys.exit()
                    # return values try to get from request.
-                       return pd.DataFrame(), False
+                       return pd.DataFrame(), True
 
             df["time local"] = df.apply(newdate, axis=1)
             if 'DateHour' in df.columns:
@@ -740,7 +740,7 @@ class Emissions:
 
         if self.df.empty:
             self.df = df
-        else:
+        elif not df.empty:
             self.df = self.df.append(df)
         # self.df.to_csv(efile)
         return ec.status_code

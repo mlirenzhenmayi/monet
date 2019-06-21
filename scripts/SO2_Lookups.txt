@@ -1,0 +1,575 @@
+data <class 'dict'> : 
+ allLookups <class 'dict'> : 
+   COMPONENT_TYPE_CODE <class 'dict'> : 
+     BGFF <class 'str'> :    Billing Gas Fuel Flowmeter
+   BOFF <class 'str'> :    Billing Oil Fuel Flowmeter
+   CALR <class 'str'> :    Calorimeter
+   CO2 <class 'str'> :    CO2 Concentration
+   DAHS <class 'str'> :    Data Acquisition and Handling System
+   DL <class 'str'> :    Data Logger or Recorder
+   DP <class 'str'> :    Differential Pressure Transmitter/Transducer
+   FLC <class 'str'> :    Flow Computer
+   FLOW <class 'str'> :    Stack Flow Analyzer
+   GCH <class 'str'> :    Gas Chromatograph
+   GFFM <class 'str'> :    Gas Fuel Flowmeter
+   H2O <class 'str'> :    Continuous Moisture Sensor
+   HCL <class 'str'> :    HCl Concentration Analyzer
+   HF <class 'str'> :    HF Concentration Analyzer
+   HG <class 'str'> :    Mercury Concentration Analyzer (Hg CEMS)
+   MS <class 'str'> :    Mass Spectrograph
+   NOX <class 'str'> :    NOx Concentration
+   O2 <class 'str'> :    O2 Concentration
+   OFFM <class 'str'> :    Oil Fuel Flowmeter
+   OP <class 'str'> :    Opacity Monitor
+   PLC <class 'str'> :    Programmable Logic Controller
+   PM <class 'str'> :    Particulate Matter
+   PRB <class 'str'> :    Probe
+   PRES <class 'str'> :    Pressure Transmitter/Transducer
+   SO2 <class 'str'> :    SO2 Concentration
+   STRAIN <class 'str'> :    Sorbent Trap Sampling Train Component, consisting of a sample gas flow meter and the associated sorbent trap
+   TANK <class 'str'> :    Oil Supply Tank
+   TEMP <class 'str'> :    Temperature Transmitter/Transducer
+
+  EQUATION_CODE <class 'dict'> : 
+     19-1 <class 'str'> :    NOXR/SO2R (same as F-5)
+   19-14 <class 'str'> :    FW (from fuel composition)
+   19-2 <class 'str'> :    NOXR/SO2R (from wet NOX or SO2, wet O2, Bwa, Fw)
+   19-3 <class 'str'> :    NOXR/SO2R (from wet NOX or SO2, wet O2, H2O, Fd)
+   19-3D <class 'str'> :    NOXR/SO2R (replacement for 19-3 during diluent cap hours)
+   19-4 <class 'str'> :    NOXR/SO2R (from wet NOX or SO2, dry O2, H2O, Fd)
+   19-5 <class 'str'> :    NOXR/SO2R (from dry NOX or SO2, wet O2, H2O, Fd)
+   19-5D <class 'str'> :    NOXR/SO2R (replacement for 19-5 during diluent cap hours)
+   19-6 <class 'str'> :    NOXR/SO2R (from dry NOX or SO2, dry CO2, Fc)
+   19-7 <class 'str'> :    NOXR/SO2R (same as F-6)
+   19-8 <class 'str'> :    NOXR/SO2R (from wet NOX or SO2, dry CO2, H2O, Fc)
+   19-9 <class 'str'> :    NOXR/SO2R (from dry NOX or SO2, wet CO2, H2O, Fc)
+   A-2 <class 'str'> :    HGRE (lb/hr wet)
+   A-3 <class 'str'> :    HGRE (lb/hr dry)
+   A-4 <class 'str'> :    HGRE (Conversion lb/hr to lb/GWh)
+   D-12 <class 'str'> :    SO2 (from SO2 rate for multiple fuels)
+   D-15 <class 'str'> :    HIT (from HI from oil or gas)
+   D-15A <class 'str'> :    HI (from HI rate for multiple fuels)
+   D-1H <class 'str'> :    SO2R (from gas sulfur content, GCV)
+   D-2 <class 'str'> :    SO2 (from OILM, oil sulfur content)
+   D-3 <class 'str'> :    OILM (from volumetric oil flow rate, density)
+   D-4 <class 'str'> :    SO2 (from gas sulfur content)
+   D-5 <class 'str'> :    SO2 (from gas SO2 emission rate, HI)
+   D-6 <class 'str'> :    HI (from gas flow rate, GCV)
+   D-8 <class 'str'> :    HI (from oil flow rate, GCV)
+   E-2 <class 'str'> :    NOXR (from multiple NOXE systems)
+   F-1 <class 'str'> :    SO2 (from SO2 wet, flow)
+   F-11 <class 'str'> :    CO2 (from CO2 wet, flow)
+   F-14A <class 'str'> :    CO2C (from dry O2, Fd, Fc)
+   F-14B <class 'str'> :    CO2C (from wet O2, H2O, Fd, Fc)
+   F-15 <class 'str'> :    HI (from wet CO2, flow, Fc)
+   F-16 <class 'str'> :    HI (from dry CO2, flow, H2O, Fc)
+   F-17 <class 'str'> :    HI (from wet O2, flow, H2O, Fd)
+   F-18 <class 'str'> :    HI (from dry O2, flow, H2O, Fd)
+   F-19 <class 'str'> :    HI (same as D-8)
+   F-19V <class 'str'> :    HI (from volumetric oil flow rate, GCV)
+   F-2 <class 'str'> :    SO2/CO2 (from SO2 or CO2 dry, flow, H2O)
+   F-20 <class 'str'> :    HI (same as D-6)
+   F-21A <class 'str'> :    HI (apportioned from HI for common stack/pipe by MWe)
+   F-21B <class 'str'> :    HI (apportioned from HI for common stack/pipe by steam load)
+   F-21C <class 'str'> :    HI (summed from HI for multiple stacks/pipes)
+   F-21D <class 'str'> :    HI (apportioned from HI for common pipe by uncertified fuel flowmeter)
+   F-23 <class 'str'> :    SO2R (from gas SO2 emission rate, HI- same as D-5)
+   F-24A <class 'str'> :    NOX (from NOX rate, HI)
+   F-25 <class 'str'> :    HI (for common stack summed from HI for units)
+   F-26A <class 'str'> :    NOX (hourly from wet NOXC, flow)
+   F-26B <class 'str'> :    NOX (hourly from dry NOXC, flow, H2O)
+   F-28 <class 'str'> :    HGM (from Hg concentration, flow)
+   F-29 <class 'str'> :    HGM (from Hg concentration, flow, H2O)
+   F-31 <class 'str'> :    H2O (from wet and dry O2)
+   F-5 <class 'str'> :    NOXR/SO2R (from NOX or SO2 dry, O2 dry, Fd)
+   F-6 <class 'str'> :    NOXR/SO2R (from NOX or SO2 wet, CO2 wet, Fc)
+   F-7A <class 'str'> :    FD (from fuel composition)
+   F-7B <class 'str'> :    FC (from carbon content, GCV)
+   F-8 <class 'str'> :    FD/FC/FW (from multiple fuels)
+   G-1 <class 'str'> :    CO2M (from fuel composition)
+   G-2 <class 'str'> :    CO2M (from fuel composition adjusted by carbon retained in ash)
+   G-3 <class 'str'> :    CO2M (from fuel composition adjusted by carbon retained in ash)
+   G-4 <class 'str'> :    CO2 (from HI, Fc)
+   G-4A <class 'str'> :    CO2 (from CO2 rate for multiple fuels)
+   G-5 <class 'str'> :    CO2M (for sorbent)
+   G-6 <class 'str'> :    CO2M (for sorbent with SO2 controls)
+   G-8 <class 'str'> :    CO2M (from CO2M for both fuel and sorbent)
+   HC-2 <class 'str'> :    HCLRE (lb/MWh wet)
+   HC-3 <class 'str'> :    HCLRE (lb/MWh dry)
+   HC-4 <class 'str'> :    HCLRE(Conversion lb/hr to lb/MWh)
+   HF-2 <class 'str'> :    HFRE (lb/MWh wet)
+   HF-3 <class 'str'> :    HFRE (lb/MWh dry)
+   HF-4 <class 'str'> :    HFRE (Conversion lb/hr to lb/MWh)
+   HG-1 <class 'str'> :    HG(converts lb/mmBtu to lb/TBtu)
+   K-5 <class 'str'> :    HGC (from Hg in trap, gas volume)
+   M-1K <class 'str'> :    H2O (from wet and dry O2 with K-factor adjustment)
+   MS-1 <class 'str'> :    Flow-weighted average from multiple stacks
+   MS-2 <class 'str'> :    Flow-weighted apportionment to multiple stacks
+   N-GAS <class 'str'> :    FGAS (net gas flow rate)
+   N-OIL <class 'str'> :    FOIL (net volumetric oil flow rate)
+   NS-1 <class 'str'> :    NOXR (for affected units in a subtractive configuration)
+   NS-2 <class 'str'> :    NOXR (apportioned)
+   S-2 <class 'str'> :    SO2RE (lb/MWh wet)
+   S-3 <class 'str'> :    SO2RE (lb/MWh dry)
+   S-4 <class 'str'> :    SO2RE (Conversion lb/hr to lb/MWh)
+   SS-1A <class 'str'> :    SO2 (hourly for affected units in a subtractive configuration)
+   SS-1B <class 'str'> :    SO2 (hourly for affected units in a subtractive configuration)
+   SS-2A <class 'str'> :    NOX (hourly for affected units in a subtractive configuration)
+   SS-2B <class 'str'> :    NOX (hourly for affected units in a subtractive configuration)
+   SS-2C <class 'str'> :    NOX (hourly for affected units in a subtractive configuration)
+   SS-3A <class 'str'> :    HI (hourly for affected units in a subtractive configuration)
+   SS-3B <class 'str'> :    HI (hourly for affected units in a subtractive configuration)
+   T-FL <class 'str'> :    FLOW (total stack flow rate)
+   X-FL <class 'str'> :    FLOW (average stack flow rate)
+
+  FUEL_CODE <class 'dict'> : 
+     ANT <class 'str'> :    Anthracite Coal
+   BFG <class 'str'> :    Blast Furnace Gas
+   BT <class 'str'> :    Bituminous Coal
+   BUT <class 'str'> :    Butane Gas
+   C <class 'str'> :    Coal
+   CDG <class 'str'> :    Coal Derived Gas
+   COG <class 'str'> :    Coke Oven Gas
+   CRF <class 'str'> :    Coal Refuse
+   DGG <class 'str'> :    Digester Gas
+   DSL <class 'str'> :    Diesel Oil
+   LFG <class 'str'> :    Landfill Gas
+   LIG <class 'str'> :    Lignite Coal
+   LPG <class 'str'> :    Liquefied Petroleum Gas
+   MIX <class 'str'> :    Mixture (Co-Fired Fuels)
+   NFS <class 'str'> :    Non-Fuel Specific
+   NNG <class 'str'> :    Natural Gas
+   OGS <class 'str'> :    Other Gas
+   OIL <class 'str'> :    Residual Oil
+   OOL <class 'str'> :    Other Oil
+   OSF <class 'str'> :    Other Solid Fuel
+   PDG <class 'str'> :    Producer Gas
+   PNG <class 'str'> :    Pipeline Natural Gas
+   PRG <class 'str'> :    Process Gas
+   PRP <class 'str'> :    Propane Gas
+   PRS <class 'str'> :    Process Sludge
+   PTC <class 'str'> :    Petroleum Coke
+   R <class 'str'> :    Refuse
+   RFG <class 'str'> :    Refinery Gas
+   SRG <class 'str'> :    Unrefined Sour Gas
+   SUB <class 'str'> :    Sub-Bituminous Coal
+   TDF <class 'str'> :    Tire-Derived Fuel
+   W <class 'str'> :    Wood
+   WL <class 'str'> :    Waste Liquid
+
+  FUEL_TYPE_CODE <class 'dict'> : 
+     C <class 'str'> :    Coal
+   CRF <class 'str'> :    Coal Refuse
+   DSL <class 'str'> :    Diesel Oil
+   LPG <class 'str'> :    Liquified Petroleum Gas
+   NNG <class 'str'> :    Natural Gas
+   OGS <class 'str'> :    Other Gas
+   OIL <class 'str'> :    Residual Oil
+   OOL <class 'str'> :    Other Oil
+   OSF <class 'str'> :    Other Solid Fuel
+   PNG <class 'str'> :    Pipeline Natural Gas
+   PRG <class 'str'> :    Process Gas
+   PRS <class 'str'> :    Process Sludge
+   PTC <class 'str'> :    Petroleum Coke
+   R <class 'str'> :    Refuse
+   TDF <class 'str'> :    Tire Derived Fuel
+   W <class 'str'> :    Wood
+   WL <class 'str'> :    Waste Liquid
+
+  GAS_LEVEL_CODE <class 'dict'> : 
+     HIGH <class 'str'> :    High
+   LOW <class 'str'> :    Low
+   MID <class 'str'> :    Mid
+   ZERO <class 'str'> :    Zero
+
+  GAS_TYPE_CODE <class 'dict'> : 
+     AIR <class 'str'> :    Purified air material
+   APPVD <class 'str'> :    Other EPA-approved EPA Protocol gas blend
+   CO2 <class 'str'> :    EPA Protocol gas consisting of CO2, and a balance gas
+   GMIS <class 'str'> :    Gas manufacturer's intermediate standard
+   N2C <class 'str'> :    EPA Protocol gas bi-blend consisting of NO2 and CO, and a balance gas
+   N2C2 <class 'str'> :    EPA Protocol gas bi-blend consisting of NO2 and CO2, and a balance gas
+   N2CC <class 'str'> :    EPA Protocol gas tri-blend consisting of NO2, CO, and CO2, and a balance gas
+   NC <class 'str'> :    EPA Protocol gas bi-blend consisting of NO and CO, and a balance gas
+   NC2 <class 'str'> :    EPA Protocol gas bi-blend consisting of NO and CO2, and a balance gas
+   NCC <class 'str'> :    EPA Protocol gas tri-blend consisting of NO, CO, and CO2, and a balance gas
+   NO <class 'str'> :    EPA Protocol gas consisting of NO, and a balance gas
+   NO2 <class 'str'> :    EPA Protocol gas consisting of NO2, and a balance gas
+   NTRM <class 'str'> :    NIST-traceable reference material
+   NX <class 'str'> :    EPA Protocol gas bi-blend consisting of NO and NO2, and a balance gas
+   NXC <class 'str'> :    EPA Protocol gas tri-blend consisting of NO, NO2, and CO, and a balance gas
+   NXC2 <class 'str'> :    EPA Protocol gas tri-blend consisting of NO, NO2, and CO2, and a balance gas
+   NXCC <class 'str'> :    EPA Protocol gas quad-blend consisting of NO, NO2, CO, and CO2, and a balance gas
+   O2 <class 'str'> :    EPA Protocol gas consisting of O2, and a balance gas
+   OC <class 'str'> :    EPA Protocol gas bi-blend consisting of O2 and CO, and a balance gas
+   OC2 <class 'str'> :    EPA Protocol gas bi-blend consisting of O2 and CO2, and a balance gas
+   OCC <class 'str'> :    EPA Protocol gas tri-blend consisting of O2, CO, and CO2, and a balance gas
+   PRM <class 'str'> :    SRM-equivalent compressed gas primary reference material
+   RGM <class 'str'> :    Research gas mixture
+   SC <class 'str'> :    EPA Protocol gas bi-blend consisting of SO2 and CO, and a balance gas
+   SC2 <class 'str'> :    EPA Protocol gas bi-blend consisting of SO2 and CO2, and a balance gas
+   SN <class 'str'> :    EPA Protocol gas bi-blend consisting of SO2 and NO, and a balance gas
+   SN2 <class 'str'> :    EPA Protocol gas bi-blend consisting of SO2 and NO2, and a balance gas
+   SN2C <class 'str'> :    EPA Protocol gas tri-blend consisting of SO2, NO2, and CO, and a balance gas
+   SN2C2 <class 'str'> :    EPA Protocol gas tri-blend consisting of SO2, NO2, and CO2, and a balance gas
+   SN2CC <class 'str'> :    EPA Protocol gas quad-blend consisting of SO2, NO2, CO, and CO2, and a balance gas
+   SNC <class 'str'> :    EPA Protocol gas tri-blend consisting of SO2, NO, and CO, and a balance gas
+   SNC2 <class 'str'> :    EPA Protocol gas tri-blend consisting of SO2, NO, and CO2, and a balance gas
+   SNCC <class 'str'> :    EPA Protocol gas quad-blend consisting of SO2, NO, CO, and CO2, and a balance gas
+   SNX <class 'str'> :    EPA Protocol gas tri-blend consisting of SO2, NO, and NO2, and a balance gas
+   SNXC <class 'str'> :    EPA Protocol gas quad-blend consisting of SO2, NO, NO2, and CO, and a balance gas
+   SNXC2 <class 'str'> :    EPA Protocol gas quad-blend consisting of SO2, NO, NO2, and CO2, and a balance gas
+   SNXCC <class 'str'> :    EPA Protocol gas quint-blend consisting of SO2, NO, NO2, CO, and CO2, and a balance gas
+   SO <class 'str'> :    EPA Protocol gas bi-blend consisting of SO2 and O2, and a balance gas
+   SO2 <class 'str'> :    EPA Protocol gas consisting of SO2, and a balance gas
+   SOC <class 'str'> :    EPA Protocol gas tri-blend consisting of SO2, O2, and CO, and a balance gas
+   SRM <class 'str'> :    Standard reference material
+   ZAM <class 'str'> :    Zero Air Material
+   ZERO <class 'str'> :    Zero level gas used for the low level calibration of a reference analyzer used in RATA testing
+
+  GFM_HOUR_FLAG_CODE <class 'dict'> : 
+     F <class 'str'> :    The end of the sample collection period
+   I <class 'str'> :    The beginning of the sample collection period
+   N <class 'str'> :    The sample gas flow meter was unavailable during a portion of the sample collection period
+   T <class 'str'> :    Transition hour - when one sample collection period ends and another begins 
+in the same hour (pair of sorbent traps is removed from service, and a new
+pair of traps is placed in service in the same hour)
+
+  GFM_SAMPLING_CODE <class 'dict'> : 
+     CCHR <class 'str'> :    Cubic centimeters per hour
+   CCMIN <class 'str'> :    Cubic centimeters per minute
+   DSCMHR <class 'str'> :    Dry standard cubic meters per hour
+   DSCMMIN <class 'str'> :    Dry standard cubic meters per minute
+   LHR <class 'str'> :    Liters per hour
+   LMIN <class 'str'> :    Liters per minute
+
+  HG_CONC_SRC_CODE <class 'dict'> : 
+     AVERAGE <class 'str'> :    The QA Status Code for both STRAIN components is "PASSED".
+   FACTOR <class 'str'> :    The QA Status Code is "PASSED" for one of the STRAIN components and "FAILED" or "LOST" for the other. 
+The Hg concentration obtained with the passing component is multiplied by a factor of 1.111.
+   HIGHER <class 'str'> :    The QA Status Code for both STRAIN components is "UNCERTAIN" 
+and reporting the higher of the two Hg concentrations was elected.
+   UNAVAILABLE <class 'str'> :    The QA Status Code is "EXPIRED" or "INC" for either or both STRAIN components;
+The QA Status Code is "FAILED" or "LOST" for both STRAIN components; or
+The QA Status code for both STRAIN components is "UNCERTAIN" and invalidating the data was elected; or
+The flue gases are routed through an unmonitored bypass stack and the Hg concentration is not measured.
+
+  LOOKUP_ALIASES <class 'dict'> : 
+     COMPONENT_TYPE_CODE <class 'str'> :    Component type code
+   EQUATION_CODE <class 'str'> :    Equation code
+   FUEL_CODE <class 'str'> :    Fuel code
+   FUEL_TYPE_CODE <class 'str'> :    Fuel type code
+   GAS_LEVEL_CODE <class 'str'> :    Gas level code
+   GAS_TYPE_CODE <class 'str'> :    Gas type code
+   GFM_HOUR_FLAG_CODE <class 'str'> :    GFM hour flag code
+   GFM_SAMPLING_CODE <class 'str'> :    GFM sampling code
+   HG_CONC_SRC_CODE <class 'str'> :    Mercury concentration source code
+   MATS_FLAG_CODE <class 'str'> :    MATS flag code
+   MODC_CODE <class 'str'> :    MODC code
+   OPERATING_CONDITION_CODE <class 'str'> :    Operating condition code
+   PARAMETER_CODE <class 'str'> :    Parameter code
+   SODC_CODE <class 'str'> :    SODC code
+   SPAN_SCALE_CODE <class 'str'> :    Span scale code
+   SRC_RESULT_CODE <class 'str'> :    Source result code
+   TEST_RESULT_CODE <class 'str'> :    Test result code
+   TEST_TYPE_CODE <class 'str'> :    Test type code
+   TRAIN_QA_STATUS_CODE <class 'str'> :    Train QA status code
+   UNITS_OF_MEASURE_CODE <class 'str'> :    Units of measure code
+
+  MATS_FLAG_CODE <class 'dict'> : 
+     D <class 'str'> :    Shutdown hour
+   U <class 'str'> :    Startup hour
+
+  MODC_CODE <class 'dict'> : 
+     01 <class 'str'> :    Primary (or Primary Bypass) Monitoring System
+   02 <class 'str'> :    Redundant or Non-Redundant Backup Monitoring System
+   03 <class 'str'> :    Approved Subpart E Alternative Monitoring System
+   04 <class 'str'> :    Reference Method Backup System
+   05 <class 'str'> :    Preapproved Parametric Monitoring Method for Controlled Units
+   06 <class 'str'> :    Average Hour Before/Hour After
+   07 <class 'str'> :    Average Hourly Concentration, Initial Missing Data
+   08 <class 'str'> :    90th Percentile Value in Lookback Period
+   09 <class 'str'> :    95th Percentile Value in Lookback Period
+   10 <class 'str'> :    Maximum Value in Lookback Period
+   11 <class 'str'> :    Average Value in Lookback Period
+   12 <class 'str'> :    Maximum or Minimum Value from Default or Span Record
+   13 <class 'str'> :    Maximum Controlled Value from Default Record
+   14 <class 'str'> :    Diluent Cap Value
+   15 <class 'str'> :    1.25 Times Maximum Value in Lookback Period
+   16 <class 'str'> :    SO2 Concentration When Very Low Sulfur Fuel Combusted
+   17 <class 'str'> :    Like-Kind Replacement Analyzer
+   18 <class 'str'> :    MPC Used for Portion of Hour When High Range of Dual Range Analyzer Unavailable due to Expired Test
+   19 <class 'str'> :    Default High Range Value Used
+   20 <class 'str'> :    200% of Full Scale Range Used
+   21 <class 'str'> :    Negative Value Replaced with Zero
+   22 <class 'str'> :    Control Inlet Monitoring System
+   23 <class 'str'> :    Maximum Value when Emitting through Unmonitored Bypass Stack
+   24 <class 'str'> :    Maximum Controlled Value when Emitting through Unmonitored Bypass Stack
+   25 <class 'str'> :    NOx MER When Full-Scale Exceedance of NOx Concentration and Diluent Monitor Unavailable
+   26 <class 'str'> :    Zero or Negative Heat Input Rate Replaced with 1 mmBtu
+   32 <class 'str'> :    Hourly Hg concentration determined from analysis of a single sorbent trap multiplied by a factor of 1.111
+   33 <class 'str'> :    Hourly Hg concentration determined from the  sorbent trap with the higher Hg concentration  (relative deviation criterion for the paired traps is not met)
+   34 <class 'str'> :    Hourly Hg, HCl, or HF concentration missing or invalid.
+   35 <class 'str'> :    Hourly Hg, HCl, or HF concentration not monitored (flue gases routed through an unmonitored bypass stack).
+   36 <class 'str'> :    Hourly Hg, HCl, SO2, or HF emission rate calculated-- valid data obtained for pollutant concentration and for all essential auxiliary parameters.
+   37 <class 'str'> :    Hourly heat input-based Hg, HCl, SO2, or HF emission rate calculated for a startup or shutdown hour, using the diluent cap value.
+   38 <class 'str'> :    Hourly Hg, HCl, or HF emission rate not calculated-- valid concentration not available or substitute data reported for one or more essential auxiliary parameters.
+   39 <class 'str'> :    Hourly electric output-based Hg, HCl, SO2, or HF emission rate calculated for a startup or shutdown hour, using the default electrical load value.
+   40 <class 'str'> :    Fuel-Specific or Pro-Rated Default Value
+   41 <class 'str'> :    Hourly Hg concentration determined from two different pairs of sorbent traps during the hour. This code applies only to routine sorbent trap change outs during normal, day-to-day operation of the sorbent trap monitoring system.
+   42 <class 'str'> :    Hourly Hg concentration determined from two different pairs of sorbent traps during the hour.  This code applies only to sorbent trap change outs that occur during  RATA testing periods.
+   43 <class 'str'> :    Hourly Hg concentration determined by the Method Detection Level.
+   44 <class 'str'> :    Hourly Hg concentration determined from Method Detection Level of a single sorbent trap multiplied by a factor of 1.111
+   45 <class 'str'> :    Maximum Rated Hourly Heat Input Rate (LME)
+   53 <class 'str'> :    Method Approved by Petition (Available Hours Included in Missing Data Lookback)
+   54 <class 'str'> :    Method Approved by Petition (Included in Missing Data Lookback)
+   55 <class 'str'> :    Method Approved by Petition (Not included in Missing Data Lookback)
+
+  OPERATING_CONDITION_CODE <class 'dict'> : 
+     A <class 'str'> :    Any Hour
+   B <class 'str'> :    Base Load Hour
+   C <class 'str'> :    Controlled Hour
+   E <class 'str'> :    Emergency Fuel Used
+   M <class 'str'> :    AE Correlation Curve Expired
+   N <class 'str'> :    Operating Parameter outside of Normal Limits
+   P <class 'str'> :    Peak Load Hour
+   U <class 'str'> :    Uncontrolled Hour
+   W <class 'str'> :    Operation above Highest HI Rate on AE Correlation Curve
+   X <class 'str'> :    Operating Parameter Data Missing or Invalid
+   Y <class 'str'> :    Operational and Control Equipment Parameters within Normal Limits
+   Z <class 'str'> :    Operation below Lowest HI Rate on AE Correlation Curve
+
+  PARAMETER_CODE <class 'dict'> : 
+     AKSF <class 'str'> :    Appendix K Sample to Stack Flow Scaling Factor
+   BCO2 <class 'str'> :    Biogenic CO2 Mass (ton)
+   BWA <class 'str'> :    Moisture Fraction in Ambient Air
+   CO2 <class 'str'> :    CO2 Hourly Mass Rate (ton/hr)
+   CO2C <class 'str'> :    CO2 Concentration (pct)
+   CO2M <class 'str'> :    CO2 Mass (ton)
+   CO2N <class 'str'> :    CO2 Minimum Concentration (pct)
+   CO2R <class 'str'> :    CO2 Emission Rate (ton/mmBtu)
+   CO2X <class 'str'> :    CO2 Maximum Concentration (pct)
+   DENSOIL <class 'str'> :    Density of Oil
+   FC <class 'str'> :    F-Factor Carbon-based
+   FD <class 'str'> :    F-Factor Dry-basis
+   FF2L <class 'str'> :    Fuel Flow to Load Rate
+   FGAS <class 'str'> :    Gas Hourly Flow Rate (hscf)
+   FLOW <class 'str'> :    Stack Flow (scfh)
+   FLOX <class 'str'> :    Maximum Stack Flow (scfh)
+   FOIL <class 'str'> :    Oil Flow Rate
+   FW <class 'str'> :    F-Factor Wet-basis
+   GCV <class 'str'> :    Gross Calorific Value for Oil or Gas
+   GHR <class 'str'> :    Gross Heat Rate
+   H2O <class 'str'> :    Moisture Percentage (pct)
+   H2ON <class 'str'> :    Minimum Moisture (pct)
+   H2OX <class 'str'> :    Maximum Moisture (pct)
+   HCL <class 'str'> :    Hydrogen chloride
+   HCLC <class 'str'> :    HCl concentration (ppm)
+   HCLRE <class 'str'> :    HCl Electrical Output Based Emissions Rate (lb/MWh)
+   HCLRH <class 'str'> :    HCl Heat Input Based Emissions Rate (lb/mmBtu)
+   HF <class 'str'> :    Hydrogen fluoride
+   HFC <class 'str'> :    HF concentration (ppm)
+   HFRE <class 'str'> :    HF Electrical Output Based Emissions Rate (lb/MWh)
+   HFRH <class 'str'> :    HF Heat Input Based Emissions Rate (lb/mmBtu)
+   HG <class 'str'> :    Mercury
+   HGC <class 'str'> :    Hg Concentration (ugscm)
+   HGRE <class 'str'> :    Hg Electrical Output Based Emission Rate
+   HGRH <class 'str'> :    Hg Heat Input Based Emission Rate
+   HI <class 'str'> :    Heat Input Rate (mmBtu/hr)
+   HIT <class 'str'> :    Heat Input Total (mmBtu)
+   LOAD <class 'str'> :    Operating Load
+   MHHI <class 'str'> :    Maximum Rated Hourly Heat Input Rate (mmBtu/hr)
+   MNGF <class 'str'> :    Mininum Gas Flow Rate (hscf)
+   MNHI <class 'str'> :    Minimum Heat Input Rate (mmBtu/hr)
+   MNNX <class 'str'> :    Minimum NOx Emission Rate (lb/mmBtu)
+   MNOF <class 'str'> :    Minimum Oil Flow Rate
+   NOCX <class 'str'> :    Maximum NOx Concentration (ppm)
+   NORX <class 'str'> :    Maximum NOx Emission Rate (lb/mmBtu)
+   NOX <class 'str'> :    NOx Hourly Mass Rate (lb/hr)
+   NOXC <class 'str'> :    NOx Concentration (ppm)
+   NOXM <class 'str'> :    NOx Mass (lb)
+   NOXR <class 'str'> :    NOx Emission Rate (lb/mmBtu)
+   O2C <class 'str'> :    O2 Concentration (pct)
+   O2N <class 'str'> :    Minimum O2 Concentration (pct)
+   O2X <class 'str'> :    Maximum O2 Concentration (pct)
+   OILM <class 'str'> :    Oil Mass Flow Rate (lb/hr)
+   OILV <class 'str'> :    Oil Volumetric Flow Rate
+   OP <class 'str'> :    Opacity
+   OPHOURS <class 'str'> :    Number of Operating Hours
+   OPTIME <class 'str'> :    Operating Time (hr)
+   PM <class 'str'> :    Particulate Matter
+   SGF <class 'str'> :    Sample Gas Flow
+   SO2 <class 'str'> :    SO2 Hourly Mass Rate (lb/hr)
+   SO2C <class 'str'> :    SO2 Concentration (ppm)
+   SO2M <class 'str'> :    SO2 Mass (lb)
+   SO2R <class 'str'> :    SO2 Hourly  Emission Rate (lb/mmBtu)
+   SO2RE <class 'str'> :    SO2 Electrical Output Based Hourly Emission Rate (lb/MW-hr)
+   SO2RH <class 'str'> :    SO2 Heat Input Based Hourly Emission Rate (lb/mmBtu)
+   SO2X <class 'str'> :    Maximum SO2 Concentration (ppm)
+   SORX <class 'str'> :    Maximum SO2 Emission Rate (lb/mmBtu)
+   SULFUR <class 'str'> :    Sulfur Content
+   VOIL <class 'str'> :    Oil Volume
+
+  SODC_CODE <class 'dict'> : 
+     0 <class 'str'> :    Measured Data
+   1 <class 'str'> :    Substitute Data Using Lookback Procedures 
+   3 <class 'str'> :    Maximum Potential Fuel Flow Rate (simplified missing data procedure for peaking units, only)
+   4 <class 'str'> :    Emergency Fuel (maximum unit fuel flow rate)
+   5 <class 'str'> :    Igniter Oil from Tank Measurements
+   6 <class 'str'> :    Uncertified OFFM to Measure Igniter Oil
+   9 <class 'str'> :    Default Minimum Fuel Flow Rate
+
+  SPAN_SCALE_CODE <class 'dict'> : 
+     H <class 'str'> :    High
+   L <class 'str'> :    Low
+
+  SRC_RESULT_CODE <class 'dict'> : 
+     FAILED <class 'str'> :    Test was failed. The hourly ratio was not maintained within 25% of the reference
+ratio throughout the sample collection period.
+   PASSED <class 'str'> :    Test was passed. The hourly ratio was maintained within 25% of the reference
+ratio throughout the sample collection period.
+
+  TEST_RESULT_CODE <class 'dict'> : 
+     ABORTED <class 'str'> :    Test Aborted
+   EXC168H <class 'str'> :    Fewer than 168 Hours after Exclusions
+   FAILED <class 'str'> :    Test Failed
+   FEW168H <class 'str'> :    Fewer than 168 QA Operating Hours
+   IGNORED <class 'str'> :    Does Not Fulfill Testing Requirement
+   INC <class 'str'> :    Incomplete Test
+   INPROG <class 'str'> :    Baseline Data Collection In Progress
+   INVALID <class 'str'> :    Invalid Test
+   PASSAPS <class 'str'> :    Test Passed Alt Spec
+   PASSED <class 'str'> :    Test Passed
+
+  TEST_TYPE_CODE <class 'dict'> : 
+     7DAY <class 'str'> :    7-Day Calibration
+   AF2LCHK <class 'str'> :    Abbreviated Flow-to-Load Check
+   APPE <class 'str'> :    Appendix E NOx Rate Test
+   BCAL <class 'str'> :    Barometer calibration (sorbent trap monitoring systems)
+   CYCLE <class 'str'> :    Cycle Time Test
+   DAHS <class 'str'> :    DAHS Verification
+   DAYCAL <class 'str'> :    Daily Calibration
+   DGFMCAL <class 'str'> :    Dry Gas Meter Calibration (Sorbent Trap Monitoring System)
+   F2LCHK <class 'str'> :    Flow-to-Load Ratio or GHR Test
+   F2LREF <class 'str'> :    Flow-to-Load or GHR Reference Data
+   FF2LBAS <class 'str'> :    Fuel Flow-to-Load Baseline Data
+   FF2LTST <class 'str'> :    Fuel Flow-to-Load Test
+   FFACC <class 'str'> :    Fuel Flowmeter Accuracy Test
+   FFACCTT <class 'str'> :    Transmitter Transducer Test
+   HGLINE <class 'str'> :    Mercury Linearity
+   HGSI1 <class 'str'> :    One-Point Hg System Integrity Check
+   HGSI3 <class 'str'> :    Three-Point Hg System Integrity Check
+   INTCHK <class 'str'> :    Flow Interference Check
+   LEAK <class 'str'> :    Leak Check
+   LINE <class 'str'> :    Linearity Check
+   MFMCAL <class 'str'> :    Mass Flow Meter Calibration (Sorbent Trap Monitoring System)
+   ONOFF <class 'str'> :    On-Line/Off-Line Calibration
+   OTHER <class 'str'> :    Other Test
+   PEI <class 'str'> :    Primary Element Inspection
+   PEMSACC <class 'str'> :    PEMS Accuracy Check
+   PEMSCAL <class 'str'> :    Daily PEMS Calibration
+   QGA <class 'str'> :    Quarterly Gas Audit (HCl and HF monitoring systems)
+   RATA <class 'str'> :    Relative Accuracy Test
+   TSCAL <class 'str'> :    Temperature sensor calibration (sorbent trap monitoring systems)
+   UNITDEF <class 'str'> :    Unit-Specific Default NOx Rate Test
+
+  TRAIN_QA_STATUS_CODE <class 'dict'> : 
+     EXPIRED <class 'str'> :    Required QA (calibration) was not performed on the sample flow meter component.
+   FAILED <class 'str'> :    The sample flow meter is in-control, but a criterion other than relative deviation was not met.
+   INC <class 'str'> :    Incomplete (missing or invalid for hour(s) in the sample collection period.
+   LOST <class 'str'> :    Trap was accidentally lost, damaged, or broken and could not be analyzed.
+   PASSED <class 'str'> :    All criteria passed.
+   UNCERTAIN <class 'str'> :    The relative deviation criterion for the paired traps was not met, while other criteria were met.
+
+  UNITS_OF_MEASURE_CODE <class 'dict'> : 
+     1 <class 'str'> :    100 Standard Cubic Feet / Hour per Megawatt
+   2 <class 'str'> :    100 Standard Cubic Feet / Hour per 1000 Pounds / Hour of Steam Load
+   3 <class 'str'> :    Pounds / Hour per Megawatt
+   4 <class 'str'> :    Pounds / Hour per 1000 Pounds / Hour of Steam Load
+   5 <class 'str'> :    Gallons / Hour per Megawatt
+   6 <class 'str'> :    Gallons / Hour per 1000 Pounds / Hour of Steam Load
+   7 <class 'str'> :    100 Standard Cubic Feet / Hour per mmBtu / Hour of Steam Load
+   8 <class 'str'> :    Pounds / Hour per mmBtu / Hour of Steam Load
+   9 <class 'str'> :    Gallons / Hour per mmBtu / Hour of Steam Load
+   ACFH <class 'str'> :    Actual Cubic Feet of Stack Flow / Hour
+   ACFM <class 'str'> :    Actual Cubic Feet of Stack Flow / Minute
+   AFPM <class 'str'> :    Actual Feet of Stack Flow / Minute
+   AFSEC <class 'str'> :    Actual Feet of Stack Flow / Second
+   AMSEC <class 'str'> :    Actual Meters of Stack Flow / Second
+   BBL <class 'str'> :    Barrel
+   BBLHR <class 'str'> :    Barrels / Hour
+   BTUBBL <class 'str'> :    BTU per Barrel
+   BTUGAL <class 'str'> :    BTU per Gallon
+   BTUHSCF <class 'str'> :    BTU per 100 Standard Cubic Feet
+   BTUKBTU <class 'str'> :    mmBTU per mmBTU of Steam Load times 1000
+   BTUKWH <class 'str'> :    BTU per Kilowatt Hour
+   BTULB <class 'str'> :    BTU per Pound
+   BTUM3 <class 'str'> :    BTU per Cubic Meter
+   BTUSCF <class 'str'> :    BTU per Standard Cubic Feet
+   CCHR <class 'str'> :    Cubic Centimeters / Hour
+   CCMIN <class 'str'> :    Cubic Centimeters / Minute
+   DSCMHR <class 'str'> :    Dry Standard Cubic Meters / Hour
+   DSCMMIN <class 'str'> :    Dry Standard Cubic Meters / Minute
+   GAL <class 'str'> :    Gallon
+   GALHR <class 'str'> :    Gallons / Hour
+   GRHSCF <class 'str'> :    Grains / 100 Standard Cubic Feet
+   HR <class 'str'> :    Hours
+   HSCF <class 'str'> :    Hundred Standard Cubic Feet / Hour
+   INH2O <class 'str'> :    Inches of Water
+   KACFH <class 'str'> :    Thousand Actual Cubic Feet of Stack Flow / Hour
+   KACFM <class 'str'> :    Thousand Actual Cubic Feet of Stack Flow / Minute
+   KAFPM <class 'str'> :    Thousand Actual Feet of Stack Flow / Minute
+   KGMWH <class 'str'> :    kg / Megawatt Hour
+   KLBHR <class 'str'> :    1000 Pounds Steam Load / Hour
+   KSCFH <class 'str'> :    Thousand Standard Cubic Feet of Stack Flow / Hour
+   KSCFM <class 'str'> :    Thousand Standard Cubic Feet of Stack Flow / Minute
+   KSFPM <class 'str'> :    Thousand Standard Feet of Stack Flow / Minute
+   LB <class 'str'> :    Pounds
+   LBBBL <class 'str'> :    Pounds per Barrel
+   LBGAL <class 'str'> :    Pounds per Gallon
+   LBGWH <class 'str'> :    Pounds / Giga-watt Hour
+   LBHR <class 'str'> :    Pounds / Hour
+   LBM3 <class 'str'> :    Pounds per Cubic Meter
+   LBMMBTU <class 'str'> :    Pounds / mmBtu
+   LBMWH <class 'str'> :    Pounds / Megawatt Hour
+   LBSCF <class 'str'> :    Pounds per Standard Cubic Feet
+   LBTBTU <class 'str'> :    Pounds / Btu
+   LHR <class 'str'> :    Liters / Hour
+   LMIN <class 'str'> :    Liters / Minute
+   M3 <class 'str'> :    Cubic Meter
+   M3HR <class 'str'> :    Cubic Meters / Hour
+   MACFH <class 'str'> :    Million Actual Cubic Feet of Stack Flow / Hour
+   MMBTU <class 'str'> :    mmBtu
+   MMBTUHR <class 'str'> :    mmBtu/ Hour
+   MSCFH <class 'str'> :    Million Standard Cubic Feet of Stack Flow / Hour
+   MW <class 'str'> :    Megawatt
+   PCT <class 'str'> :    Percentage
+   PPM <class 'str'> :    Parts per Million
+   SCF <class 'str'> :    Standard Cubic Feet
+   SCFCBTU <class 'str'> :    CO2 Standard Cubic Feet / mmBtu
+   SCFDBTU <class 'str'> :    Dry Standard Cubic Feet / mmBtu
+   SCFH <class 'str'> :    Standard Cubic Feet / Hour
+   SCFM <class 'str'> :    Standard Cubic Feet of Stack Flow / Minute
+   SCFWBTU <class 'str'> :    Wet Standard Cubic Feet / mmBtu
+   SFPM <class 'str'> :    Standard Feet of Stack Flow / Minute
+   SMSEC <class 'str'> :    Standard Meters of Stack Flow / Second
+   TNHR <class 'str'> :    Tons / Hour
+   TNMMBTU <class 'str'> :    Tons / mmBtu
+   TON <class 'str'> :    Tons
+   UGSCM <class 'str'> :    Micrograms / Standard Cubic Meter
+
+
+
+apiInfo <class 'dict'> : 
+ majorversion <class 'int'> :  1
+ minorversion <class 'int'> :  0
+
+downloadDateTime <class 'str'> : 2019-06-21T18:13:26.8163388Z
+pagination <class 'dict'> : 
+ total <class 'int'> :  1
+ limit <class 'int'> :  2147483647
+ offset <class 'int'> :  1
+ returned <class 'int'> :  1
+
+errorMessage <class 'NoneType'> : 
+errorId <class 'NoneType'> : 

@@ -262,6 +262,7 @@ class SEmissions(object):
            prints out list of emissions soures with information about them.
 
         """
+        print('FIND')
         area = self.area
         if testcase:
             efile = "emission_02-28-2018_103721604.csv"
@@ -309,7 +310,7 @@ class SEmissions(object):
             lambda row: loc2utc(row["time local"], row["oris"], tzhash), axis=1
         )
         temp = self.df[self.df.time == 'None']
-        print(temp[0:20])
+        print('TEMP with None time\n', temp[0:20])
         self.df = self.df[self.df.time != 'None'] 
          
 
@@ -371,18 +372,36 @@ class SEmissions(object):
         """
         # print("GET SOURCES")
         if self.df.empty:
+            print('SOURCES EMPTY')
             self.find()
         ut = unit
         df = obs_util.timefilter(self.df, [self.d1, self.d2])
         df = self.modc2spnum(df)
+      
+        #-------------------------------
+        #-------------------------------
+        # set negative values to 0.
+        def remove_negs(x):
+            if x < 0:
+               return 0
+            else:
+               return x       
+ 
+        df[stype] = df.apply(
+            lambda row: remove_negs(row[stype]), axis=1
+           )
+        #-------------------------------
+        #-------------------------------
+
+
         #dftemp = df[df["spnum"] == 1]
         #dftemp = df[df["spnum"] == 2]
         #dftemp = df[df["spnum"] == 3]
         #print("SP 3", dftemp.SO2MODC.unique())
         #print("OP TIME", dftemp.OperatingTime.unique())
-        #if not self.use_spnum:
+        if not self.use_spnum:
            # set all species numbers to 1
-        #   df['spnum'] = 1
+           df['spnum'] = 1
         cols = ["oris", "stackht", "spnum"]
         if unit: cols.append('unit')
         # cols=['oris']
@@ -469,7 +488,7 @@ class SEmissions(object):
         # placeholder. Will later add routine to get heat for plume rise
         # calculation.
 
-        dfheat = df * 0 + heat
+        dfheat = df.copy() * 0 + heat
         # dfheat = self.get_heat(unit=unit)
         # if unit:
         #    dfstack = self.get_stackvalues(unit=unit)
@@ -538,8 +557,6 @@ class SEmissions(object):
 
         # create a dictionary with key oris number and value and EmiTimes
         # object.
-
-
         for oris in orislist:
             for mid in unithash[oris]:
                 # output directory is determined by tdir and starting date.
@@ -600,7 +617,6 @@ class SEmissions(object):
                 #if spnum!=1: print(date, rate, spnum)
                 if date >= edate:
                     heat = dfh[date]
-                    print(spnum)
                     check = efile.add_record(
                         date, record_duration, lat, lon, height, rate, emit_area, heat, spnum
                     )
@@ -659,24 +675,40 @@ class SEmissions(object):
 
         # when operatingTime is 0, the modc is Nan
         # these are set as Species 1 since 0 emissions is certain.
+
+        # sometimes negative emissions are associated with higher MODC
+        # not sure why this is.
         """
         df = dfin.copy()
 
         def sort_modc(x):
-            if x["SO2MODC"] in [1, 2, 3, 4]:
+            try:
+               val = int(x["SO2MODC"])
+            except:
+               val = 99
+
+            try:
+               optime = float(x["OperatingTime"])
+            except:
+               optime = 99
+
+
+            if val in [1, 2, 3, 4]:
                 return 1
-            if x["SO2MODC"] in [6, 7]:
+            if val in [6, 7]:
                 return 2
             else:
-                if x["OperatingTime"] == 0:
+                if optime < 0.0001:
                     return 1
                 else:
                     return 3
-        print('USE SPNUM', self.use_spnum)
-        if self.use_spnum: 
-            df["spnum"] = df.apply(sort_modc, axis=1)
-        else: 
-            df["spnum"] = 1
+
+
+        #print('USE SPNUM', self.use_spnum)
+        #if self.use_spnum: 
+        df["spnum"] = df.apply(sort_modc, axis=1)
+        #else: 
+        #    df["spnum"] = 1
         #print(df.columns)
         #temp = df[df['so2_lbs']>0]
         #print(temp[['time','SO2MODC','spnum','so2_lbs']][0:10]) 
@@ -690,7 +722,8 @@ class SEmissions(object):
 
     def plot(self, save=True, quiet=True, maxfig=10):
         """plot time series of emissions"""
-        if self.cems.df.empty:
+        if self.df.empty:
+            print('PLOT EMPTY')
             self.find()
         sns.set()
         namehash = df2hash(self.df, "oris", "facility_name")
@@ -700,6 +733,9 @@ class SEmissions(object):
         cols = ["oris", "spnum"]
         data1 = pd.pivot_table(
             df, index=["time"], values="so2_lbs", columns=cols, aggfunc=np.sum
+        )
+        data2 = pd.pivot_table(
+            df, index=["time"], values="SO2MODC", columns=cols, aggfunc=np.sum
         )
         # ---------------
         # data1 = cems_api.cemspivot(self.df,
@@ -722,10 +758,15 @@ class SEmissions(object):
                 self.fignum += 1
                 jjj = 0
             fig = plt.figure(self.fignum)
-            ax = fig.add_subplot(1, 1, 1)
+            ax = fig.add_subplot(2, 1, 1)
+            ax2 = fig.add_subplot(2, 1, 2)
             data = data1[ky] * self.lbs2kg
             ax.plot(data, clr)
-            plt.ylabel("SO2 mass kg")
+            ax2.plot(data2[ky], clr)
+            
+            ax.set_ylabel("SO2 mass kg")
+            ax2.set_ylabel("SO2 MODC value")
+            plt.sca(ax) 
             plt.title(str(loc) + " " + namehash[loc])
             if save:
                 figname = self.tdir + "/cems." + str(int(loc)) + ".jpg"

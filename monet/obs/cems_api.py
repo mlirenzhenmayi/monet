@@ -170,7 +170,8 @@ def get_lookups():
     # rqq = self.apiurl + "emissions/" + getstr
     # rqq += "?api_key=" + self.key
     data = sendrequest(getstr)
-    dstr = unpack_response(data)
+    jobject = data.json()
+    dstr = unpack_response(jobject)
     return dstr
 
     # According to lookups MODC values
@@ -424,6 +425,9 @@ class EmissionsCall(EpaApiObject):
         self.so2name = "SO2CEMReportedSO2MassRate"
         self.so2nameB = "UnadjustedSO2"
         super().__init__(fname, save, prompt)
+        #if 'DateHour' in df.columns:
+        #    df = df.drop(['DateHour'], axis=1)
+        
 
     def create_getstr(self):
         # for locationID in unitra:
@@ -437,6 +441,7 @@ class EmissionsCall(EpaApiObject):
     def load(self):
         #datefmt = "%Y %m %d %H:%M"
         datefmt =  self.datefmt
+        datefmt2 = "%Y %m %d %H:%M:%S"
         chash = {"mid": str, "oris": str, "unit": str}
         df = pd.read_csv(
             self.fname,
@@ -448,9 +453,9 @@ class EmissionsCall(EpaApiObject):
         # if not df.empty:
         if convert and not df.empty:
             # check for  two date formats.
+
+            # -----------------------------------------
             def newdate(x):
-                #datefmt = "%Y-%m-%d %H:%M:%S"
-                datefmt2 = "%Y %m %d %H:%M:%S"
                 rval = x["time local"]
                 rval = rval.replace('-',' ')
                 rval = rval.strip()
@@ -465,15 +470,13 @@ class EmissionsCall(EpaApiObject):
                     except:
                        fail = 2
                        print(self.fname)
-                   #print(df)
                        print('WARNING: Could not parse date ' + rval)
-                   #sys.exit()
-                   # return values try to get from request.
-                       return pd.DataFrame(), True
+                return rval
+            # -----------------------------------------
 
             df["time local"] = df.apply(newdate, axis=1)
-            if 'DateHour' in df.columns:
-                df = df.drop(['DateHour'], axis=1)
+            #if 'DateHour' in df.columns:
+            #    df = df.drop(['DateHour'], axis=1)
         # df = pd.read_csv(self.fname, index_col=[0])
         return df, False
 
@@ -572,6 +575,7 @@ class EmissionsCall(EpaApiObject):
             return rdt
 
         df["time local"] = df.apply(newdate, axis=1)
+        df = df.drop(['DateHour'], axis=1)
         return df
 
     def convert_cols(self, df):

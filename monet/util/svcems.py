@@ -66,12 +66,11 @@ def get_timezone(lat, lon):
 
 class SourceSummary:
     def __init__(self, tdir="./", fname="source_summary.csv", data=pd.DataFrame()):
-
+          
         if not data.empty:
             self.sumdf = self.create(data)
         else:
             self.sumdf = self.load(tdir, fname)
-
         self.tdir = tdir
         self.fname = fname
 
@@ -82,7 +81,8 @@ class SourceSummary:
         """
         tempdf = self.sumdf[["ORIS", "Max(lbs)"]]
         tempdf.groupby("ORIS").max()
-        df = tempdf[tempdf["Max(lbs)"] > threshold]
+        df = tempdf[tempdf["Max(lbs)"] >= threshold]
+        bad = tempdf[tempdf["Max(lbs)"] < threshold]
         goodoris = df["ORIS"].unique()
         return goodoris
 
@@ -137,9 +137,11 @@ class SourceSummary:
         keep.append("so2_lbs")
         #print(keep)
         # drop columns not in the keep list.
-
         data1 = cems_api.keepcols(data1, keep)
-
+        data1.fillna({'stackht':0}, inplace=True)
+        data1.dropna(axis=0, inplace=True, subset=["so2_lbs"])
+        #data1.dropna(inplace=True)
+        #data1.fillna(0, inplace=True, subset=["so2_lbs"])
         # get the mean of so2_lbs
         meandf = data1.groupby(grouplist).mean()
         # get the max of so2_lbs
@@ -181,6 +183,8 @@ class SourceSummary:
         self.sumdf.to_csv(fname)
 
 
+
+
 def df2hash(df, key, value):
     """ create a dictionary from two columns
         in a pandas dataframe. 
@@ -205,7 +209,7 @@ class SEmissions(object):
        map  - plots locations of power plants on map
     """
 
-    def __init__(self, dates, area, tdir="./", source_thresh=100, spnum=False,
+    def __init__(self, dates, alist, area=True, tdir="./", source_thresh=100, spnum=False,
                   tag=None):
         """
         self.sources: pandas dataframe
@@ -242,7 +246,12 @@ class SEmissions(object):
         self.d1 = dates[0]
         self.d2 = dates[1]
         # area to consider
-        self.area = area
+        if area: 
+            self.area = alist
+        else:
+            self.goodoris = alist
+            self.area = None
+        self.byarea = area
         self.tdir = tdir
         self.fignum = 1
         # self.sources is a DataFrame returned by the CEMS class.
@@ -256,25 +265,26 @@ class SEmissions(object):
         # according to SO2MODC flag.
         self.use_spnum= spnum
 
-    def find(self, testcase=False, byunit=False, verbose=False):
+    def find(self, testcase=False,  verbose=False):
         """find emissions using the CEMS class
 
            prints out list of emissions soures with information about them.
 
         """
-        print('FIND')
-        area = self.area
+        # figure out whether finding by area or predefined orislist.
+        if self.byarea: alist = self.area
+        else: alist = self.goodoris
+
         if testcase:
             efile = "emission_02-28-2018_103721604.csv"
             self.cems.load(efile, verbose=verbose)
         else:
-            data = self.cems.add_data([self.d1, self.d2], area, verbose=True)
+            data = self.cems.add_data([self.d1, self.d2], alist,
+                                      area=self.byarea,  verbose=True)
 
+       
         source_summary = SourceSummary(data=data)
         self.meanhash = df2hash(source_summary.sumdf, "ORIS", "Max(lbs)")
-        # print('MEANHASH')
-        # print(self.meanhash)
-
         # remove sources which do not have high enough emissions.
         self.goodoris = source_summary.check_oris(self.ethresh)
         self.df = data[data["oris"].isin(self.goodoris)].copy()
@@ -282,7 +292,6 @@ class SEmissions(object):
 
         lathash = df2hash(self.df, "oris", "latitude")
         lonhash = df2hash(self.df, "oris", "longitude")
-
         # convert time to utc
         tzhash = {}
         for oris in self.df["oris"].unique():
@@ -303,15 +312,15 @@ class SEmissions(object):
                     #print('tzhash', tzhash)
                     utc = 'None'
             return utc
-
         # all these copy statements are to avoid the warning - a value is trying
         # to be set ona copy of a dataframe.
         self.df["time"] = self.df.apply(
             lambda row: loc2utc(row["time local"], row["oris"], tzhash), axis=1
         )
         temp = self.df[self.df.time == 'None']
-        print('TEMP with None time\n', temp[0:20])
-        self.df = self.df[self.df.time != 'None'] 
+        if not temp.empty: 
+           print('TEMP with None time\n', temp[0:20])
+           self.df = self.df[self.df.time != 'None'] 
          
 
     def get_so2_sources(self, unit=False):
@@ -807,6 +816,7 @@ class SEmissions(object):
                 if loc in self.goodoris:
                     # ax.text(lon, lat, pstr, fontsize=12, color="red")
                     ax.plot(lon, lat, "ko")
+                    plt.text(lon, lat, (str(loc)), fontsize=12, color='red')
                 else:
                     ax.text(lon, lat, str(int(loc)), fontsize=8, color="k")
                     ax.plot(lon, lat, "k.")

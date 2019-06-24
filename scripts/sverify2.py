@@ -119,6 +119,7 @@ class ConfigFile(NameList):
           self.spnum = True      # different species for MODC flags
           self.byunit = True     # split emittimes by unit
           self.cunits = 'PPB'    # ppb or ug/m3
+          self.orislist = "None"
 
           # attributes for obs data
           self.obs = True
@@ -186,6 +187,13 @@ class ConfigFile(NameList):
         hstr="value to use in area field for EMITIMES file"
         self.descrip['EmitArea'] = hstr
         lorder.append('EmitArea')
+   
+        hstr="List of ORIS codes to retrieve data for \n"
+        hstr+= sp10 + "If this value is not set then data for all ORIS codes found \n"
+        hstr+= sp10 + "in the defined area will be retrieved.\n"
+        hstr+= sp10 + "separate multiple codes with : (e.g. 8042:2712:7213)\n"
+        self.descrip['oris'] = hstr
+        lorder.append('oris')
 
         hstr="(True) or False). Create EMITIMES for each unit."
         self.descrip['ByUnit'] = hstr
@@ -249,6 +257,9 @@ class ConfigFile(NameList):
         else:
             rval = False
         return rval
+
+    def process_oris(self):
+        return self.orislist.split(':')
  
     def hash2att(self):
         self.bounds = self.test('area', self.bounds)
@@ -260,12 +271,14 @@ class ConfigFile(NameList):
         self.heat = self.test('heat', self.heat)
         self.heat = float(self.heat)
         self.cunits = self.test('unit',self.cunits)
-        
+       
+        self.orislist = self.test('oris',self.orislist)
+        if self.orislist != "None": self.orislist = self.process_oris()  
         self.hdir = self.test('hysplitdir', self.hdir)
         self.tdir = self.test('outdir', self.tdir)
         self.quiet = self.test('quiet', self.quiet)
         self.quiet = int(self.quiet)
-     
+    
         self.chunks = self.test('emitdays', self.chunks)
         self.chunks = int(self.chunks)
 
@@ -430,7 +443,14 @@ rfignum = 1
 if options.cems:
     from monet.util.svcems import SEmissions
 
-    ef = SEmissions([d1, d2], area,  tdir=options.tdir, spnum=options.spnum,
+    if options.orislist[0] != "None":
+       alist = options.orislist
+       byarea = False
+    else:
+       alist = area
+       byarea= True
+
+    ef = SEmissions([d1, d2], alist, area=byarea,  tdir=options.tdir, spnum=options.spnum,
                     tag = options.tag)
     ef.find()
     if options.quiet ==0: 
@@ -452,7 +472,6 @@ if options.cems:
         if options.quiet < 2:
             plt.show()
 
-
 if options.obs:
     import sys
     from monet.util.svobs import SObs
@@ -465,7 +484,6 @@ if options.obs:
         obs.check()
     except BaseException:
         print("No met data for stations.")
-    # sys.exit()
     obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir)
 
 

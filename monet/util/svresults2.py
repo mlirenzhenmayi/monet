@@ -11,6 +11,7 @@ from monet.utilhysplit.statmain import MatchedData
 from monet.util.svcems import SourceSummary
 from monet.util.svcems import df2hash
 from monet.util.svobs import SObs
+import monet.util.svobs as svo
 from monet.util.svobs import get_tseries
 import seaborn as sns
 from shapely.geometry import Point
@@ -83,11 +84,19 @@ class CemsObs(object):
         source_sum_file is the name of the  source_summary file.
         obsfile is the csv file.
         """
+        # inputs
         self.obsfile = obsfile
         self.sourcesum = source_sum_file
         self.cemsfile = cemsfile
+
+        # outputs
         self.sumdf = gpd.GeoDataFrame() #created by make_sumdf
+
+        # internal use
         self.obs = None #SObs object
+        # create self.obs file.
+        self.get_obs()
+
 
     def match(self):
         #cems = 
@@ -109,11 +118,33 @@ class CemsObs(object):
         return sumdf
 
     def get_met(self):
-        met = self.obs.read_met()
-        return met
+        metdf = self.obs.read_met()
+        return metdf
+
+    def get_met_site(self, site):
+        metdf = self.obs.read_met()
+        cols = metdf.columns.values
+        for val in cols:
+            if "siteid" in val:
+                cname = val
+        sra = self.met[cname].unique()
+        if site in sra:
+           df = metdf[metdf[cname] == site]
+        else:
+           df = pd.DataFrame()
+        #sitdf = metdf[
+        return df
 
 
     #def plot_sumdf(self):
+    def get_obs(self):
+        # read the obs file.
+        str1 = self.obsfile.split('.')
+        dt1 = datetime.datetime.strptime(str1[0], "obs%Y%m%d") 
+        dt2 = datetime.datetime.strptime(str1[1], "%Y%m%d") 
+        area=''
+        obs = SObs([dt1, dt2], area)
+        self.obs = obs
 
 
     def make_sumdf(self):
@@ -135,15 +166,12 @@ class CemsObs(object):
         sgpd = make_gpd(sourcesum, 'lat', 'lon')
         orishash = df2hash(sgpd, 'ORIS','geometry')
 
+        
         # read the obs file.
-        str1 = obsfile.split('.')
-        dt1 = datetime.datetime.strptime(str1[0], "obs%Y%m%d") 
-        dt2 = datetime.datetime.strptime(str1[1], "%Y%m%d") 
-        area=''
-        obs = SObs([dt1, dt2], area)
-        self.obs = obs
+        self.get_obs()
+
         if not os.path.isfile(obsfile): print('not file ' + obsfile)
-        odf = obs.read_csv(obsfile, hdrs=[0])
+        odf = svo.read_csv(obsfile, hdrs=[0])
         osum = odf[['siteid','latitude','longitude']]
         osum = make_gpd(osum.drop_duplicates(), 'latitude', 'longitude')
         siteidhash = df2hash(osum,'siteid','geometry')
@@ -281,7 +309,7 @@ class SVresults:
                flist = self.find_files(oris, poll=poll) 
                df = self.fromdataA(flist) 
                self.dhash[(str(oris),poll)] = df 
-               sidlist = df['sid'].unique() 
+               if not df.empty: sidlist = df['sid'].unique() 
                self.sidlist.extend(sidlist) 
         self.sidlist = list(set(self.sidlist))              
 
@@ -359,16 +387,30 @@ class SVresults:
                     print(dirpath + '/' + fl)
         return dataA_files 
 
-    def writedatem(self, dfile, bymonth=False):
+    def writedatem(self, dfile, bymonth=True):
         flist = self.find_files(oris=None)
         df = self.fromdataA(flist)
-        #df = self.massage_df(df)
-        df = df.reset_index()
-        df.drop('Num', axis=1, inplace=True)
+        #df.set_index('date', inplace=True)
+        if df.empty: return
         print(df[0:10])
+        #df = self.massage_df(df)
+        #df = df.resample("H").asfreq()
+        #df = df.reset_index()
+        #df.drop('Num', axis=1, inplace=True)
+        #print('WRITING--------------------------')
+        #print(df[0:10])
         sidlist = df['sid'].unique()
         for sid in sidlist:
             dftemp = df[df['sid'] == sid] 
+            dftemp.set_index('date', inplace=True)
+            #dftemp = dftemp.resample("H").asfreq()
+            try:
+                dftemp = self.massage_df(dftemp)
+            except:
+                print('Problem with ' + str(sid))
+                print(dftemp[0:10])
+                continue
+            dftemp.reset_index(inplace=True)
             dfile2 = str(sid) + '.' + dfile
             frame2datem(dfile2, dftemp, 
                     cnames=['date','duration','lat', 'lon',
@@ -376,6 +418,7 @@ class SVresults:
             if bymonth:
                 dftemp["month"] = dftemp["date"].map(lambda x: x.month)
                 mnths = dftemp['month'].unique()
+                print('MONTHS', mnths)
             else:
                 mnths = []
             for mmm in mnths:
@@ -397,32 +440,53 @@ class SVresults:
         nnn = 0
         # read output from c2datem in each subdirectory.
         #for run in runlist:
+        #print('LIST', filelist)
+        mcols = ['lat','lon','sid','obs','date']
+        mcols = ['sid', 'date', 'lat','lon','obs']
         for fname  in filelist:
-            print(fname)
             # read the c2datem output.
             tempdf = read_dataA(fname)
+            tempdf.drop(['Num'], inplace=True, axis=1)
             if nnn == 0 and not tempdf.empty:
                 df = tempdf.copy()
+                #df = df.set_index(mcols)
                 nnn += 1
             elif not tempdf.empty:
-                df = pd.merge(df, tempdf, how="outer")
+                #tempdf = tempdf.set_index(mcols)
+                #print('***-----------')
+                #print(df.sort_values('model', ascending=False)[0:10])
+                #print('merging', fname)
+                #print(tempdf.sort_values('model',ascending=False)[0:10])
+                #print('-----------')
+                df = pd.concat([df, tempdf], sort=True).groupby(mcols).sum().reset_index()
+                #df = df + tempdf 
+                #df = pd.merge(df, tempdf, left_on=mcols, right_on=mcols)
+                #print(df.sort_values('model',ascending=False)[0:10])
+                #print('***-----------')
             elif tempdf.empty:
                 print("-----------------------------")
                 print("WARNING: svresults2.py results method empty dataframe")
                 print(fname)
                 print("-----------------------------")
-        print(df[0:10])
-        df["duration"] = "0100"
-        df["altitude"] = 20
-        # print(df[0:10])
-        # frame2datem(dfile, df, cnames=['date','duration','lat', 'lon',
-        #                        'obs','model','sid','altitude'] )
+        #print(df[0:10])
+        if not df.empty:
+            df["duration"] = "0100"
+            df["altitude"] = 20
+            # print(df[0:10])
+            # frame2datem(dfile, df, cnames=['date','duration','lat', 'lon',
+            #                        'obs','model','sid','altitude'] )
 
-        # TO DO.
-        # fill missing data with 0. MAY NEED TO CHANGE THIS.
-        df["obs"].fillna(0, inplace=True)
-        df["model"].fillna(0, inplace=True)
-        df2 = df.set_index("date")
+            # TO DO.
+            # fill missing data with 0. MAY NEED TO CHANGE THIS.
+            df["obs"].fillna(0, inplace=True)
+            df["model"].fillna(0, inplace=True)
+            df2 = df.copy()
+            #df2 = df.reset_index()
+            #df2.drop('Num', axis=1, inplace=True)
+            #df2 = df.copy()
+            #df2 = df.set_index("date")
+        else:
+            df2 = pd.DataFrame()
         return df2 
         # 
 
@@ -433,7 +497,7 @@ class SVresults:
         clr = generate_colors()       
         chash = {}
         for oris in self.orislist:
-            chash[oris] = next(clr)
+            chash[str(oris)] = next(clr)
         return chash
 
     def set_colors(self, chash=None):
@@ -444,11 +508,13 @@ class SVresults:
     def plotall(self):
         sns.set()
         for sid in self.sidlist:
-            fig = plt.figure(1)
+            figa = plt.figure(1)
+            figb = plt.figure(3)
+            figc = plt.figure(4)
             fig2 = plt.figure(2)
-            ax1a = fig.add_subplot(3,1,1)
-            ax1b = fig.add_subplot(3,1,2)
-            ax1c = fig.add_subplot(3,1,3)
+            ax1a = figa.add_subplot(1,1,1)
+            ax1b = figb.add_subplot(1,1,1)
+            ax1c = figc.add_subplot(1,1,1)
 
             ax2 = fig2.add_subplot(1,1,1)
             iii=0
@@ -458,7 +524,11 @@ class SVresults:
             for poll in self.plist: 
                 for oris in self.orislist:
                     df = self.dhash[(str(oris), poll)]
+                    if df.empty: continue
+                    print(df[0:10])
+                    print(df.columns)
                     dftemp = df[df["sid"] == sid]
+                    dftemp.set_index('date', inplace=True)
                     dftemp = self.massage_df(dftemp)
                     obs = dftemp["obs"]
                     model = dftemp["model"]
@@ -488,15 +558,15 @@ class SVresults:
                     iii+=1
                 ax2.plot(mall.index.tolist(), mall.values, sns.xkcd_rgb['hot pink'],
                          label='ALL')
-                ax2.plot(mall1.index.tolist(), mall1.values, sns.xkcd_rgb['pink'],
-                         label='ALL high certainty')
+                #ax2.plot(mall1.index.tolist(), mall1.values, sns.xkcd_rgb['pink'],
+                #         label='ALL high certainty')
                 set_date_ticks(ax1a)
                 set_date_ticks(ax1b)
                 set_date_ticks(ax1c)
                 set_date_ticks(ax2)
                 set_legend(ax1a)
                 set_legend(ax2)
-                ax1.set_title(str(sid) + ' ' + str(poll))
+                ax1a.set_title(str(sid) + ' ' + str(poll))
                 plt.show()
 
     def massage_df(self, df):

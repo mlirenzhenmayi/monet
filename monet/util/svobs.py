@@ -308,6 +308,18 @@ class SObs(object):
         if units == "UG/M3":
             self.obs = convert_epa_unit(self.obs, obscolumn="obs", unit=units)
 
+    def met_header(self, cols):
+        newcols = []
+        for val in cols:
+            newval= val[0]
+            if 'WD' in val: 
+               newval='WD'
+            elif 'WS' in val: 
+               newval='WS'
+            elif 'SO2' in val: 
+               newval='SO2'
+            newcols.append(newval)
+        return newcols
 
     def check(self):
         """
@@ -324,15 +336,16 @@ class SObs(object):
         print(sra)
         for site in sra:
             df = self.met[self.met[cname] == site]
-
+            df.columns = self.met_header(df.columns)
             print(df.columns.values)
-            xtest = df[("WD", "Degrees Compass")]
-            ytest = df[("WS", "m/s")]
-            ztest = df[("SO2", "ppb")]
-            y = df[("SO2", "ppb")]
-            x = ("WD", "Degrees Compass")
-            y = ("SO2", "ppb")
-            z = ("WS", "m/s")
+            print(site) 
+            #xtest = df[("WD", "Degrees Compass")]
+            xtest = df["WD"]
+            ytest = df["WS"]
+            ztest = df["SO2"]
+            y = df["SO2"]
+            x = df["WD"]
+            z = df["WS"]
 
             if np.isnan(xtest).all():
                 continue
@@ -344,15 +357,15 @@ class SObs(object):
             #                           reverse=True)
             fig = plt.figure(1)
             ax1 = fig.add_subplot(1, 3, 1)
-            plt.set_gca(ax1)
+            #plt.set_gca(ax1)
             ggg = sns.jointplot(x=x, y=y, data=df, kind="hex", color="b")
             ggg.plot_joint(plt.scatter, c="m", s=30, linewidth=1, marker=".")
             ax2 = fig.add_subplot(1, 3, 2)
-            plt.set_gca(ax2)
+            #plt.set_gca(ax2)
             ggg = sns.jointplot(x=z, y=y, data=df, kind="hex", color="b")
             ggg.plot_joint(plt.scatter, c="m", s=30, linewidth=1, marker=".")
             ax3 = fig.add_subplot(1, 3, 3)
-            plt.set_gca(ax3)
+            #plt.set_gca(ax3)
             ggg = sns.jointplot(x=x, y=z, data=df, kind="hex", color="b")
             ggg.plot_joint(plt.scatter, c="m", s=30, linewidth=1, marker=".")
 

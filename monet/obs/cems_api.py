@@ -370,8 +370,8 @@ class EpaApiObject:
         data = sendrequest(self.getstr)
         jobject = data.json()
         rstr = self.getstr + "\n"
-        rstr += unpack_reponse(jobject)
-        return rst
+        rstr += unpack_response(jobject)
+        return rstr
 
     def get_raw_data(self):
         data = sendrequest(self.getstr)
@@ -846,6 +846,7 @@ class MonitoringPlan(EpaApiObject):
         self.dfall = df.copy()
         df = df[df["oris"] == self.oris]
         df = df[df["mid"] == self.mid]
+        if not df.empty: self.status_code=200
         return df, True
 
     def save(self):
@@ -1046,6 +1047,31 @@ class FacilitiesData(EpaApiObject):
         units = temp["unit"].unique()
         return units
 
+    def process_unit_time(self, instr):
+        instr = str(instr)
+        year = int(instr[0:4])
+        quarter = int(instr[4])
+        if quarter  == 1:
+           dt = datetime.datetime(year, 1,1)
+        elif quarter  == 2:
+           dt = datetime.datetime(year, 4,1)
+        elif quarter  == 3:
+           dt = datetime.datetime(year, 7,1)
+        elif quarter  == 4:
+           dt = datetime.datetime(year, 10,1)
+        return dt
+
+    def get_unit_start(self, oris, unit):
+        oris = str(oris)
+        temp = self.df[self.df["oris"] == oris]
+        temp = temp[temp["unit"] == unit]
+        start = temp['begin time'].unique()       
+        end = temp['end time'].unique()       
+        sdate = []
+        for sss in start:
+            sdate.append(self.process_unit_time(sss))
+        return sdate
+
     def unpack(self, data):
         """
         iterates through a response which contains nested dictionaries and lists.
@@ -1054,6 +1080,19 @@ class FacilitiesData(EpaApiObject):
         # Each dictionary has a list under the key monitoringLocations.
         # each monitoryLocation has a name which is what is needed
         # for the locationID input into the get_emissions.
+
+        return is a dataframe with following fields.
+
+        oris
+        facility name
+        latitude
+        longitude
+        status
+        begin time
+        end time
+        unit id
+        isunit
+
         """
         # dlist is a list of dictionaries.
         dlist = []
@@ -1077,10 +1116,12 @@ class FacilitiesData(EpaApiObject):
             #                       ahash['longitude'])
             for sid in val["monitoringPlans"]:
                 bhash = {}
-                if sid["status"] == "Active":
-                    bhash["begin time"] = sid["beginYearQuarter"]
-                    bhash["end time"] = sid["endYearQuarter"]
-                    for unit in sid["monitoringLocations"]:
+                
+                #if sid["status"] == "Active":
+                bhash['status'] = sid["status"]
+                bhash["begin time"] = str(sid["beginYearQuarter"])
+                bhash["end time"] = str(sid["endYearQuarter"])
+                for unit in sid["monitoringLocations"]:
                         chash = {}
                         chash["unit"] = unit["name"]
                         chash["isunit"] = unit["isUnit"]
@@ -1168,11 +1209,91 @@ class CEMS:
         self.emit = Emissions()
         self.orislist = []
 
-    def add_data(self, rdate, area, verbose=True):
+
+      
+    def add_data_area(self, rdate, area, verbose=True): 
+        fac = FacilitiesData()
+        llcrnr = (area[0], area[1])
+        urcrnr = (area[2], area[3])
+        orislist = fac.oris_by_area(llcrnr, urcrnr)
+
+
+    def get_monitoring_plan(self, oris, mid, date1, datelist, dflist):
+        # 4. get stack heights for each monitoring location from
+        #    class
+        # although the date is included for the monitoring plan request,
+        # the information returned is the same most of the time
+        # (possibly unless the monitoring plan changes during the time
+        # of interst).
+        # to reduce number of requests, the monitoring plan is only
+        # requested for the first date in the list.
+        status_code = 204    
+        iii=0
+        while status_code != 200:
+            #print('getting plan')
+            plan = MonitoringPlan(str(oris), str(mid), date1)
+            status_code = plan.status_code
+            #print(status_code, date1)
+            date1 += datetime.timedelta(hours = 24*30*3)
+            iii+=1
+            if iii >= 1: break
+
+        mhash = plan.to_dict()
+        if mhash:
+            if len(mhash) > 1:
+                print(
+                    "CEMS class WARNING: more than one \
+                      Monitoring location for this unit\n"
+                )
+                print(str(oris) + ' ' +  str(mid) + '---')
+                for val in mhash.keys():
+                    print(val, mhash[val])
+                print('-------------------------------')
+                    #print(
+                    #    "unit " + val["name"] + " oris " + str(oris))
+                sys.exit()
+            else:
+                mhash = mhash[0]
+                stackht = float(mhash["stackht"])
+        else:
+            stackht = None
+            istr = "\n" + "Could not retrieve stack height from monitoring plan \n"
+            istr += "Please enter stack height (in meters) \n"
+            istr += "for oris " + str(oris) + ' and unit' + str(mid)+ " \n"
+            test = input(istr)
+            try:
+               stackht = float(test)
+            except:
+               stackht = None
+        dflist.append((oris, mid, stackht))
+        # 5. Call to the Emissions class to add each monitoring location
+        #    to the dataframe for each quarter in the time period.
+        for ndate in datelist:
+            quarter = findquarter(ndate)
+            status = self.emit.add(
+                oris,
+                mid,
+                ndate.year,
+                quarter,
+            )
+            if status == 200:
+                self.orislist.append((oris, mid))
+                write_status_message(status, oris, mid, quarter, "log.txt")
+            else:
+                write_status_message(plan.status_code, oris, 'no mp ' +
+                                 str(mid), quarter, "log.txt")
+
+        return dflist
+
+
+    def add_data(self, rdate, alist, area=True, verbose=True):
         """
         INPUTS:
         rdate :  either datetime object or tuple of two datetime objects.
-        area  : list of 4 floats. (lat, lon, lat, lon)
+        alist  : list of 4 floats. (lat, lon, lat, lon)
+                OR list of oris codes.
+        area : if True then alist defines area to use.
+               if False then alist is a list of oris codes.
         verbose : boolean
 
         RETURNS:
@@ -1200,14 +1321,18 @@ class CEMS:
         # 1. get list of oris codes within the area of interest
         # class FacilitiesData for this
         fac = FacilitiesData()
-        llcrnr = (area[0], area[1])
-        urcrnr = (area[2], area[3])
-        orislist = fac.oris_by_area(llcrnr, urcrnr)
+        if area:
+            llcrnr = (alist[0], alist[1])
+            urcrnr = (alist[2], alist[3])
+            orislist = fac.oris_by_area(llcrnr, urcrnr)
+        else:
+            orislist = alist
         datelist = get_datelist(rdate)
         if verbose:
             print("ORIS to retrieve ", orislist)
         if verbose:
             print("DATES ", datelist)
+
         # 2. get list of monitoring location ids for each oris code
         # FacilitiesData also provides this.
         facdf = fac.df[fac.df["oris"].isin(orislist)]
@@ -1219,6 +1344,7 @@ class CEMS:
                 print("Units to retrieve ", str(oris), units)
             # 3. each unit has a monitoring plan.
             for mid in units:
+              
                 # 4. get stack heights for each monitoring location from
                 #    class
                 # although the date is included for the monitoring plan request,
@@ -1227,43 +1353,12 @@ class CEMS:
                 # of interst).
                 # to reduce number of requests, the monitoring plan is only
                 # requested for the first date in the list.
-                plan = MonitoringPlan(str(oris), str(mid), datelist[0])
-                mhash = plan.to_dict()
-                if mhash:
-                    if len(mhash) > 1:
-                        print(
-                            "CEMS class WARNING: more than one \
-                              Monitoring location for this unit\n"
-                        )
-                        print(str(oris) + ' ' +  str(mid) + '---')
-                        for val in mhash.keys():
-                            print(val, mhash[val])
-                        print('-------------------------------')
-                            #print(
-                            #    "unit " + val["name"] + " oris " + str(oris))
-                        sys.exit()
-                    else:
-                        mhash = mhash[0]
-                        stackht = float(mhash["stackht"])
-                else:
-                    stackht = None
-                dflist.append((oris, mid, stackht))
-                # 5. Call to the Emissions class to add each monitoring location
-                #    to the dataframe for each quarter in the time period.
-                for ndate in datelist:
-                    quarter = findquarter(ndate)
-                    status = self.emit.add(
-                        oris,
-                        mid,
-                        ndate.year,
-                        quarter,
-                    )
-                    if status == 200:
-                        self.orislist.append((oris, mid))
-                        write_status_message(status, oris, mid, quarter, "log.txt")
-                    else:
-                        write_status_message(plan.status_code, oris, 'no mp ' +
-                                         str(mid), quarter, "log.txt")
+                sdate = fac.get_unit_start(oris, mid)
+                if datelist[0] > sdate[0]: udate = datelist[0]
+                else: udate = sdate[0]
+                dflist = self.get_monitoring_plan(oris, mid, udate, datelist, dflist)
+
+
         # merge stack height data into the facilities information data frame.
         tempdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])
         # facdf contains latitutde longitude information.

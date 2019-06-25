@@ -273,7 +273,7 @@ class ConfigFile(NameList):
         self.cunits = self.test('unit',self.cunits)
        
         self.orislist = self.test('oris',self.orislist)
-        if self.orislist != "None": self.orislist = self.process_oris()  
+        self.orislist = self.process_oris()  
         self.hdir = self.test('hysplitdir', self.hdir)
         self.tdir = self.test('outdir', self.tdir)
         self.quiet = self.test('quiet', self.quiet)
@@ -442,14 +442,14 @@ if options.results:
 rfignum = 1
 if options.cems:
     from monet.util.svcems import SEmissions
-
+    print(options.orislist[0])
     if options.orislist[0] != "None":
        alist = options.orislist
        byarea = False
     else:
        alist = area
        byarea= True
-
+    print('ALIST', alist)
     ef = SEmissions([d1, d2], alist, area=byarea,  tdir=options.tdir, spnum=options.spnum,
                     tag = options.tag)
     ef.find()

@@ -938,9 +938,12 @@ class HycsControl(object):
         """will replace the duration if already exists"""
         self.run_duration = duration
 
-    def write(self, annotate=False):
+    def write(self, annotate=False, metgrid=False):
         """writes CONTROL file to text file
            self.wdir + self.fname
+
+
+           metgrid option will write a 1 before the number of met files.
         """
         note = ""
         sp28 = " " * 28
@@ -974,6 +977,8 @@ class HycsControl(object):
             fid.write(str(self.ztop) + note + "\n")
             if annotate:
                 note = sp28 + "#Number of Meteorological Data Files"
+            if metgrid:
+               fid.write('1 ')
             fid.write(str(self.num_met) + note + "\n")
             iii = 0
             for met in self.metfiles:
@@ -1047,6 +1052,17 @@ class HycsControl(object):
     #            self.locs.append(line.strip())
     #            self.nlocs += 1
 
+
+
+    def parse_num_met(self, line):
+        temp = line.split()
+        num1 = int(temp[0])
+        try:
+           num2 = int(temp[1])
+        except: 
+           num2 = 1
+        return num2 * num1
+
     def read(self, verbose=False):
         """
         Read in control file.
@@ -1073,7 +1089,13 @@ class HycsControl(object):
             self.run_duration = content[zz].strip()
             self.vertical_motion = content[zz + 1].strip()
             self.ztop = content[zz + 2].strip()
-            self.num_met = int(content[zz + 3].strip())
+
+            num_met = content[zz+3].strip()
+            self.num_met = self.parse_num_met(num_met) 
+            #self.num_met = int(content[zz + 3].strip())
+
+
+
             zz = zz + 4
             for ii in range(zz, zz + 2 * self.num_met, 2):
                 self.metdirs.append(content[ii].strip())

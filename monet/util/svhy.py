@@ -435,7 +435,9 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                             control.add_metfile(mf[0], mf[1])
                     for cg in control.concgrids:
                         cg.outfile += "." + suffix
-                    control.write()
+                    if control.num_met > 12: metgrid=True
+                    else: metgrid=False 
+                    control.write(metgrid=metgrid)
                     writelanduse(landusedir=landusedir, working_directory=wdir + "/")
 
                     with open(wdir + "/rundatem.sh", "w") as fid:

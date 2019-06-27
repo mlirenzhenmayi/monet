@@ -7,6 +7,7 @@ import pandas as pd
 import requests
 #import pytz
 import seaborn as sns
+from urllib.parse import quote
 import monet.obs.obs_util as obs_util
 
 """
@@ -54,7 +55,10 @@ def get_filename(fname, prompt):
     """
     if fname:
         done = False
+        iii=0
         while not done:
+            if iii > 2: done=True
+            iii+=1
             if os.path.isfile(fname):
                 done = True
             elif prompt:
@@ -231,7 +235,10 @@ def get_datelist(rdate):
         done = False
         iii = 0
         while not done:
-            r3 = addquarter(rdatelist[-1])
+            try:
+                r3 = addquarter(rdatelist[-1])
+            except:
+                done=True
             if r3 <= r2:
                 rdatelist.append(r3)
             else:
@@ -239,6 +246,8 @@ def get_datelist(rdate):
             if iii > 100:
                 done = True
             iii += 1
+            
+           
     else:
         rdatelist = [rdate]
     return rdatelist
@@ -376,7 +385,7 @@ class EpaApiObject:
     def get_raw_data(self):
         data = sendrequest(self.getstr)
         if data.status_code != 200:
-            return None
+            return pd.DataFrame()
         else:
             return data
 
@@ -826,13 +835,18 @@ class MonitoringPlan(EpaApiObject):
             prompt=False):
         self.oris = oris  # oris code of facility
         self.mid = mid  # monitoring location id.
+        self.date = date  # monitoring location id.
         self.date = date  # date
         self.dfall = pd.DataFrame()
         super().__init__(fname, save, prompt)
 
-    def to_dict(self):
+    def to_dict(self, unit=None):
+        if unit:
+            df = self.df[self.df['name'] == unit]
+        else:
+            df = self.df.copy()
         try:
-            mhash = self.df.reset_index().to_dict("records")
+            mhash = df.reset_index().to_dict("records")
         except:
             mhash = None
         return mhash
@@ -840,6 +854,9 @@ class MonitoringPlan(EpaApiObject):
     def load(self):
         # Multiple mplans may be saved to the same csv file.
         # so this may return an emptly dataframe
+      
+        # returns empty dataframe and flag to send request.
+        return pd.DataFrame(), True
         df = super().load()
         chash = {"mid": str, "oris": str}
         df = pd.read_csv(self.fname, index_col=[0], converters=chash)
@@ -851,6 +868,7 @@ class MonitoringPlan(EpaApiObject):
 
     def save(self):
         # do not want to overwrite other mplans in the file.
+        df = pd.DataFrame()
         try:
             self.load()
         except BaseException:
@@ -859,7 +877,7 @@ class MonitoringPlan(EpaApiObject):
             df = pd.concat([self.dfall, self.df], sort=True)
             df = df.drop_duplicates(subset=["oris", "mid"])
             df.to_csv(self.fname)
-        else:
+        elif not self.df.empty:
             self.df.to_csv(self.fname)
 
     def create_getstr(self):
@@ -895,33 +913,34 @@ class MonitoringPlan(EpaApiObject):
                 # dhash["unit"] = self.mid
                 dhash["stackht"] = att["stackHeight"] * ft2meters
                 dhash["stackht unit"] = "m"  # int
-                dhash["crossAreaExit"] = att["crossAreaExit"]
-                dhash["crossAreaFlow"] = att["crossAreaFlow"]
-                dhash["locID"] = att["locId"]
+                #dhash["crossAreaExit"] = att["crossAreaExit"]
+                #dhash["crossAreaFlow"] = att["crossAreaFlow"]
+                #dhash["locID"] = att["locId"]
                 # dhash["isunit"] = att["isUnit"]
                 # dlist.append(dhash)
-            for method in unithash["monitoringMethods"]:
-                if method["parameterCode"] == "SO2":
-                    dhash["parameterCode"] = "SO2"
-                    dhash["methodCode"] = method["methodCode"]
-                    dhash["subDataCode"] = method["subDataCode"]
-                    dhash["parameterCodeDesc"] = method["parameterCodeDesc"]
-            for method in unithash["emissionsFormulas"]:
-                if method["parameterCode"] == "SO2":
-                    elist = [
-                        "formulaId",
-                        "parameterCode",
-                        "equationCode",
-                        "formulaEquation",
-                        "equationCodeDesc",
-                    ]
-                    for val in elist:
-                        dhash[val] = method[val]
+            #for method in unithash["monitoringMethods"]:
+            #    if method["parameterCode"] == "SO2":
+            #        dhash["parameterCode"] = "SO2"
+                    #dhash["methodCode"] = method["methodCode"]
+                    #dhash["subDataCode"] = method["subDataCode"]
+                    #dhash["parameterCodeDesc"] = method["parameterCodeDesc"]
+            #for method in unithash["emissionsFormulas"]:
+            #    if method["parameterCode"] == "SO2":
+            #        elist = [
+            #            "formulaId",
+            #            "parameterCode",
+            #            "equationCode",
+            #            "formulaEquation",
+            #            "equationCodeDesc",
+            #        ]
+             #       for val in elist:
+             #           dhash[val] = method[val]
             dhash["oris"] = self.oris
             dhash["mid"] = self.mid
             dhash["request_date"] = self.date
             dlist.append(dhash)
         df = pd.DataFrame(dlist)
+        #print('MPLAN DF------\n', df)
         return df
 
         # Then have list of dicts
@@ -1012,7 +1031,35 @@ class FacilitiesData(EpaApiObject):
     """
 
     def __init__(self, fname="Fac.csv", prompt=False, save=True):
+        self.plan_hash = {}
         super().__init__(fname, save, prompt)
+
+
+    def process_time_fields(self, df):
+
+        def process_unit_time(instr):
+            instr = str(instr)
+            # there are many None in end time field.
+            try: 
+                year = int(instr[0:4])
+            except:
+                return None
+            quarter = int(instr[4])
+            if quarter  == 1:
+               dt = datetime.datetime(year, 1,1)
+            elif quarter  == 2:
+               dt = datetime.datetime(year, 4,1)
+            elif quarter  == 3:
+               dt = datetime.datetime(year, 7,1)
+            elif quarter  == 4:
+               dt = datetime.datetime(year, 10,1)
+            return dt
+        df['begin time'] =  df.apply(lambda row: process_unit_time(row['begin time']),
+                      axis=1)
+        df['end time'] = df.apply(lambda row: process_unit_time(row['end time']),
+                      axis=1)
+        return df
+
 
     def __str__(self):
         cols = self.df.columns
@@ -1065,12 +1112,52 @@ class FacilitiesData(EpaApiObject):
         oris = str(oris)
         temp = self.df[self.df["oris"] == oris]
         temp = temp[temp["unit"] == unit]
+
+        
         start = temp['begin time'].unique()       
         end = temp['end time'].unique()       
         sdate = []
         for sss in start:
             sdate.append(self.process_unit_time(sss))
         return sdate
+
+    def get_unit_request(self, oris, unit, sdate):
+        oris = str(oris)
+        temp = self.df[self.df["oris"] == oris]
+        temp = temp[temp["unit"] == unit]
+        temp = self.process_time_fields(temp)
+        temp = temp[temp["begin time"] <= sdate]
+        if temp.empty: return None
+
+
+        def test_end(d1, d2):
+            print('IN TEST END', d1, d2)
+            # if no end time then return true.
+            try:
+                if not d1: 
+                   return True
+            except:
+                print('WARNING test end', d1, d2)
+                return True
+            else:
+               try:
+                   if d1 >= d2:
+                      return True
+               except:
+                   print('WARNING test end', d1, d2)
+                   return True
+               else:
+                  return False
+        temp['testdate'] = temp.apply(lambda row: test_end(row['end time'], sdate),
+                               axis=1) 
+        print('Monitoring Plan')
+        print(temp[0:10])
+        temp = temp[temp['testdate'] == True]
+        rstr = temp['request_string'].unique()       
+        return rstr
+
+        
+
 
     def unpack(self, data):
         """
@@ -1114,20 +1201,34 @@ class FacilitiesData(EpaApiObject):
             ahash["longitude"] = val["geographicLocation"]["longitude"]
             # ahash['time_offset'] = get_timezone_offset(ahash['latitude'],
             #                       ahash['longitude'])
+            # keep track of which locations belong to a plan
+            plan_number=1
             for sid in val["monitoringPlans"]:
                 bhash = {}
                 
                 #if sid["status"] == "Active":
+                bhash['plan number'] = plan_number
                 bhash['status'] = sid["status"]
                 bhash["begin time"] = str(sid["beginYearQuarter"])
                 bhash["end time"] = str(sid["endYearQuarter"])
+                plan_name = []
+                blist = []
                 for unit in sid["monitoringLocations"]:
                         chash = {}
                         chash["unit"] = unit["name"]
                         chash["isunit"] = unit["isUnit"]
                         chash.update(ahash)
                         chash.update(bhash)
-                        dlist.append(chash)
+                        blist.append(chash)
+                        #dlist.append(chash)
+                        plan_name.append(chash["unit"])
+                plan_name.sort()
+                request_string = quote(str.join(',',plan_name)) 
+                self.plan_hash[plan_number] = request_string        
+                for hhh in blist:
+                    hhh['request_string'] = request_string
+                plan_number += 1 
+                dlist.extend(blist)
         df = pd.DataFrame(dlist)
         return df
 
@@ -1218,7 +1319,7 @@ class CEMS:
         orislist = fac.oris_by_area(llcrnr, urcrnr)
 
 
-    def get_monitoring_plan(self, oris, mid, date1, datelist, dflist):
+    def get_monitoring_plan(self, oris, mid, mrequest, date1, datelist, dflist):
         # 4. get stack heights for each monitoring location from
         #    class
         # although the date is included for the monitoring plan request,
@@ -1229,16 +1330,20 @@ class CEMS:
         # requested for the first date in the list.
         status_code = 204    
         iii=0
-        while status_code != 200:
+        print(mid, '-------------MREQUEST', mrequest)
+        #while status_code != 200:
             #print('getting plan')
-            plan = MonitoringPlan(str(oris), str(mid), date1)
-            status_code = plan.status_code
+        for mr in mrequest:
+                plan = MonitoringPlan(str(oris), mr, date1)
+                status_code = plan.status_code
+              
+                mhash = plan.to_dict(mid)
+                print(mhash)
+                print('----------------------')
             #print(status_code, date1)
-            date1 += datetime.timedelta(hours = 24*30*3)
-            iii+=1
-            if iii >= 1: break
+        #date1 += datetime.timedelta(hours = 24*30*3)
 
-        mhash = plan.to_dict()
+        mhash = plan.to_dict(mid)
         if mhash:
             if len(mhash) > 1:
                 print(
@@ -1248,7 +1353,6 @@ class CEMS:
                 print(str(oris) + ' ' +  str(mid) + '---')
                 for val in mhash.keys():
                     print(val, mhash[val])
-                print('-------------------------------')
                     #print(
                     #    "unit " + val["name"] + " oris " + str(oris))
                 sys.exit()
@@ -1266,6 +1370,8 @@ class CEMS:
             except:
                stackht = None
         dflist.append((oris, mid, stackht))
+
+
         # 5. Call to the Emissions class to add each monitoring location
         #    to the dataframe for each quarter in the time period.
         for ndate in datelist:
@@ -1327,6 +1433,7 @@ class CEMS:
             orislist = fac.oris_by_area(llcrnr, urcrnr)
         else:
             orislist = alist
+        # date list is list of dates betwen r1, r2 starting each quarter.
         datelist = get_datelist(rdate)
         if verbose:
             print("ORIS to retrieve ", orislist)
@@ -1344,7 +1451,7 @@ class CEMS:
                 print("Units to retrieve ", str(oris), units)
             # 3. each unit has a monitoring plan.
             for mid in units:
-              
+                if verbose: print('Starting UNIT ', str(mid), units)  
                 # 4. get stack heights for each monitoring location from
                 #    class
                 # although the date is included for the monitoring plan request,
@@ -1353,12 +1460,31 @@ class CEMS:
                 # of interst).
                 # to reduce number of requests, the monitoring plan is only
                 # requested for the first date in the list.
-                sdate = fac.get_unit_start(oris, mid)
-                if datelist[0] > sdate[0]: udate = datelist[0]
-                else: udate = sdate[0]
-                dflist = self.get_monitoring_plan(oris, mid, udate, datelist, dflist)
-
-
+                #sdate = fac.get_unit_start(oris, mid)
+                mrequest = None
+                iii=0
+                for udate in datelist:
+                    mrequest = fac.get_unit_request(oris, mid, udate)
+                    if mrequest: break
+                    if verbose: print('trying get unit request ', str(mid), udate)  
+                   
+                #print('************')
+                if not mrequest: 
+                   with open('MESSAGE.txt', 'a') as fid :
+                       fid.write(' No monitoring plan for ')
+                       fid.write(' oris: ' +  str(oris))
+                       fid.write(' mid: ' +  str(mid))
+                       fid.write(' date: ' +  datelist[0].strftime("%y %m/%d") )
+                       fid.write('\n')
+                #else:
+                #   print('YES requests')
+                #   print(oris, mid, datelist[0])
+                #print('************')
+                #if datelist[0] > sdate[0]: udate = datelist[0]
+                #else: udate = sdate[0]
+                else:
+                    udate = datelist[0]
+                    dflist = self.get_monitoring_plan(oris, mid, mrequest, udate, datelist, dflist)
         # merge stack height data into the facilities information data frame.
         tempdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])
         # facdf contains latitutde longitude information.

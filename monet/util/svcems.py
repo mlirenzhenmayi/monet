@@ -282,7 +282,6 @@ class SEmissions(object):
             data = self.cems.add_data([self.d1, self.d2], alist,
                                       area=self.byarea,  verbose=True)
 
-       
         source_summary = SourceSummary(data=data)
         self.meanhash = df2hash(source_summary.sumdf, "ORIS", "Max(lbs)")
         # remove sources which do not have high enough emissions.
@@ -314,6 +313,7 @@ class SEmissions(object):
             return utc
         # all these copy statements are to avoid the warning - a value is trying
         # to be set ona copy of a dataframe.
+        print('AAAA', self.df[0:10])
         self.df["time"] = self.df.apply(
             lambda row: loc2utc(row["time local"], row["oris"], tzhash), axis=1
         )
@@ -525,7 +525,7 @@ class SEmissions(object):
             #    )
             d1 = d2 + datetime.timedelta(hours=1)
             iii += 1
-            if iii > 1000:
+            if iii > 10:
                 done = True
             if d1 > self.d2:
                 done = True
@@ -771,8 +771,10 @@ class SEmissions(object):
             ax2 = fig.add_subplot(2, 1, 2)
             data = data1[ky] * self.lbs2kg
             ax.plot(data, clr)
-            ax2.plot(data2[ky], clr)
-            
+            try:
+                ax2.plot(data2[ky], clr)
+            except:
+                pass 
             ax.set_ylabel("SO2 mass kg")
             ax2.set_ylabel("SO2 MODC value")
             plt.sca(ax) 

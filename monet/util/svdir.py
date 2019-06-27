@@ -77,6 +77,12 @@ def date2dir(topdirpath, sdate, dhour=1, chkdir=False):
         call(callstr, shell=True)      
     return finaldir
 
+def dir2date(topdirpath, fdir, dhour=1):
+    if topdirpath[-1] != '/': topdirpath += '/'
+    fmt = topdirpath + 'y%Y/m%m/d%d/'
+    rdate = datetime.datetime.strptime(fdir, fmt)
+    return rdate
+
 
 def dirtree(topdirpath,  sdate, edate,
             chkdir=True, verbose = True, maxiter=1e6, dhour = 1):

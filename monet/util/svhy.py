@@ -208,6 +208,7 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
 
     # from arlhysplit.runh import getmetfiles
     from monet.util.svdir import date2dir
+    from monet.util.svdir import dir2date
 
     dstart = sdate
     dend = edate
@@ -231,7 +232,8 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
                 if not et.read_file(): continue
                 # print('NRECS', nrecs)
                 # sys.exit()
-                sdate = et.cycle_list[0].sdate
+                #sdate = et.cycle_list[0].sdate
+                sdate = dir2date(tdirpath, dirpath)
                 if sdate < dstart or sdate > dend:
                     continue
                 suffix = fl[4:8]
@@ -325,6 +327,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
     # from arlhysplit.runh import getmetfiles
     from monet.util.svdir import dirtree
     from monet.util.svdir import date2dir
+    from monet.util.svdir import dir2date
 
 
     dstart = sdate
@@ -443,6 +446,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     if dirpath == firstdirpath:
                         parinit = (None, None, None)
                     else:
+                        sdate = dir2date(tdirpath, dirpath)
                         pdate = sdate - datetime.timedelta(hours=timechunks)
                         pdir = date2dir(tdirpath, pdate, dhour=timechunks)
                         parinitA = "PARDUMP." + suffix

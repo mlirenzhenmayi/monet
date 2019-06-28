@@ -506,7 +506,7 @@ class SEmissions(object):
         # dfheat = self.get_heat(unit=unit)
         # if unit:
         #    dfstack = self.get_stackvalues(unit=unit)
-        locs = df.columns.values
+        #locs = df.columns.values
         done = False
         iii = 0
         d1 = edate
@@ -519,7 +519,14 @@ class SEmissions(object):
             #    sdf = dfstack[d1:d2]
             # if no emissions during time period then break.
             if dftemp.empty:
-                break
+                print('---------------------------------------')
+                print('-------create emitimes method ---------')
+                print('---------------------------------------')
+                print('NO EMISSIONS FOR TIME PERIOD')
+                print(d1.strftime('%Y %m/%d'), ' to ')
+                print(d2.strftime('%Y %m/%d'))
+                print('---------------------------------------')
+                continue
             self.emit_subroutine(dftemp, hdf, d1, schunks, tdir, unit=unit,
                                   emit_area=emit_area)
             # create separate EMIT TIMES file for each unit.
@@ -530,7 +537,7 @@ class SEmissions(object):
             #    )
             d1 = d2 + datetime.timedelta(hours=1)
             iii += 1
-            if iii > 10:
+            if iii > 24:
                 done = True
             if d1 > self.d2:
                 done = True
@@ -751,7 +758,7 @@ class SEmissions(object):
         data2 = pd.pivot_table(
             df, index=["time"], values="SO2MODC", columns=cols, aggfunc=np.sum
         )
-        data1.fillna(0, inplace=True)
+        #data1.fillna(0, inplace=True)
         dft = data1.reset_index()
         # ---------------
         # data1 = cems_api.cemspivot(self.df,
@@ -780,6 +787,7 @@ class SEmissions(object):
             #print(data[0:20])
             #print(data[-20:])
             ax.plot(data, clr)
+            ax.plot(data[-500:], clr)
             try:
                 ax2.plot(data2[ky], clr)
             except:

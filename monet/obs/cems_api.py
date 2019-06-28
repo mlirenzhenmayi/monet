@@ -564,6 +564,7 @@ class EmissionsCall(EpaApiObject):
                     print("--------------------------------------")
                     print("ORIS " + str(self.oris))
                     print("UNIT " + str(self.mid) + " no SO2 data")
+                    print(self.fname)
                     print("--------------------------------------")
                     # return empty dataframe
                     return pd.DataFrame()
@@ -572,6 +573,7 @@ class EmissionsCall(EpaApiObject):
                     print("--------------------------------------")
                     print("ORIS " + str(self.oris))
                     print("UNIT " + str(self.mid) + " YES SO2 data")
+                    print(self.fname)
                     print("--------------------------------------")
             # 2. Process rest of lines
             else:
@@ -609,7 +611,7 @@ class EmissionsCall(EpaApiObject):
             try:
                 rdt = datetime.datetime.strptime(xxx["DateHour"], fmt)
             except BaseException:
-                print("LINE WITH NO DATE :", xxx["DateHour"], ":")
+                #print("LINE WITH NO DATE :", xxx["DateHour"], ":")
                 rdt = datetime.datetime(1000, 1, 1, 0)
             return rdt
 

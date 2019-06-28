@@ -653,7 +653,13 @@ class EmitLine(object):
         returnstr += "{:1.4f}".format(self.lat) + " "
         returnstr += "{:1.4f}".format(self.lon) + " "
         returnstr += "{:1.0f}".format(self.height) + " "
-        returnstr += "{:1.2e}".format(self.rate) + " "
+
+        if self.rate <= 999999:
+            returnstr += "{:10.0f}".format(self.rate) + " "
+        elif self.rate > 999999:
+            returnstr += "{:10.3e}".format(self.rate)
+
+
         returnstr += "{:1.2e}".format(self.area) + " "
         try:
             returnstr += "{:1.2e}".format(self.heat)

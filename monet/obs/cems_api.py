@@ -1169,7 +1169,8 @@ class FacilitiesData(EpaApiObject):
         temp = self.process_time_fields(temp)
         temp = temp[temp["begin time"] <= sdate]
         if temp.empty: return None
-
+        # TEMPORARY PRINT STATEMENT
+        # print(temp)
 
         def test_end(d1, d2):
             # if no end time then return true.
@@ -1515,7 +1516,7 @@ class CEMS:
                        fid.write(' mid: ' +  str(mid))
                        fid.write(' date: ' +  datelist[0].strftime("%y %m/%d") )
                        fid.write('\n')
-                    udate = datelist[0]
+                    #udate = datelist[0]
                     dflist = self.get_monitoring_plan(oris, mid, mrequest, udate, datelist, dflist)
         # merge stack height data into the facilities information data frame.
         tempdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])

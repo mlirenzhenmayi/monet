@@ -196,6 +196,16 @@ def get_lookups():
     # 6-7 probably ok
     # higher values should be flagged.
 
+def quarter2date(year, quarter):
+    if quarter  == 1:
+       dt = datetime.datetime(year, 1,1)
+    elif quarter  == 2:
+       dt = datetime.datetime(year, 4,1)
+    elif quarter  == 3:
+       dt = datetime.datetime(year, 7,1)
+    elif quarter  == 4:
+       dt = datetime.datetime(year, 11,1)
+    return dt
 
 def addquarter(rdate):
     """
@@ -216,6 +226,29 @@ def addquarter(rdate):
     newdate = datetime.datetime(year, month, 1, 0)
     return newdate
 
+def get_datelist_sub(r1, r2):
+    rlist = []
+    qt1 = findquarter(r1)
+    yr1 = r1.year
+ 
+    qt2 = findquarter(r2)
+    yr2 = r2.year
+    done = False
+    iii=0
+    while not done: 
+       rlist.append(quarter2date(yr1, qt1))
+       if yr1 > yr2 : 
+          done=True
+       elif yr1==yr2 and qt1 > qt2:
+          done=True
+       qt1 += 1
+       if qt1 > 4: 
+          qt1 = 1
+          yr1 += 1
+       iii+=0
+       if iii > 16: break
+    return rlist   
+       
 
 def get_datelist(rdate):
     """
@@ -223,31 +256,13 @@ def get_datelist(rdate):
     rdate : tuple of datetime objects
     (start date, end date)
     RETURNS:
-    rdatelist : list of datetimes.
+    rdatelist : list of datetimes covering range specified by rdate by quarter.
 
     Return list of first date in each quarter from
     startdate to end date.
     """
     if isinstance(rdate, list):
-        r1 = rdate[0]
-        r2 = rdate[1]
-        rdatelist = [r1]
-        done = False
-        iii = 0
-        while not done:
-            try:
-                r3 = addquarter(rdatelist[-1])
-            except:
-                done=True
-            if r3 <= r2:
-                rdatelist.append(r3)
-            else:
-                done = True
-            if iii > 100:
-                done = True
-            iii += 1
-            
-           
+       rdatelist = get_datelist_sub(rdate[0], rdate[1])
     else:
         rdatelist = [rdate]
     return rdatelist
@@ -346,6 +361,7 @@ class EpaApiObject:
             if save:
                 self.save()
 
+
     def set_filename(self, fname):
         self.fname = fname
 
@@ -382,10 +398,14 @@ class EpaApiObject:
         rstr += unpack_response(jobject)
         return rstr
 
+    def return_empty(self):
+        return pd.DataFrame()
+
+
     def get_raw_data(self):
         data = sendrequest(self.getstr)
         if data.status_code != 200:
-            return pd.DataFrame()
+            return self.return_empty()
         else:
             return data
 
@@ -448,6 +468,7 @@ class EmissionsCall(EpaApiObject):
         return getstr
 
     def load(self):
+        # Emissions call
         #datefmt = "%Y %m %d %H:%M"
         datefmt =  self.datefmt
         datefmt2 = "%Y %m %d %H:%M:%S"
@@ -457,10 +478,10 @@ class EmissionsCall(EpaApiObject):
             index_col=[0],
             converters=chash,
             parse_dates=False)
-        convert = True
-        # print(df[0:10])
         # if not df.empty:
-        if convert and not df.empty:
+        if not df.empty:
+            self.status_code=200
+            print('SO2 DATA EXISTS')
             # check for  two date formats.
 
             # -----------------------------------------
@@ -487,7 +508,12 @@ class EmissionsCall(EpaApiObject):
             #if 'DateHour' in df.columns:
             #    df = df.drop(['DateHour'], axis=1)
         # df = pd.read_csv(self.fname, index_col=[0])
+        else:
+            print('NO SO2 DATA in FILE')
         return df, False
+
+    def return_empty(self):
+        return None
 
     def get(self):
         data = self.get_raw_data()
@@ -543,6 +569,10 @@ class EmissionsCall(EpaApiObject):
                     return pd.DataFrame()
                 else:
                     cols = tcols
+                    print("--------------------------------------")
+                    print("ORIS " + str(self.oris))
+                    print("UNIT " + str(self.mid) + " YES SO2 data")
+                    print("--------------------------------------")
             # 2. Process rest of lines
             else:
                 lt = line.split(",")
@@ -579,7 +609,7 @@ class EmissionsCall(EpaApiObject):
             try:
                 rdt = datetime.datetime.strptime(xxx["DateHour"], fmt)
             except BaseException:
-                print("PROBLEM DATE :", xxx["DateHour"], ":")
+                print("LINE WITH NO DATE :", xxx["DateHour"], ":")
                 rdt = datetime.datetime(1000, 1, 1, 0)
             return rdt
 
@@ -750,7 +780,8 @@ class Emissions:
         locationID = str(locationID)
         ec = EmissionsCall(oris, locationID, year, quarter)
         df = ec.df
-
+        #print('EMISSIONS CALL to DF', year, quarter, locationID)
+        #print(df[0:10])
         if self.df.empty:
             self.df = df
         elif not df.empty:
@@ -775,7 +806,6 @@ class Emissions:
     def plot(self):
         import matplotlib.pyplot as plt
 
-        print("plot emissions")
         df = self.df.copy()
         # print(df['date'][0:10])
         # print(df['USO2'][0:10])
@@ -841,6 +871,8 @@ class MonitoringPlan(EpaApiObject):
         super().__init__(fname, save, prompt)
 
     def to_dict(self, unit=None):
+        if self.df.empty: return None
+        #print(self.df[0:10])
         if unit:
             df = self.df[self.df['name'] == unit]
         else:
@@ -896,6 +928,8 @@ class MonitoringPlan(EpaApiObject):
         columns
         stackname, unit, stackheight, crossAreaExit,
         crossAreaFlow, locID, isunit
+
+        Example ORIS 1571 unit 2 has no stack heigth.
         """
         ihash = data["data"]
         ft2meters = 0.3048
@@ -911,7 +945,12 @@ class MonitoringPlan(EpaApiObject):
                 # dhash = {}
                 dhash["stackname"] = stackname
                 # dhash["unit"] = self.mid
-                dhash["stackht"] = att["stackHeight"] * ft2meters
+                try:
+                    dhash["stackht"] = float(att["stackHeight"]) * ft2meters
+                except:
+                    print('For unit ', unithash["name"])
+                    print('Stack height not valid: ', att["stackHeight"])
+                    dhash["stackht"] =  -99
                 dhash["stackht unit"] = "m"  # int
                 #dhash["crossAreaExit"] = att["crossAreaExit"]
                 #dhash["crossAreaFlow"] = att["crossAreaFlow"]
@@ -1131,27 +1170,22 @@ class FacilitiesData(EpaApiObject):
 
 
         def test_end(d1, d2):
-            print('IN TEST END', d1, d2)
             # if no end time then return true.
             try:
                 if not d1: 
                    return True
             except:
-                print('WARNING test end', d1, d2)
                 return True
             else:
                try:
                    if d1 >= d2:
                       return True
                except:
-                   print('WARNING test end', d1, d2)
                    return True
                else:
                   return False
         temp['testdate'] = temp.apply(lambda row: test_end(row['end time'], sdate),
                                axis=1) 
-        print('Monitoring Plan')
-        print(temp[0:10])
         temp = temp[temp['testdate'] == True]
         rstr = temp['request_string'].unique()       
         return rstr
@@ -1330,7 +1364,6 @@ class CEMS:
         # requested for the first date in the list.
         status_code = 204    
         iii=0
-        print(mid, '-------------MREQUEST', mrequest)
         #while status_code != 200:
             #print('getting plan')
         for mr in mrequest:
@@ -1338,8 +1371,6 @@ class CEMS:
                 status_code = plan.status_code
               
                 mhash = plan.to_dict(mid)
-                print(mhash)
-                print('----------------------')
             #print(status_code, date1)
         #date1 += datetime.timedelta(hours = 24*30*3)
 
@@ -1365,6 +1396,8 @@ class CEMS:
             istr += "Please enter stack height (in meters) \n"
             istr += "for oris " + str(oris) + ' and unit' + str(mid)+ " \n"
             test = input(istr)
+            #print(istr) 
+            #test = '100'
             try:
                stackht = float(test)
             except:
@@ -1451,7 +1484,6 @@ class CEMS:
                 print("Units to retrieve ", str(oris), units)
             # 3. each unit has a monitoring plan.
             for mid in units:
-                if verbose: print('Starting UNIT ', str(mid), units)  
                 # 4. get stack heights for each monitoring location from
                 #    class
                 # although the date is included for the monitoring plan request,
@@ -1466,8 +1498,6 @@ class CEMS:
                 for udate in datelist:
                     mrequest = fac.get_unit_request(oris, mid, udate)
                     if mrequest: break
-                    if verbose: print('trying get unit request ', str(mid), udate)  
-                   
                 #print('************')
                 if not mrequest: 
                    with open('MESSAGE.txt', 'a') as fid :
@@ -1476,17 +1506,19 @@ class CEMS:
                        fid.write(' mid: ' +  str(mid))
                        fid.write(' date: ' +  datelist[0].strftime("%y %m/%d") )
                        fid.write('\n')
-                #else:
-                #   print('YES requests')
-                #   print(oris, mid, datelist[0])
-                #print('************')
-                #if datelist[0] > sdate[0]: udate = datelist[0]
-                #else: udate = sdate[0]
                 else:
+                    with open('MESSAGE.txt', 'a') as fid:
+                       fid.write(' EXISTS  monitoring plan for ')
+                       fid.write(' oris: ' +  str(oris))
+                       fid.write(' mid: ' +  str(mid))
+                       fid.write(' date: ' +  datelist[0].strftime("%y %m/%d") )
+                       fid.write('\n')
                     udate = datelist[0]
                     dflist = self.get_monitoring_plan(oris, mid, mrequest, udate, datelist, dflist)
         # merge stack height data into the facilities information data frame.
         tempdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])
+
+        
         # facdf contains latitutde longitude information.
         facdf = pd.merge(
             tempdf,
@@ -1497,15 +1529,16 @@ class CEMS:
         )
         # drop un-needed columns from the emissions DataFrame
         emitdf = get_so2(self.emit.df)
-        # merge data from the facilties DataFrame into the Emissions DataFrame
-        emitdf = pd.merge(
-            emitdf,
-            facdf,
-            how="left",
-            left_on=["oris", "unit"],
-            right_on=["oris", "unit"],
-        )
-        self.df = emitdf
+        if not emitdf.empty: 
+            # merge data from the facilties DataFrame into the Emissions DataFrame
+            emitdf = pd.merge(
+                emitdf,
+                facdf,
+                how="left",
+                left_on=["oris", "unit"],
+                right_on=["oris", "unit"],
+            )
+            self.df = emitdf
         return emitdf
 
 
@@ -1541,8 +1574,6 @@ def match_column(df, varname):
     columns = list(df.columns.values)
     cmatch = None
     for ccc in columns:
-        # print('-----'  + ccc + '------')
-        # print( temp[ccc].unique())
         match = 0
         for vstr in varname:
             if vstr.lower() in ccc.lower():

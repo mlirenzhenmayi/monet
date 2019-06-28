@@ -328,7 +328,7 @@ class SEmissions(object):
            self.df = self.df[self.df.time != 'None'] 
          
 
-    def get_so2_sources(self, unit=False):
+    def get_so2_sources(self, unit=True):
         sources = self.get_sources(stype="so2_lbs", unit=unit)
         sources = sources * self.lbs2kg  # convert from lbs to kg.
         return sources
@@ -373,7 +373,28 @@ class SEmissions(object):
             print("DROPPING")
         return rval
 
-    def get_sources(self, stype="so2_lbs", unit=False, verbose=True):
+    def get_stackheight_hash(self, df):
+        """
+        creates dictionary with key is oris code.
+        value is maximum stack height for that oris.
+        """
+          
+        dftemp = df[['oris','stackht']] 
+        dftemp.drop_duplicates(inplace=True)
+        orislist = dftemp['oris'].unique()
+          
+        shash = {} 
+        for oris in orislist:
+            df2 = dftemp[dftemp['oris']==oris]         
+            stackhts = df2['stackht'].unique()
+            print('Stack Heights for oris ' + str(oris))
+            print(stackhts)
+            sh = np.max(stackhts)
+            shash[oris] = sh
+        return shash 
+
+
+    def get_sources(self, stype="so2_lbs", unit=True, verbose=True):
         """
         Returns a dataframe with rows indexed by date.
         column has info about lat, lon,
@@ -416,8 +437,18 @@ class SEmissions(object):
         if not self.use_spnum:
            # set all species numbers to 1
            df['spnum'] = 1
-        cols = ["oris", "stackht", "spnum"]
+
+        if not unit:
+           # need to find stack heights to use.
+           stackht = self.get_stackheight_hash(df)
+            
+
+
+        cols = ["oris"] 
+        cols.append("spnum")
+        if unit: cols.append("stackht")
         if unit: cols.append('unit')
+
         # cols=['oris']
         sources = pd.pivot_table(
             df, index=["time"], values=stype, columns=cols, aggfunc=np.sum
@@ -426,13 +457,7 @@ class SEmissions(object):
         #    (stype), cols=['oris','stackht'], daterange=[self.d1, self.d2], verbose=False)
         droplist = []
         cnew = []
-        #if verbose:
-        #    print("----GET SOURCES columns------")
         columns = list(sources.columns.values)
-        # print('----columns------')
-        # print(columns) #EXTRA
-        # print(stackhash)
-        # print('----columns------')
         #######################################################################
         #######################################################################
         # original column header contains either just ORIS code or
@@ -450,10 +475,15 @@ class SEmissions(object):
         for val in cols:
             lat = lathash[val[0]]
             lon = lonhash[val[0]]
-            tp = (val[0], val[1], lat, lon, val[2])
-            if unit: tp = (val[0], val[1], lat, lon, val[2], val[3])
+            spnum = val[1]
+            if not unit:
+                height = stackht[val[0]]
+            else:
+                height = val[2]
+            tp = (val[0], height, lat, lon, spnum)
+            if unit: tp = (val[0], height, lat, lon, spnum, val[3])
             newcolumn.append(tp)
-           
+            # tuple  oris, stackheight, lat, lon, spnum, unit 
         sources.columns = newcolumn
         #######################################################################
         #######################################################################
@@ -542,7 +572,6 @@ class SEmissions(object):
             if d1 > self.d2:
                 done = True
 
-    # def emit_subroutine(self, df, dfheat):
 
     def emit_subroutine(
         self, df, dfheat, edate, schunks, tdir="./", unit=True, bname="EMIT",
@@ -591,8 +620,6 @@ class SEmissions(object):
                 else: key = oris
                 ehash[key] =  emitimes.EmiTimes(filename=ename)
                 ehash[key].set_species(sphash)
-
-
 
         # now this loop fills the EmitTimes objects
         for hdr in locs:
@@ -787,7 +814,6 @@ class SEmissions(object):
             #print(data[0:20])
             #print(data[-20:])
             ax.plot(data, clr)
-            ax.plot(data[-500:], clr)
             try:
                 ax2.plot(data2[ky], clr)
             except:

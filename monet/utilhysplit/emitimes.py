@@ -652,7 +652,7 @@ class EmitLine(object):
         returnstr += self.duration + " "
         returnstr += "{:1.4f}".format(self.lat) + " "
         returnstr += "{:1.4f}".format(self.lon) + " "
-        returnstr += str(self.height) + " "
+        returnstr += "{:1.0f}".format(self.height) + " "
         returnstr += "{:1.2e}".format(self.rate) + " "
         returnstr += "{:1.2e}".format(self.area) + " "
         try:

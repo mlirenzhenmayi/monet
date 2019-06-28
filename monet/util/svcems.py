@@ -282,6 +282,11 @@ class SEmissions(object):
             data = self.cems.add_data([self.d1, self.d2], alist,
                                       area=self.byarea,  verbose=True)
 
+        if data.empty:
+           print('NO SO2 data found. Exiting program')
+           sys.exit()
+
+
         source_summary = SourceSummary(data=data)
         self.meanhash = df2hash(source_summary.sumdf, "ORIS", "Max(lbs)")
         # remove sources which do not have high enough emissions.
@@ -746,6 +751,8 @@ class SEmissions(object):
         data2 = pd.pivot_table(
             df, index=["time"], values="SO2MODC", columns=cols, aggfunc=np.sum
         )
+        data1.fillna(0, inplace=True)
+        dft = data1.reset_index()
         # ---------------
         # data1 = cems_api.cemspivot(self.df,
         #    ("so2_lbs"), cols=['oris'], daterange=[self.d1, self.d2], verbose=False)
@@ -770,6 +777,8 @@ class SEmissions(object):
             ax = fig.add_subplot(2, 1, 1)
             ax2 = fig.add_subplot(2, 1, 2)
             data = data1[ky] * self.lbs2kg
+            #print(data[0:20])
+            #print(data[-20:])
             ax.plot(data, clr)
             try:
                 ax2.plot(data2[ky], clr)

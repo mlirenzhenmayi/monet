@@ -934,7 +934,7 @@ class MonitoringPlan(EpaApiObject):
         Example ORIS 1571 unit 2 has no stack heigth.
         """
         ihash = data["data"]
-        ft2meters = 0.3048
+        ft2m = 0.3048
         dlist = []
         # print(ihash.keys())
         stackname = ihash["unitStackName"]
@@ -948,7 +948,7 @@ class MonitoringPlan(EpaApiObject):
                 dhash["stackname"] = stackname
                 # dhash["unit"] = self.mid
                 try:
-                    dhash["stackht"] = float(att["stackHeight"]) * ft2meters
+                    dhash["stackht"] = float(att["stackHeight"]) *ft2m
                 except:
                     print('For unit ', unithash["name"])
                     print('Stack height not valid: ', att["stackHeight"])
@@ -1172,23 +1172,28 @@ class FacilitiesData(EpaApiObject):
         # TEMPORARY PRINT STATEMENT
         # print(temp)
 
-        def test_end(d1, d2):
-            # if no end time then return true.
-            try:
-                if not d1: 
-                   return True
-            except:
-                return True
+        def test_end(endtime, current):
+            # if endtime None return True
+            if isinstance(endtime, pd._libs.tslibs.nattype.NaTType):
+               return True
+            elif not endtime: 
+               return True
+            # if endtime greater than current return true
+            elif endtime >= current:
+               return True
+            # if endtime less than current time return true
+            elif endtime < current:
+               return False 
             else:
-               try:
-                   if d1 >= d2:
-                      return True
-               except:
-                   return True
-               else:
-                  return False
+               return True
+
         temp['testdate'] = temp.apply(lambda row: test_end(row['end time'], sdate),
                                axis=1) 
+        print('--------------------------------------------')
+        print('Monitoring Plans available')
+        klist = ['testdate', 'begin time', 'end time', 'unit', 'oris', 'request_string']
+        print(temp[klist])
+        print('--------------------------------------------')
         temp = temp[temp['testdate'] == True]
         rstr = temp['request_string'].unique()       
         return rstr
@@ -1367,17 +1372,18 @@ class CEMS:
         # requested for the first date in the list.
         status_code = 204    
         iii=0
+        mhash = None
         #while status_code != 200:
-            #print('getting plan')
         for mr in mrequest:
                 plan = MonitoringPlan(str(oris), mr, date1)
                 status_code = plan.status_code
-              
                 mhash = plan.to_dict(mid)
             #print(status_code, date1)
         #date1 += datetime.timedelta(hours = 24*30*3)
-
-        mhash = plan.to_dict(mid)
+        #if mrequest:
+        #    mhash = plan.to_dict(mid)
+        #else:
+        #    mhash = None
         if mhash:
             if len(mhash) > 1:
                 print(
@@ -1520,7 +1526,6 @@ class CEMS:
                     dflist = self.get_monitoring_plan(oris, mid, mrequest, udate, datelist, dflist)
         # merge stack height data into the facilities information data frame.
         tempdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])
-
         
         # facdf contains latitutde longitude information.
         facdf = pd.merge(

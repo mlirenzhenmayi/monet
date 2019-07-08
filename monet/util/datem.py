@@ -143,7 +143,7 @@ def frame2datem(
     with open(dfile, "a") as fid:
         for index, row in df.iterrows():
             fid.write(row[cnames[0]].strftime("%Y %m %d %H%M") + " ")
-            fid.write(row[cnames[1]] + " ")
+            fid.write(str(row[cnames[1]]) + " ")
             fid.write("%8.3f  %8.3f" % (row[cnames[2]], row[cnames[3]]))
             fid.write("%8.4f  %8.4f " % (row[cnames[4]], row[cnames[5]]))
             if isinstance(row[cnames[6]], int):

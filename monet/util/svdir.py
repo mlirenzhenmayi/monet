@@ -79,6 +79,7 @@ def date2dir(topdirpath, sdate, dhour=1, chkdir=False):
 
 def dir2date(topdirpath, fdir, dhour=1):
     if topdirpath[-1] != '/': topdirpath += '/'
+    if fdir[-1] != '/': fdir += '/'
     fmt = topdirpath + 'y%Y/m%m/d%d/'
     rdate = datetime.datetime.strptime(fdir, fmt)
     return rdate

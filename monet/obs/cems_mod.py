@@ -1,7 +1,11 @@
 import datetime
 import os
+import sys
 import numpy as np
 import pandas as pd
+from monet.obs.cems_api import FacilitiesData
+from monet.obs.cems_api import get_monitoring_plan
+from monet.obs.cems_api import get_datelist
 
 """
 NAME: cems_mod.py
@@ -26,8 +30,8 @@ def get_stack_dict(df, orispl=None):
     (stackid, stackht (in feet))
     """
     stackhash = {}
-    df = df[df["orispl_code"].isin(orispl)]
-    # df = df[['orispl_code', 'boilerid', 'stackht','stackdiam']]
+    df = df[df["oris"].isin(orispl)]
+    # df = df[['oris', 'boilerid', 'stackht','stackdiam']]
 
     def newc(x):
         return (
@@ -38,8 +42,8 @@ def get_stack_dict(df, orispl=None):
             x["stackvel"],
         )
 
-    for oris in df["orispl_code"].unique():
-        dftemp = df[df["orispl_code"] == oris]
+    for oris in df["oris"].unique():
+        dftemp = df[df["oris"] == oris]
         dftemp["tuple"] = dftemp.apply(newc, axis=1)
         value = dftemp["tuple"].unique()
         stackhash[oris] = value
@@ -57,8 +61,8 @@ def max_stackht(df, meters=True, verbose=False):
     mult = 1
     if meters:
         mult = 0.3048
-    for orispl in df["orispl_code"].unique():
-        dftemp = df[df["orispl_code"] == orispl]
+    for orispl in df["oris"].unique():
+        dftemp = df[df["oris"] == orispl]
         slist = mult * np.array(dftemp["stackht"].unique())
 
         maxval = np.max(slist)
@@ -139,7 +143,7 @@ def read_stack_height(verbose=False, testing=False):
             "boiler",
             "stackht",
             "stackdiam",
-            "orispl_code",
+            "oris",
             "plant",
         ]
     else:
@@ -157,7 +161,7 @@ def read_stack_height(verbose=False, testing=False):
             ]
         ]
         df2.columns = [
-            "orispl_code",
+            "oris",
             "stackid",
             "boilerid",
             "stackht",
@@ -166,7 +170,7 @@ def read_stack_height(verbose=False, testing=False):
             "stackvel",
         ]
     df2.drop_duplicates(inplace=True)
-    df2 = df2[df2["orispl_code"] != -999]
+    df2 = df2[df2["oris"] != -999]
     # df2 = max_stackht(df2)
     # df2.drop(['stackht'], inplace=True)
     # df2.drop_duplicates(inplace=True)
@@ -223,7 +227,11 @@ def get_date_fmt(date, verbose=False):
     return fmt
 
 
-class CEMS(object):
+
+
+
+
+class CEMSftp(object):
     """
     Class for data from continuous emission monitoring systems (CEMS).
     Data from power plants can be downloaded from
@@ -261,13 +269,16 @@ class CEMS(object):
         self.info += self.url + "\n"
         self.df = pd.DataFrame()
         self.namehash = {}  # if columns are renamed keeps track of original names.
+        self.orislist = []
+        
         # Each facility may have more than one unit which is specified by the
         # unit id.
 
     def __str__(self):
         return self.info
 
-    def add_data(self, rdate, states=["md"], download=False, verbose=True):
+    #def add_data(self, rdate, states=["md"], download=False, verbose=True):
+    def add_data(self, rdate, alist, area=True, download=True,verbose=True):
         """
            gets the ftp url from the retrieve method and then
            loads the data from the ftp site using the load method.
@@ -293,6 +304,21 @@ class CEMS(object):
         boolean True
 
         """
+        ## To DO need to generate list of states from either list of oris codes
+        ## or lat lon coordinates
+        # md is 1552 (ok)
+        # ms is 2049 (problem)
+        self.fac = FacilitiesData()
+        if area:
+           llcrnr = (alist[0], alist[1])
+           urcrnr = (alist[2], alist[3]) 
+           orislist = self.fac.oris_by_area(llcrnr, urcrnr)
+           states = self.fac.state_from_oris(orislist) 
+        else:
+           orislist = alist
+           states = self.fac.state_from_oris(orislist) 
+        self.orislist.extend(orislist)
+
         if isinstance(states, str):
             states = [states]
         if isinstance(rdate, list):
@@ -318,121 +344,9 @@ class CEMS(object):
             for st in states:
                 url = self.retrieve(rd, st, download=download, verbose=verbose)
                 self.load(url, verbose=verbose)
+        self.df['SO2MODC'] = 2
         return self.df
 
-    def match_column(self, varname):
-        """varname is list of strings.
-           returns column name which contains all the strings.
-        """
-        columns = list(self.df.columns.values)
-        cmatch = None
-        for ccc in columns:
-            # print('-----'  + ccc + '------')
-            # print( temp[ccc].unique())
-            match = 0
-            for vstr in varname:
-                if vstr.lower() in ccc.lower():
-                    match += 1
-            if match == len(varname):
-                cmatch = ccc
-        return cmatch
-
-    def cemspivot(
-        self, varname, daterange=None, unitid=False, stackht=False, verbose=True
-    ):
-        """
-        Parameters
-        ----------
-        varname: string
-            name of column in the cems dataframe
-        daterange: list of two datetime objects
-            define a date range
-        unitid: boolean.
-                 If True and unit id columns exist then these will be kept as
-                 separate columns in the pivot table.
-        verbose: boolean
-                 if true print out extra information.
-        Returns: pandas DataFrame object
-            returns dataframe with rows time. Columns are (orispl_code,
-            unit_id).
-            If no unit_id in the file then columns are just orispl_code.
-            if unitid flag set to False then sums over unit_id's that belong to
-             an orispl_code. Values are from the column specified by the
-             varname input.
-        """
-
-        from .obs_util import timefilter
-
-        stackht = False  # option not tested.
-        temp = self.df.copy()
-        if daterange:
-            temp = timefilter(temp, daterange)
-        if stackht:
-            stack_df = read_stack_height(verbose=verbose)
-            olist = temp["orispl_code"].unique()
-            stack_df = stack_df[stack_df["orispl_code"].isin(olist)]
-            stack_df = max_stackht(stack_df)
-            temp = temp.merge(
-                stack_df, left_on=["orispl_code"], right_on=["orispl_code"], how="left"
-            )
-        if "unitid" in temp.columns.values and unitid:
-            # if temp['unit_id'].unique():
-            #    if verbose:
-            #        print('UNIT IDs ', temp['unit_id'].unique())
-            cols = ["orispl_code", "unitid"]
-            if stackht:
-                cols.append("stackht")
-        else:
-            cols = ["orispl_code"]
-            if stackht:
-                cols.append("max_stackht")
-
-        # create pandas frame with index datetime and columns for value for
-        # each unit_id,orispl
-        pivot = pd.pivot_table(
-            temp, values=varname, index=["time"], columns=cols, aggfunc=np.sum
-        )
-        # print('PIVOT ----------')
-        # print(pivot[0:20])
-        return pivot
-
-    def get_var(self, varname, orisp=None, daterange=None, unitid=-99, verbose=True):
-        """
-           returns time series with variable indicated by varname.
-           returns data frame where rows are date and columns are the
-           values of cmatch for each fac_id.
-
-           routine looks for column which contains all strings in varname.
-           Currently not case sensitive.
-
-           loc and ORISPL CODES.
-           unitid is a unit_id
-
-           if a particular unitid is specified then will return values for that
-            unit.
-
-
-        Parameters
-        ----------
-        varname : string or iteratable of strings
-            varname may be string or list of strings.
-        loc : type
-            Description of parameter `loc`.
-        daterange : type
-            Description of parameter `daterange`.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-        """
-        if unitid == -99:
-            ui = False
-        temp = self.cemspivot(varname, daterange, unitid=ui)
-        if not ui:
-            return temp[orisp]
-        else:
-            return temp[orisp, unitid]
 
     def retrieve(self, rdate, state, download=True, verbose=False):
         """Short summary.
@@ -482,38 +396,9 @@ class CEMS(object):
         self.info += "File retrieved :" + efile + "\n"
         return efile
 
-    def create_location_dictionary(self, verbose=False):
-        """
-        returns dictionary withe key orispl_code and value  (latitude,
-        longitude) tuple
-        """
-        if "latitude" in list(self.df.columns.values):
-            dftemp = self.df.copy()
-            pairs = zip(
-                dftemp["orispl_code"], zip(dftemp["latitude"], dftemp["longitude"])
-            )
-            pairs = list(set(pairs))
-            lhash = dict(pairs)  # key is facility id and value is name.
-            if verbose:
-                print(lhash)
-            return lhash
-        else:
-            return False
 
-    def create_name_dictionary(self, verbose=False):
-        """
-        returns dictionary withe key orispl_code and value facility name
-        """
-        if "latitude" in list(self.df.columns.values):
-            dftemp = self.df.copy()
-            pairs = zip(dftemp["orispl_code"], dftemp["facility_name"])
-            pairs = list(set(pairs))
-            lhash = dict(pairs)  # key is facility id and value is name.
-            if verbose:
-                print(lhash)
-            return lhash
-        else:
-            return False
+
+
 
     def columns_rename(self, columns, verbose=False):
         """
@@ -528,10 +413,14 @@ class CEMS(object):
         """
         rcolumn = []
         for ccc in columns:
-            if "facility" in ccc.lower() and "name" in ccc.lower():
+            if "unitid" in ccc.lower():
+                rcolumn = self.rename(ccc, "unit", rcolumn, verbose)
+            elif "facility" in ccc.lower() and "name" in ccc.lower():
                 rcolumn = self.rename(ccc, "facility_name", rcolumn, verbose)
+            elif "op_time" in ccc.lower():
+                rcolumn = self.rename(ccc, "OperatingTime", rcolumn, verbose)
             elif "orispl" in ccc.lower():
-                rcolumn = self.rename(ccc, "orispl_code", rcolumn, verbose)
+                rcolumn = self.rename(ccc, "oris", rcolumn, verbose)
             elif "facility" in ccc.lower() and "id" in ccc.lower():
                 rcolumn = self.rename(ccc, "fac_id", rcolumn, verbose)
             elif (
@@ -584,80 +473,66 @@ class CEMS(object):
             print(ccc + " to " + newname)
         return rcolumn
 
-    def add_info(self, dftemp):
-        """
-        -------------Load supplmental data-----------------------
-        Add location (latitude longitude) and time UTC information to dataframe
-         dftemp.
-        cemsinfo.csv contains info on facility id, lat, lon, time offset from
-         UTC.
-        allows transformation from local time to UTC.
-        If not all power stations are found in the cemsinfo.csv file,
-        then Nan will be written in lat, lon and 'time' column.
-
-        Parameters
-        ----------
-        dftemp: pandas dataframe
-
-        Returns
-        ----------
-        dftemp: pandas dataframe
-        """
-        basedir = os.path.abspath(os.path.dirname(__file__))[:-3]
-        iname = os.path.join(basedir, "data", "cemsinfo.csv")
-        # iname = os.path.join(basedir, 'data', 'cem_facility_loc.csv')
-        method = 1
-        # TO DO: Having trouble with pytest throwing an error when using the
-        # apply on the dataframe.
-        # runs ok, but pytest fails. Tried several differnt methods.
-        if os.path.isfile(iname):
-            sinfo = pd.read_csv(iname, sep=",", header=0)
-            try:
-                dftemp.drop(["latitude", "longitude"], axis=1, inplace=True)
-            except Exception:
-                pass
-            dfnew = pd.merge(
-                dftemp,
-                sinfo,
-                how="left",
-                left_on=["orispl_code"],
-                right_on=["orispl_code"],
-            )
-            # print('---------z-----------')
-            # print(dfnew.columns.values)
-            # remove stations which do not have a time offset.
-            dfnew.dropna(axis=0, subset=["time_offset"], inplace=True)
-            if method == 1:
-                # this runs ok but fails pytest
-                def i2o(x):
-                    return datetime.timedelta(hours=x["time_offset"])
-
-                dfnew["time_offset"] = dfnew.apply(i2o, axis=1)
-                dfnew["time"] = dfnew["time local"] + dfnew["time_offset"]
-            elif method == 2:
-                # this runs ok but fails pytest
-                def utc(x):
-                    return pd.Timestamp(x["time local"]) + datetime.timedelta(
-                        hours=x["time_offset"]
-                    )
-
-                dfnew["time"] = dfnew.apply(utc, axis=1)
-            elif method == 3:
-                # this runs ok but fails pytest
-                def utc(x, y):
-                    return x + datetime.timedelta(hours=y)
-
-                dfnew["time"] = dfnew.apply(
-                    lambda row: utc(row["time local"], row["time_offset"]), axis=1
+    def add_info(self, dftemp, datelist):
+        if not self.orislist:
+            orislist = dftemp['oris'].unique()
+        else:
+            orislist = self.orislist
+            print('ORIS available in ftp download', dftemp['oris'].unique())
+            dftemp = dftemp[dftemp['oris'].isin(orislist)]
+        print('orislist to retrieve', orislist)
+        facdf = self.fac.df[self.fac.df["oris"].isin(map(str,orislist))]
+        dflist = []
+        for oris in orislist:
+            t1 = dftemp[dftemp['oris']==oris]
+            unitsA = t1['unit'].unique()
+            unitsB = self.fac.get_units(oris)
+            print('---------------------------------------')
+            print('ORIS: ' , oris)
+            print('units in FacilitiesData', unitsB)
+            print('units in ftp data', unitsA)
+            print(datelist)
+            print('---------------------------------------')
+            for mid in unitsA:
+                mrequest = None 
+                iii=0
+                for udate in datelist:
+                    mrequest = self.fac.get_unit_request(oris, mid, udate)
+                    if mrequest: break
+                if mrequest:
+                   dflist = get_monitoring_plan(oris, mid, mrequest, udate,
+                                                dflist) 
+        stackdf =  pd.DataFrame(dflist, columns = ["oris","unit","stackht"])
+        facdf = facdf[['oris','unit','facility_name','latitude','longitude']]
+        facdf = facdf.drop_duplicates()
+        facdf = pd.merge(
+                   stackdf,
+                   facdf,
+                   how="left",
+                   left_on=["oris","unit"], 
+                   right_on=["oris","unit"], 
                 )
-            # remove the time_offset column.
-            dfnew.drop(["time_offset"], axis=1, inplace=True)
-            mlist = dftemp.columns.values.tolist()
-            # merge the dataframes back together to include rows with no info
-            # in the cemsinfo.csv
-            dftemp = pd.merge(dftemp, dfnew, how="left", left_on=mlist, right_on=mlist)
-        return dftemp
-        # return dfnew
+        # get facility name from the api.
+        dftemp.drop(['facility_name'],inplace=True, axis=1)
+        c1 = facdf.columns.values
+        c2 = dftemp.columns.values
+        jlist = [x for x in c1 if x in c2]
+        #ftemp = facdf[['oris','latitude','longitude','unit','stackht']]
+        #ftemp = ftemp[ftemp['oris']=='1571']
+        #print(ftemp)
+        #print('merging on', jlist)
+        #print(dftemp.dtypes)
+        #print('---')
+        #print(facdf.dtypes)
+        emitdf = pd.merge(
+                     dftemp,
+                     facdf,
+                     how='left',
+                     left_on = jlist,
+                     right_on = jlist,
+                    ) 
+        return emitdf
+
 
     def load(self, efile, verbose=True):
         """
@@ -671,10 +546,16 @@ class CEMS(object):
         """
 
         # pandas read_csv can read either from a file or url.
-        dftemp = pd.read_csv(efile, sep=",", index_col=False, header=0)
+        chash={"ORISPL_CODE":str}
+        dftemp = pd.read_csv(efile, sep=",", index_col=False, header=0,
+                             converters=chash)
         columns = list(dftemp.columns.values)
         columns = self.columns_rename(columns, verbose)
         dftemp.columns = columns
+        print('zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz')
+        print('Loading from ftp ' + efile)
+        print(columns)
+        print('zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz')
         if verbose:
             print(columns)
         dfmt = get_date_fmt(dftemp["date"][0], verbose=verbose)
@@ -694,8 +575,10 @@ class CEMS(object):
         # -------------Load supplmental data-----------------------
         # contains info on facility id, lat, lon, time offset from UTC.
         # allows transformation from local time to UTC.
-        dftemp = self.add_info(dftemp)
-
+        dftime = dftime.tolist()
+        datelist = get_datelist([dftime[0], dftime[-1]])
+        dftemp = self.add_info(dftemp, datelist)
+        verbose=True 
         if ["year"] in columns:
             dftemp.drop(["year"], axis=1, inplace=True)
         if self.df.empty:

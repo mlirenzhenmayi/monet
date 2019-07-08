@@ -120,6 +120,7 @@ class ConfigFile(NameList):
           self.byunit = True     # split emittimes by unit
           self.cunits = 'PPB'    # ppb or ug/m3
           self.orislist = "None"
+          self.cemsource = 'api'  #get cems data from API or from ftp download
 
           # attributes for obs data
           self.obs = True
@@ -202,6 +203,11 @@ class ConfigFile(NameList):
         hstr="(5) Integer. Number of days in an EMITIMES file."
         self.descrip['emitdays'] = hstr
         lorder.append('emitdays')
+     
+        hstr="(api) Download CEMS data from API or use ftp site. values are api"
+        hstr += sp10 + "or ftp"
+        self.descrip['cemsource'] = hstr
+        lorder.append('cemsource')
 
         hstr="(PPB) or ug/m3. If PPB will cause ichem=6 to be set for HYSPLIT runs."
         self.descrip['unit'] = hstr
@@ -258,6 +264,16 @@ class ConfigFile(NameList):
             rval = False
         return rval
 
+    def process_cemsource(self):
+        cs = self.cemsource
+        cs = cs.lower()
+        cs = cs.strip()
+        if cs not in ['ftp','api']:
+           print('Source for CEMS data is not valid')
+           print('Must choose api or ftp')
+           sys.exit()
+        return cs
+
     def process_oris(self):
         return self.orislist.split(':')
  
@@ -271,13 +287,19 @@ class ConfigFile(NameList):
         self.heat = self.test('heat', self.heat)
         self.heat = float(self.heat)
         self.cunits = self.test('unit',self.cunits)
-       
+        #------------------------------------------------------ 
         self.orislist = self.test('oris',self.orislist)
         self.orislist = self.process_oris()  
         self.hdir = self.test('hysplitdir', self.hdir)
         self.tdir = self.test('outdir', self.tdir)
+
         self.quiet = self.test('quiet', self.quiet)
         self.quiet = int(self.quiet)
+
+        self.cemsource = self.test('cemsource', self.cemsource)
+        self.cemsource = self.process_cemsource()
+
+           
     
         self.chunks = self.test('emitdays', self.chunks)
         self.chunks = int(self.chunks)
@@ -435,6 +457,7 @@ if options.results:
     datemfile = options.tag + 'DATEM.txt'
     svr.writedatem(datemfile)
     svr.fill_hash()
+    print('PLOTTING')
     svr.plotall()
     #runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
     #results("outfile.txt", runlist)
@@ -449,9 +472,8 @@ if options.cems:
     else:
        alist = area
        byarea= True
-    print('ALIST', alist)
     ef = SEmissions([d1, d2], alist, area=byarea,  tdir=options.tdir, spnum=options.spnum,
-                    tag = options.tag)
+                    tag = options.tag, cemsource=options.cemsource)
     ef.find()
     if options.quiet ==0: 
         ef.nowarning_plot(save=True, quiet=False)

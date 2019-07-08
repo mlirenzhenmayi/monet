@@ -815,7 +815,7 @@ class HycsControl(object):
         self.num_grids = 0  # number of concentration grids.
         self.num_sp = 0  # number of pollutants / species
         self.num_met = 0  # number of met files
-        self.rtype = rtype  # dispersion or trajectory run.
+        self.rtype = rtype  # dispersion or trajectory run or vmixing.
 
         self.outfile = "cdump"
         self.outdir = "./"
@@ -996,6 +996,10 @@ class HycsControl(object):
                 fid.write(note + "\n")
                 iii += 1
 
+            # done writing if using for vmixing.
+            if self.rtype == 'vmixing':
+               return False
+
             if self.rtype == "trajectory":
                 fid.write(self.outdir + "\n")
                 fid.write(self.outfile)
@@ -1103,6 +1107,8 @@ class HycsControl(object):
             zz = zz + 2 * self.num_met
             # if it is a trajectory control file then just
             # two more lines
+            if self.rtype == 'vmixing': 
+                return "Vmixing"
             if self.rtype == "trajectory":
                 self.outdir = content[zz]
                 self.outfile = content[zz + 1]

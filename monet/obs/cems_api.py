@@ -909,7 +909,7 @@ class MonitoringPlan(EpaApiObject):
         # returns empty dataframe and flag to send request.
         #return pd.DataFrame(), True
         #df = super().load()
-        chash = {"mid": str, "oris": str}
+        chash = {"mid": str, "oris": str, "name":str}
         df = pd.read_csv(self.fname, index_col=[0], converters=chash)
         self.dfall = df.copy()
         df = df[df["oris"] == self.oris]

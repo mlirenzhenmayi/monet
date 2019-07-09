@@ -239,14 +239,14 @@ def get_datelist_sub(r1, r2):
        rlist.append(quarter2date(yr1, qt1))
        if yr1 > yr2 : 
           done=True
-       elif yr1==yr2 and qt1 > qt2:
+       elif yr1==yr2 and qt1 == qt2:
           done=True
        qt1 += 1
        if qt1 > 4: 
           qt1 = 1
           yr1 += 1
        iii+=0
-       if iii > 16: break
+       if iii > 30: break
     return rlist   
        
 
@@ -317,7 +317,8 @@ def get_so2(df):
         "longitude",
     ]
     df = keepcols(df, keep)
-    df = df[df['oris'] != 'None']
+    print(df)
+    if not df.empty: df = df[df['oris'] != 'None']
     return df
 
 
@@ -960,12 +961,31 @@ class MonitoringPlan(EpaApiObject):
         shash = {}
 
         # first go through the unitStackConfigurations
+        # sometimes a unit can have more than one unitStack.
+        # TODO - not sure how to handle this. 
+        # y2009 3788 oris has this issue but both unit stacks have
+        # the same stack height so it is not an issue.
+
+        # the api seems to do emissions by the stack and not by
+        # the unit. so this may be a non-issue for api data.
+
+        # oris 1305 y2017 has unitStack CP001 and unitID GT1 and GT3.
+        # height is given for GT1 and GT3 and NOT CP001.
+
         for stackconfig in ihash["unitStackConfigurations"]:
             # this maps the unitid to the stack id.
             # after reading in the data, go back and assign
             # stack height to the unit based on the stackconfig.
             if 'unitId' in stackconfig.keys():
                 name = stackconfig['unitId']
+                if name in shash.keys():
+                   wstr = '-----------------------------\n'
+                   wstr += 'WARNING: unit ' + name  + '\n'
+                   wstr +=  ' oris; ' + self.oris + '\n'
+                   wstr +=  'has multiple unitStacks \n'
+                   wstr +=  shash[name] + ' ' + stackconfig["unitStack"]
+                   wstr += '-----------------------------\n'
+                   print(wstr)
                 shash[name] = stackconfig["unitStack"]
             else:
                 print('STACKconfig')
@@ -986,6 +1006,9 @@ class MonitoringPlan(EpaApiObject):
             dhash["stackname"] = stackname
             for att in unithash["locationAttributes"]:
                 if "stackHeight" in att.keys():
+                    print('stackheight' + name)
+                    print(att["stackHeight"])
+                   
                     try: 
                         dhash["stackht"] = float(att["stackHeight"]) *ft2m
                     except:
@@ -1024,10 +1047,18 @@ class MonitoringPlan(EpaApiObject):
         nseries = nseries['stackht']
         nhash = nseries.to_dict()
         def find_stackht(name, stackht, shash, nhash):
+            print('zzz', stackht)
             if pd.isna(stackht):
-               sid = shash[name]      
-               stackht = nhash[sid]
+               if name in shash.keys():
+                   sid = shash[name]      
+                   stackht = nhash[sid]
+               else:
+                   ahash = dict((y,x) for x,y in shash.items())
+                   if name in ahash.keys():
+                      sid = ahash[name]
+                      stackht = nhash[sid] 
             return stackht
+        print('df', df)
         #df['stackht2'] = df.apply(lambda row: find_stackht(row['name'], row['stackht'], shash, nhash), axis=1)      
         df['stackht'] = df.apply(lambda row: find_stackht(row['name'], row['stackht'], shash, nhash), axis=1)      
         df['stackht_unit'] = 'm'
@@ -1478,7 +1509,6 @@ class CEMS:
         statuslist = []
         for ndate in datelist:
             quarter = findquarter(ndate)
-            print('NDATE', ndate, datelist)
             print(str(oris) + ' ' + str(mid) + ' Loading data for quarter ' + str(quarter))
             status = self.emit.add(
                 oris,
@@ -1623,6 +1653,8 @@ class CEMS:
         c1 = facdf.columns.values
         c2 = emitdf.columns.values
         jlist = [x for x in c1 if x in c2]
+
+        if emitdf.empty: return emitdf
         emitdf = emitdf.dropna(axis=0, subset=['so2_lbs'])
 
         def badrow(rrr):

@@ -62,6 +62,26 @@ def remove_negs(df, stype):
        )
     return df
 
+def get_stackheight_hash(df):
+    """
+    creates dictionary with key is oris code.
+    value is maximum stack height for that oris.
+    """
+      
+    dftemp = df[['oris','stackht']] 
+    dftemp.drop_duplicates(inplace=True)
+    orislist = dftemp['oris'].unique()
+      
+    shash = {} 
+    for oris in orislist:
+        df2 = dftemp[dftemp['oris']==oris]         
+        stackhts = df2['stackht'].unique()
+        print('Stack Heights for oris ' + str(oris))
+        print(stackhts)
+        sh = np.max(stackhts)
+        shash[oris] = sh
+    return shash 
+
 def get_timezone(lat, lon):
     """ returns time difference in hours"""
     tf = TimezoneFinder()
@@ -206,15 +226,23 @@ class SourceSummary:
         fname = tdir + name
         cols = self.sumdf.columns.values.copy()
         cols[8] = cols[8].replace('lbs','tons')
+        orislist = self.sumdf['ORIS'].unique()
         with open(fname, 'w') as fid:
              rstr = ''
              for val in cols:
                  rstr += str(val) + ' ,    '
              rstr += '\n'
              fid.write(rstr)    
+             for oris in orislist:
+                 tempdf = self.sumdf[self.sumdf['ORIS'] == oris]
+                 rstr = self.create_string(tempdf)
+                 fid.write(rstr)
+
+    def create_string(self, sumdf):
              total = 0
-             for index, row in self.sumdf.iterrows():
-                 rstr = str(row['ORIS']) + ' '
+             rstr=''
+             for index, row in sumdf.iterrows():
+                 rstr += str(row['ORIS']) + ' '
                  rstr += ','
                  rstr += "{0:>10.11s}".format(str(row['unit']))
                  rstr += ','
@@ -236,10 +264,11 @@ class SourceSummary:
                  rstr += "{:10.3f}".format(row['OperatingTime'])  
                  rstr += '\n'
                  total += row['Total(lbs)']
-                 fid.write(rstr)
-             rstr = 'Total '  + "{:10.4e}".format(total)   + ' lbs \n'
-             rstr += 'Total '  + "{:10.4e}".format(total * 0.0005) + ' Tons'  
-             fid.write(rstr)
+                 #fid.write(rstr)
+             #rstr += 'Total '  + "{:10.4e}".format(total)   + ' lbs \n'
+             rstr += 'Total '  + "{:10.1f}".format(total * 0.0005) + ' Tons\n'  
+             return rstr
+             #fid.write(rstr)
         #self.sumdf.to_csv(fname)
 
 
@@ -450,26 +479,6 @@ class SEmissions(object):
             print("DROPPING")
         return rval
 
-    def get_stackheight_hash(self, df):
-        """
-        creates dictionary with key is oris code.
-        value is maximum stack height for that oris.
-        """
-          
-        dftemp = df[['oris','stackht']] 
-        dftemp.drop_duplicates(inplace=True)
-        orislist = dftemp['oris'].unique()
-          
-        shash = {} 
-        for oris in orislist:
-            df2 = dftemp[dftemp['oris']==oris]         
-            stackhts = df2['stackht'].unique()
-            print('Stack Heights for oris ' + str(oris))
-            print(stackhts)
-            sh = np.max(stackhts)
-            shash[oris] = sh
-        return shash 
-
 
     def get_sources(self, stype="so2_lbs", unit=True, verbose=True):
         """
@@ -487,65 +496,34 @@ class SEmissions(object):
             print('SOURCES EMPTY')
             self.find()
         ut = unit
-        #print('check 0') 
-        #temp = self.df[['time','so2_lbs','oris','unit']]       
-        #print(temp[0:10])
         df = obs_util.timefilter(self.df, [self.d1, self.d2])
-        #print('check 1') 
-        #temp = df[['time','so2_lbs','oris','unit']]       
-        #print(temp[0:10])
         df = self.modc2spnum(df)
-        #print('check 2') 
-        #temp = df[['time','so2_lbs','oris','unit']]       
-        #print(temp[0:10])
-        
-        #-------------------------------
-        #-------------------------------
         # set negative values to 0.
         df = remove_negs(df, stype)
-
-        #def remove_negs(x):
-        #    if x < 0:
-        #       return 0
-        #    else:
-        #       return x       
- 
-        #df[stype] = df.apply(
-        #    lambda row: remove_negs(row[stype]), axis=1
-        #   )
-        #-------------------------------
-        #-------------------------------
-
 
         #dftemp = df[df["spnum"] == 1]
         #dftemp = df[df["spnum"] == 2]
         #dftemp = df[df["spnum"] == 3]
         #print("SP 3", dftemp.SO2MODC.unique())
         #print("OP TIME", dftemp.OperatingTime.unique())
+
         if not self.use_spnum:
            # set all species numbers to 1
            df['spnum'] = 1
 
         if not unit:
            # need to find stack heights to use.
-           stackht = self.get_stackheight_hash(df)
-        #print('getting sources') 
-        #temp = df[['time','so2_lbs','oris','unit']]       
-        #print(temp[0:50])
+           stackht = get_stackheight_hash(df)
+
         cols = ["oris"] 
         cols.append("spnum")
         if unit: cols.append("stackht")
         if unit: cols.append('unit')
 
-        # cols=['oris']
         sources = pd.pivot_table(
             df, index=["time"], values=stype, columns=cols, aggfunc=np.sum
         )
-        # sources = cems_api.cemspivot(self.df,
-        #    (stype), cols=['oris','stackht'], daterange=[self.d1, self.d2], verbose=False)
-        droplist = []
-        cnew = []
-        columns = list(sources.columns.values)
+  
         #######################################################################
         #######################################################################
         # original column header contains either just ORIS code or
@@ -568,6 +546,8 @@ class SEmissions(object):
                 height = stackht[val[0]]
             else:
                 height = val[2]
+            # val[0] is the oris code
+            # val[3] is the unit number
             tp = (val[0], height, lat, lon, spnum)
             if unit: tp = (val[0], height, lat, lon, spnum, val[3])
             newcolumn.append(tp)
@@ -859,7 +839,7 @@ class SEmissions(object):
              warnings.simplefilter("ignore")
              self.plot(save, quiet, maxfig)
 
-    def plot(self, save=True, quiet=True, maxfig=10, byunit=True):
+    def plot(self, save=True, quiet=True, maxfig=10, byunit=False):
         """plot time series of emissions"""
         if self.df.empty:
             print('PLOT EMPTY')
@@ -908,8 +888,10 @@ class SEmissions(object):
             ax = fig.add_subplot(2, 1, 1)
             ax2 = fig.add_subplot(2, 1, 2)
             data = data1[ky] * self.lbs2kg
-            #print(data[0:20])
-            #print(data[-20:])
+            print('plotting----------------')
+            print(data[0:20])
+            print(data[-20:])
+            print('-----------------plotting')
             ax.plot(data, clr)
             try:
                 ax2.plot(data2[ky], clr)
@@ -918,7 +900,7 @@ class SEmissions(object):
             ax.set_ylabel("SO2 mass kg")
             ax2.set_ylabel("SO2 MODC value")
             plt.sca(ax) 
-            if byunit: locstr = str(loc) + ' unit' + str(unit)
+            if byunit: locstr = str(loc) + '.' + str(unit).strip()
             else: locstr = str(loc)
             plt.title(locstr + " " + namehash[loc])
             if save:

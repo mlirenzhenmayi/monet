@@ -5,7 +5,8 @@ import sys
 import pandas as pd
 import numpy as np
 import requests
-#import pytz
+
+# import pytz
 import seaborn as sns
 from urllib.parse import quote
 import monet.obs.obs_util as obs_util
@@ -55,10 +56,11 @@ def get_filename(fname, prompt):
     """
     if fname:
         done = False
-        iii=0
+        iii = 0
         while not done:
-            if iii > 2: done=True
-            iii+=1
+            if iii > 2:
+                done = True
+            iii += 1
             if os.path.isfile(fname):
                 done = True
             elif prompt:
@@ -155,13 +157,13 @@ def sendrequest(rqq, key=None, url=None):
             print("Too many requests Please Wait before trying again.")
             sys.exit()
     else:
-        print('WARNING: your api key for EPA data was not found')
-        print('Please obtain a key from')
-        print('https://www.epa.gov/airmarkets/field-audit-checklist_tool-fact-api')
-        print('The key should be placed in $HOME/.epaapirc')
-        print('Contents of the file should be as follows')
-        print('key: apikey')
-        print('url: https://api.epa.gov/FACT/1.0/')
+        print("WARNING: your api key for EPA data was not found")
+        print("Please obtain a key from")
+        print("https://www.epa.gov/airmarkets/field-audit-checklist_tool-fact-api")
+        print("The key should be placed in $HOME/.epaapirc")
+        print("Contents of the file should be as follows")
+        print("key: apikey")
+        print("url: https://api.epa.gov/FACT/1.0/")
         sys.exit()
     return data
 
@@ -196,16 +198,18 @@ def get_lookups():
     # 6-7 probably ok
     # higher values should be flagged.
 
+
 def quarter2date(year, quarter):
-    if quarter  == 1:
-       dt = datetime.datetime(year, 1,1)
-    elif quarter  == 2:
-       dt = datetime.datetime(year, 4,1)
-    elif quarter  == 3:
-       dt = datetime.datetime(year, 7,1)
-    elif quarter  == 4:
-       dt = datetime.datetime(year, 11,1)
+    if quarter == 1:
+        dt = datetime.datetime(year, 1, 1)
+    elif quarter == 2:
+        dt = datetime.datetime(year, 4, 1)
+    elif quarter == 3:
+        dt = datetime.datetime(year, 7, 1)
+    elif quarter == 4:
+        dt = datetime.datetime(year, 11, 1)
     return dt
+
 
 def addquarter(rdate):
     """
@@ -226,29 +230,31 @@ def addquarter(rdate):
     newdate = datetime.datetime(year, month, 1, 0)
     return newdate
 
+
 def get_datelist_sub(r1, r2):
     rlist = []
     qt1 = findquarter(r1)
     yr1 = r1.year
- 
+
     qt2 = findquarter(r2)
     yr2 = r2.year
     done = False
-    iii=0
-    while not done: 
-       rlist.append(quarter2date(yr1, qt1))
-       if yr1 > yr2 : 
-          done=True
-       elif yr1==yr2 and qt1 == qt2:
-          done=True
-       qt1 += 1
-       if qt1 > 4: 
-          qt1 = 1
-          yr1 += 1
-       iii+=0
-       if iii > 30: break
-    return rlist   
-       
+    iii = 0
+    while not done:
+        rlist.append(quarter2date(yr1, qt1))
+        if yr1 > yr2:
+            done = True
+        elif yr1 == yr2 and qt1 == qt2:
+            done = True
+        qt1 += 1
+        if qt1 > 4:
+            qt1 = 1
+            yr1 += 1
+        iii += 0
+        if iii > 30:
+            break
+    return rlist
+
 
 def get_datelist(rdate):
     """
@@ -262,7 +268,7 @@ def get_datelist(rdate):
     startdate to end date.
     """
     if isinstance(rdate, list):
-       rdatelist = get_datelist_sub(rdate[0], rdate[1])
+        rdatelist = get_datelist_sub(rdate[0], rdate[1])
     else:
         rdatelist = [rdate]
     return rdatelist
@@ -299,16 +305,16 @@ def get_so2(df):
     drop columns that are not in keep.
     """
     keep = [
-        #"DateHour",
+        # "DateHour",
         "time local",
-        #"time",
+        # "time",
         "OperatingTime",
-        #"HourLoad",
+        # "HourLoad",
         # "u so2_lbs",
         "so2_lbs",
-        #"AdjustedFlow",
-        #"UnadjustedFlow",
-        #"FlowMODC",
+        # "AdjustedFlow",
+        # "UnadjustedFlow",
+        # "FlowMODC",
         "SO2MODC",
         "unit",
         "stackht",
@@ -318,7 +324,8 @@ def get_so2(df):
     ]
     df = keepcols(df, keep)
     print(df)
-    if not df.empty: df = df[df['oris'] != 'None']
+    if not df.empty:
+        df = df[df["oris"] != "None"]
     return df
 
 
@@ -341,9 +348,12 @@ class EpaApiObject:
         self.df = pd.DataFrame()
         self.fname = fname
         self.datefmt = "%Y %m %d %H:%M"
-        if fdir: self.fdir=fdir
-        else: self.fdir = './apifiles/'
-        if self.fdir[-1] != '/' : self.fdir += '/'
+        if fdir:
+            self.fdir = fdir
+        else:
+            self.fdir = "./apifiles/"
+        if self.fdir[-1] != "/":
+            self.fdir += "/"
         # returns None if filename does not exist.
         # if prompt True then will ask for new filename if does not exist.
         fname2 = get_filename(self.fdir + fname, prompt)
@@ -352,7 +362,7 @@ class EpaApiObject:
         getboolean = True
         if fname2:
             print("Loading from file ", self.fdir + self.fname)
-            self.fname =  fname2
+            self.fname = fname2
             self.df, getboolean = self.load()
         elif fname:
             self.fname = self.fdir + fname
@@ -364,17 +374,12 @@ class EpaApiObject:
             if save:
                 self.save()
 
-
     def set_filename(self, fname):
         self.fname = fname
 
     def load(self):
         chash = {"mid": str, "oris": str}
-        df = pd.read_csv(
-            self.fname,
-            index_col=[0],
-            converters=chash,
-            parse_dates=True)
+        df = pd.read_csv(self.fname, index_col=[0], converters=chash, parse_dates=True)
         # df = pd.read_csv(self.fname, index_col=[0])
         return df, True
 
@@ -404,7 +409,6 @@ class EpaApiObject:
     def return_empty(self):
         return pd.DataFrame()
 
-
     def get_raw_data(self):
         data = sendrequest(self.getstr)
         if data.status_code != 200:
@@ -417,7 +421,7 @@ class EpaApiObject:
         try:
             self.status_code = data.status_code
         except:
-            self.status_code = 'None'
+            self.status_code = "None"
         try:
             jobject = data.json()
         except BaseException:
@@ -437,15 +441,7 @@ class EmissionsCall(EpaApiObject):
     Attributes
     """
 
-    def __init__(
-            self,
-            oris,
-            mid,
-            year,
-            quarter,
-            fname=None,
-            save=True,
-            prompt=False):
+    def __init__(self, oris, mid, year, quarter, fname=None, save=True, prompt=False):
         self.oris = oris  # oris code of facility
         self.mid = mid  # monitoring location id.
         self.year = str(year)
@@ -457,66 +453,62 @@ class EmissionsCall(EpaApiObject):
         self.so2name = "SO2CEMReportedSO2MassRate"
         self.so2nameB = "UnadjustedSO2"
         super().__init__(fname, save, prompt)
-        #if 'DateHour' in df.columns:
+        # if 'DateHour' in df.columns:
         #    df = df.drop(['DateHour'], axis=1)
-        
 
     def create_getstr(self):
         # for locationID in unitra:
         # efile = "efile.txt"
         estr = "emissions/hourlyData/csv"
-        getstr = quote("/".join(
-            [estr, str(self.oris), str(self.mid), self.year, self.quarter]
-        ))
+        getstr = quote(
+            "/".join([estr, str(self.oris), str(self.mid), self.year, self.quarter])
+        )
         return getstr
 
     def load(self):
         # Emissions call
-        #datefmt = "%Y %m %d %H:%M"
-        datefmt =  self.datefmt
+        # datefmt = "%Y %m %d %H:%M"
+        datefmt = self.datefmt
         datefmt2 = "%Y %m %d %H:%M:%S"
         chash = {"mid": str, "oris": str, "unit": str}
-        df = pd.read_csv(
-            self.fname,
-            index_col=[0],
-            converters=chash,
-            parse_dates=False)
+        df = pd.read_csv(self.fname, index_col=[0], converters=chash, parse_dates=False)
         # if not df.empty:
         if not df.empty:
-            self.status_code=200
-            print('SO2 DATA EXISTS')
+            self.status_code = 200
+            print("SO2 DATA EXISTS")
             # check for  two date formats.
 
             # -----------------------------------------
             def newdate(x):
                 rval = x["time local"]
-                if isinstance(rval, float): 
-                   if np.isnan(rval):
-                      return pd.NaT
-                    
-                rval = rval.replace('-',' ')
+                if isinstance(rval, float):
+                    if np.isnan(rval):
+                        return pd.NaT
+
+                rval = rval.replace("-", " ")
                 rval = rval.strip()
-                fail=0
-                try: 
-                   rval = datetime.datetime.strptime(rval,datefmt)
+                fail = 0
+                try:
+                    rval = datetime.datetime.strptime(rval, datefmt)
                 except:
-                   fail = 1
-                if fail == 1: 
-                    try: 
-                       rval = datetime.datetime.strptime(rval,datefmt2)
+                    fail = 1
+                if fail == 1:
+                    try:
+                        rval = datetime.datetime.strptime(rval, datefmt2)
                     except:
-                       fail = 2
-                       print(self.fname)
-                       print('WARNING: Could not parse date ' + rval)
+                        fail = 2
+                        print(self.fname)
+                        print("WARNING: Could not parse date " + rval)
                 return rval
+
             # -----------------------------------------
 
             df["time local"] = df.apply(newdate, axis=1)
-            #if 'DateHour' in df.columns:
+            # if 'DateHour' in df.columns:
             #    df = df.drop(['DateHour'], axis=1)
         # df = pd.read_csv(self.fname, index_col=[0])
         else:
-            print('NO SO2 DATA in FILE')
+            print("NO SO2 DATA in FILE")
         return df, False
 
     def return_empty(self):
@@ -618,12 +610,12 @@ class EmissionsCall(EpaApiObject):
             try:
                 rdt = datetime.datetime.strptime(xxx["DateHour"], fmt)
             except BaseException:
-                #print("LINE WITH NO DATE :", xxx["DateHour"], ":")
+                # print("LINE WITH NO DATE :", xxx["DateHour"], ":")
                 rdt = pd.NaT
             return rdt
 
         df["time local"] = df.apply(newdate, axis=1)
-        df = df.drop(['DateHour'], axis=1)
+        df = df.drop(["DateHour"], axis=1)
         return df
 
     def convert_cols(self, df):
@@ -681,15 +673,15 @@ class EmissionsCall(EpaApiObject):
         # if operating time is zero then map to 0 (it is '' in file)
         optime = "OperatingTime"
         cname = self.so2name
-        df["so2_lbs"] = df.apply(
-            lambda row: getmass(
-                row[optime],
-                row[cname]),
-            axis=1)
-        temp = df[['time local', 'so2_lbs',cname, optime]]
-        temp = df[df['OperatingTime']>1.0]
-        print('Operating Time greater than 1 ')
-        print(temp[['oris','unit','OperatingTime','time local','so2_lbs',self.so2name]])
+        df["so2_lbs"] = df.apply(lambda row: getmass(row[optime], row[cname]), axis=1)
+        temp = df[["time local", "so2_lbs", cname, optime]]
+        temp = df[df["OperatingTime"] > 1.0]
+        print("Operating Time greater than 1 ")
+        print(
+            temp[
+                ["oris", "unit", "OperatingTime", "time local", "so2_lbs", self.so2name]
+            ]
+        )
         # -------------------------------------------------------------
         # these were checks to see what values the fields were holding.
         # temp is values that are not valid
@@ -753,14 +745,7 @@ class Emissions:
         self.so2name = "SO2CEMReportedSO2MassRate"
         self.so2nameB = "UnadjustedSO2"
 
-    def add(
-        self,
-        oris,
-        locationID,
-        year,
-        quarter,
-        logfile="warnings.emit.txt",
-        ):
+    def add(self, oris, locationID, year, quarter, logfile="warnings.emit.txt"):
         """
         oris : int
         locationID : str
@@ -792,8 +777,8 @@ class Emissions:
         locationID = str(locationID)
         ec = EmissionsCall(oris, locationID, year, quarter)
         df = ec.df
-        #print('EMISSIONS CALL to DF', year, quarter, locationID)
-        #print(df[0:10])
+        # print('EMISSIONS CALL to DF', year, quarter, locationID)
+        # print(df[0:10])
         if self.df.empty:
             self.df = df
         elif not df.empty:
@@ -877,14 +862,7 @@ class MonitoringPlan(EpaApiObject):
 
     """
 
-    def __init__(
-            self,
-            oris,
-            mid,
-            date,
-            fname="Mplans.csv",
-            save=True,
-            prompt=False):
+    def __init__(self, oris, mid, date, fname="Mplans.csv", save=True, prompt=False):
         self.oris = oris  # oris code of facility
         self.mid = mid  # monitoring location id.
         self.date = date  # date
@@ -892,9 +870,10 @@ class MonitoringPlan(EpaApiObject):
         super().__init__(fname, save, prompt)
 
     def to_dict(self, unit=None):
-        if self.df.empty: return None
+        if self.df.empty:
+            return None
         if unit:
-            df = self.df[self.df['name'] == unit]
+            df = self.df[self.df["name"] == unit]
         else:
             df = self.df.copy()
         try:
@@ -906,28 +885,29 @@ class MonitoringPlan(EpaApiObject):
     def load(self):
         # Multiple mplans may be saved to the same csv file.
         # so this may return an emptly dataframe
-      
+
         # returns empty dataframe and flag to send request.
-        #return pd.DataFrame(), True
-        #df = super().load()
-        chash = {"mid": str, "oris": str, "name":str}
+        # return pd.DataFrame(), True
+        # df = super().load()
+        chash = {"mid": str, "oris": str, "name": str}
         df = pd.read_csv(self.fname, index_col=[0], converters=chash)
         self.dfall = df.copy()
         df = df[df["oris"] == self.oris]
         df = df[df["mid"] == self.mid]
-        if not df.empty: self.status_code=200
+        if not df.empty:
+            self.status_code = 200
         return df, True
 
     def save(self):
         # do not want to overwrite other mplans in the file.
         df = pd.DataFrame()
         try:
-            df, bval  = self.load()
+            df, bval = self.load()
         except BaseException:
             pass
         if not self.dfall.empty:
             df = pd.concat([self.dfall, self.df], sort=True)
-            df = df.drop_duplicates(subset=["oris", "name","request_date"])
+            df = df.drop_duplicates(subset=["oris", "name", "request_date"])
             df.to_csv(self.fname)
         elif not self.df.empty:
             self.df.to_csv(self.fname)
@@ -962,7 +942,7 @@ class MonitoringPlan(EpaApiObject):
 
         # first go through the unitStackConfigurations
         # sometimes a unit can have more than one unitStack.
-        # TODO - not sure how to handle this. 
+        # TODO - not sure how to handle this.
         # y2009 3788 oris has this issue but both unit stacks have
         # the same stack height so it is not an issue.
 
@@ -976,19 +956,19 @@ class MonitoringPlan(EpaApiObject):
             # this maps the unitid to the stack id.
             # after reading in the data, go back and assign
             # stack height to the unit based on the stackconfig.
-            if 'unitId' in stackconfig.keys():
-                name = stackconfig['unitId']
+            if "unitId" in stackconfig.keys():
+                name = stackconfig["unitId"]
                 if name in shash.keys():
-                   wstr = '-----------------------------\n'
-                   wstr += 'WARNING: unit ' + name  + '\n'
-                   wstr +=  ' oris; ' + self.oris + '\n'
-                   wstr +=  'has multiple unitStacks \n'
-                   wstr +=  shash[name] + ' ' + stackconfig["unitStack"]
-                   wstr += '-----------------------------\n'
-                   print(wstr)
+                    wstr = "-----------------------------\n"
+                    wstr += "WARNING: unit " + name + "\n"
+                    wstr += " oris; " + self.oris + "\n"
+                    wstr += "has multiple unitStacks \n"
+                    wstr += shash[name] + " " + stackconfig["unitStack"]
+                    wstr += "-----------------------------\n"
+                    print(wstr)
                 shash[name] = stackconfig["unitStack"]
             else:
-                print('STACKconfig')
+                print("STACKconfig")
                 print(stackconfig)
 
         # next through the monitoringLocations
@@ -998,36 +978,36 @@ class MonitoringPlan(EpaApiObject):
             name = unithash["name"]
             dhash["name"] = name
             if name in shash.keys():
-                dhash['stackunit'] = shash[name]
+                dhash["stackunit"] = shash[name]
             else:
-                dhash['stackunit'] = name
+                dhash["stackunit"] = name
 
             dhash["isunit"] = unithash["isUnit"]
             dhash["stackname"] = stackname
             for att in unithash["locationAttributes"]:
                 if "stackHeight" in att.keys():
-                    print('stackheight' + name)
+                    print("stackheight" + name)
                     print(att["stackHeight"])
-                   
-                    try: 
-                        dhash["stackht"] = float(att["stackHeight"]) *ft2m
-                    except:
-                        dhash["stackht"] =  np.NaN
-                else:
-                    dhash["stackht"] =  np.NaN
 
-                #dhash["crossAreaExit"] = att["crossAreaExit"]
-                #dhash["crossAreaFlow"] = att["crossAreaFlow"]
-                #dhash["locID"] = att["locId"]
+                    try:
+                        dhash["stackht"] = float(att["stackHeight"]) * ft2m
+                    except:
+                        dhash["stackht"] = np.NaN
+                else:
+                    dhash["stackht"] = np.NaN
+
+                # dhash["crossAreaExit"] = att["crossAreaExit"]
+                # dhash["crossAreaFlow"] = att["crossAreaFlow"]
+                # dhash["locID"] = att["locId"]
                 # dhash["isunit"] = att["isUnit"]
                 # dlist.append(dhash)
-            #for method in unithash["monitoringMethods"]:
+            # for method in unithash["monitoringMethods"]:
             #    if method["parameterCode"] == "SO2":
             #        dhash["parameterCode"] = "SO2"
-                    #dhash["methodCode"] = method["methodCode"]
-                    #dhash["subDataCode"] = method["subDataCode"]
-                    #dhash["parameterCodeDesc"] = method["parameterCodeDesc"]
-            #for method in unithash["emissionsFormulas"]:
+            # dhash["methodCode"] = method["methodCode"]
+            # dhash["subDataCode"] = method["subDataCode"]
+            # dhash["parameterCodeDesc"] = method["parameterCodeDesc"]
+            # for method in unithash["emissionsFormulas"]:
             #    if method["parameterCode"] == "SO2":
             #        elist = [
             #            "formulaId",
@@ -1036,38 +1016,37 @@ class MonitoringPlan(EpaApiObject):
             #            "formulaEquation",
             #            "equationCodeDesc",
             #        ]
-             #       for val in elist:
-             #           dhash[val] = method[val]
+            #       for val in elist:
+            #           dhash[val] = method[val]
             dhash["oris"] = self.oris
             dhash["mid"] = self.mid
             dhash["request_date"] = self.date
             dlist.append(dhash)
         df = pd.DataFrame(dlist)
-        nseries = df.set_index('name')
-        nseries = nseries['stackht']
+        nseries = df.set_index("name")
+        nseries = nseries["stackht"]
         nhash = nseries.to_dict()
-        def find_stackht(name, stackht, shash, nhash):
-            print('zzz', stackht)
-            if pd.isna(stackht):
-               if name in shash.keys():
-                   sid = shash[name]      
-                   stackht = nhash[sid]
-               else:
-                   ahash = dict((y,x) for x,y in shash.items())
-                   if name in ahash.keys():
-                      sid = ahash[name]
-                      stackht = nhash[sid] 
-            return stackht
-        print('df', df)
-        #df['stackht2'] = df.apply(lambda row: find_stackht(row['name'], row['stackht'], shash, nhash), axis=1)      
-        df['stackht'] = df.apply(lambda row: find_stackht(row['name'], row['stackht'], shash, nhash), axis=1)      
-        df['stackht_unit'] = 'm'
-        #print('MPLAN MPLAN MPLAN ***************************')
-        #print('MPLAN MPLAN MPLAN ***************************')
-        #print(df)
-        #print('***************************')    
 
-        #print('MPLAN DF------\n', df)
+        def find_stackht(name, stackht, shash, nhash):
+            if pd.isna(stackht):
+                # this handles case when height is specified for the stackId
+                # and not the unitId
+                if name in shash.keys():
+                    sid = shash[name]
+                    stackht = nhash[sid]
+                # this handles case when height is specified for the unitId
+                # and not the stackId
+                else:
+                    ahash = dict((y, x) for x, y in shash.items())
+                    if name in ahash.keys():
+                        sid = ahash[name]
+                        stackht = nhash[sid]
+            return stackht
+
+        df["stackht"] = df.apply(
+            lambda row: find_stackht(row["name"], row["stackht"], shash, nhash), axis=1
+        )
+        df["stackht_unit"] = "m"
         return df
 
         # Then have list of dicts
@@ -1161,32 +1140,38 @@ class FacilitiesData(EpaApiObject):
         self.plan_hash = {}
         super().__init__(fname, save, prompt)
 
-
     def process_time_fields(self, df):
+        """
+        time fields give year and quarter.
+        This converts them to a datetime object with
+        date at beginning of quarter.
+        """
 
         def process_unit_time(instr):
             instr = str(instr)
             # there are many None in end time field.
-            try: 
+            try:
                 year = int(instr[0:4])
             except:
                 return None
             quarter = int(instr[4])
-            if quarter  == 1:
-               dt = datetime.datetime(year, 1,1)
-            elif quarter  == 2:
-               dt = datetime.datetime(year, 4,1)
-            elif quarter  == 3:
-               dt = datetime.datetime(year, 7,1)
-            elif quarter  == 4:
-               dt = datetime.datetime(year, 10,1)
+            if quarter == 1:
+                dt = datetime.datetime(year, 1, 1)
+            elif quarter == 2:
+                dt = datetime.datetime(year, 4, 1)
+            elif quarter == 3:
+                dt = datetime.datetime(year, 7, 1)
+            elif quarter == 4:
+                dt = datetime.datetime(year, 10, 1)
             return dt
-        df['begin time'] =  df.apply(lambda row: process_unit_time(row['begin time']),
-                      axis=1)
-        df['end time'] = df.apply(lambda row: process_unit_time(row['end time']),
-                      axis=1)
-        return df
 
+        df["begin time"] = df.apply(
+            lambda row: process_unit_time(row["begin time"]), axis=1
+        )
+        df["end time"] = df.apply(
+            lambda row: process_unit_time(row["end time"]), axis=1
+        )
+        return df
 
     def __str__(self):
         cols = self.df.columns
@@ -1203,6 +1188,8 @@ class FacilitiesData(EpaApiObject):
         """
         llcrnr : tuple (float,float)
         urcrnr : tuple (float,float)
+        returns list of oris codes in box defined by
+        llcrnr and urcrnr
         """
         dftemp = obs_util.latlonfilter(self.df, llcrnr, urcrnr)
         orislist = dftemp["oris"].unique()
@@ -1215,8 +1202,8 @@ class FacilitiesData(EpaApiObject):
         list of state abbreviations
         """
         statelist = []
-        temp = self.df[self.df['oris'].isin(orislist)]
-        return temp['state'].unique() 
+        temp = self.df[self.df["oris"].isin(orislist)]
+        return temp["state"].unique()
 
     def get_units(self, oris):
         """
@@ -1235,14 +1222,14 @@ class FacilitiesData(EpaApiObject):
         instr = str(instr)
         year = int(instr[0:4])
         quarter = int(instr[4])
-        if quarter  == 1:
-           dt = datetime.datetime(year, 1,1)
-        elif quarter  == 2:
-           dt = datetime.datetime(year, 4,1)
-        elif quarter  == 3:
-           dt = datetime.datetime(year, 7,1)
-        elif quarter  == 4:
-           dt = datetime.datetime(year, 10,1)
+        if quarter == 1:
+            dt = datetime.datetime(year, 1, 1)
+        elif quarter == 2:
+            dt = datetime.datetime(year, 4, 1)
+        elif quarter == 3:
+            dt = datetime.datetime(year, 7, 1)
+        elif quarter == 4:
+            dt = datetime.datetime(year, 10, 1)
         return dt
 
     def get_unit_start(self, oris, unit):
@@ -1250,9 +1237,8 @@ class FacilitiesData(EpaApiObject):
         temp = self.df[self.df["oris"] == oris]
         temp = temp[temp["unit"] == unit]
 
-        
-        start = temp['begin time'].unique()       
-        end = temp['end time'].unique()       
+        start = temp["begin time"].unique()
+        end = temp["end time"].unique()
         sdate = []
         for sss in start:
             sdate.append(self.process_unit_time(sss))
@@ -1264,38 +1250,37 @@ class FacilitiesData(EpaApiObject):
         temp = temp[temp["unit"] == unit]
         temp = self.process_time_fields(temp)
         temp = temp[temp["begin time"] <= sdate]
-        if temp.empty: return None
+        if temp.empty:
+            return None
         # TEMPORARY PRINT STATEMENT
         # print(temp)
 
         def test_end(endtime, current):
             # if endtime None return True
             if isinstance(endtime, pd._libs.tslibs.nattype.NaTType):
-               return True
-            elif not endtime: 
-               return True
+                return True
+            elif not endtime:
+                return True
             # if endtime greater than current return true
             elif endtime >= current:
-               return True
+                return True
             # if endtime less than current time return true
             elif endtime < current:
-               return False 
+                return False
             else:
-               return True
+                return True
 
-        temp['testdate'] = temp.apply(lambda row: test_end(row['end time'], sdate),
-                               axis=1) 
-        print('--------------------------------------------')
-        print('Monitoring Plans available')
-        klist = ['testdate', 'begin time', 'end time', 'unit', 'oris', 'request_string']
+        temp["testdate"] = temp.apply(
+            lambda row: test_end(row["end time"], sdate), axis=1
+        )
+        print("--------------------------------------------")
+        print("Monitoring Plans available")
+        klist = ["testdate", "begin time", "end time", "unit", "oris", "request_string"]
         print(temp[klist])
-        print('--------------------------------------------')
-        temp = temp[temp['testdate'] == True]
-        rstr = temp['request_string'].unique()       
+        print("--------------------------------------------")
+        temp = temp[temp["testdate"] == True]
+        rstr = temp["request_string"].unique()
         return rstr
-
-        
-
 
     def unpack(self, data):
         """
@@ -1331,47 +1316,81 @@ class FacilitiesData(EpaApiObject):
         # dlist = [{'dog': 2}, {'dog':2}] instead of
         # dlist = [{'dog': 1}, {'dog':2}]
 
+        slist = []
         for val in data["data"]:
             ahash = {}
             ahash["oris"] = str(val["orisCode"])
             ahash["facility_name"] = val["name"]
             ahash["latitude"] = val["geographicLocation"]["latitude"]
             ahash["longitude"] = val["geographicLocation"]["longitude"]
-            state1 = val['state']
-            ahash["state"] = state1['abbrev']
+            state1 = val["state"]
+            ahash["state"] = state1["abbrev"]
             # ahash['time_offset'] = get_timezone_offset(ahash['latitude'],
             #                       ahash['longitude'])
             # keep track of which locations belong to a plan
-            plan_number=1
+            plan_number = 1
             # list 2
+            for sid in val["units"]:
+                unithash = {}
+                unitid = sid["unitId"]
+                unithash["unit"] = unitid
+                unithash["oris"] = ahash["oris"]
+                for gid in sid["generators"]:
+                    capacity = gid["nameplateCapacity"]
+                    # capacity_hash['unitid'] = capacity
+                    unithash["capacity"] = capacity
+                for gid in sid["fuels"]:
+                    if gid["indicatorDescription"].strip() == "Primary":
+                        fuel = gid["fuelCode"]
+                        # fuel_hash['unitid'] = fuel
+                        unithash["primary_fuel"] = fuel
+                    else:
+                        unithash["primary_fuel"] = np.NaN
+                for gid in sid["controls"]:
+                    if gid["parameterCode"].strip() == "SO2":
+                        control = gid["controlCode"]
+                        # control_hash['unitid'] = control
+                        unithash["so2_contro"] = control
+                    else:
+                        unithash["so2_contro"] = np.NaN
+                slist.append(unithash)
+            unitdf = pd.DataFrame(slist)
+
             for sid in val["monitoringPlans"]:
                 bhash = {}
-                
-                #if sid["status"] == "Active":
-                bhash['plan number'] = plan_number
-                bhash['status'] = sid["status"]
+
+                # if sid["status"] == "Active":
+                bhash["plan number"] = plan_number
+                bhash["status"] = sid["status"]
                 bhash["begin time"] = str(sid["beginYearQuarter"])
                 bhash["end time"] = str(sid["endYearQuarter"])
-                #bhash["state"] = str(sid["abbrev"])
+                # bhash["state"] = str(sid["abbrev"])
                 plan_name = []
                 blist = []
                 for unit in sid["monitoringLocations"]:
-                        chash = {}
-                        chash["unit"] = unit["name"]
-                        chash["isunit"] = unit["isUnit"]
-                        chash.update(ahash)
-                        chash.update(bhash)
-                        blist.append(chash)
-                        #dlist.append(chash)
-                        plan_name.append(chash["unit"])
+                    chash = {}
+                    chash["unit"] = unit["name"]
+                    chash["isunit"] = unit["isUnit"]
+                    chash.update(ahash)
+                    chash.update(bhash)
+                    blist.append(chash)
+                    # dlist.append(chash)
+                    plan_name.append(chash["unit"])
                 plan_name.sort()
-                request_string = quote(str.join(',',plan_name)) 
-                self.plan_hash[plan_number] = request_string        
+                request_string = quote(str.join(",", plan_name))
+                self.plan_hash[plan_number] = request_string
                 for hhh in blist:
-                    hhh['request_string'] = request_string
-                plan_number += 1 
+                    hhh["request_string"] = request_string
+                plan_number += 1
                 dlist.extend(blist)
+
         df = pd.DataFrame(dlist)
+        print(unitdf[0:10])
+        print(df[0:10])
+        df = pd.merge(
+            df, unitdf, how="left", left_on=["unit", "oris"], right_on=["unit", "oris"]
+        )
+        print(df[0:10])
         return df
 
 
@@ -1416,7 +1435,8 @@ def unpack_response(dhash, deep=100, pid=0):
         else:
             rstr += "\n"
     return rstr
- 
+
+
 def get_monitoring_plan(oris, mid, mrequest, date1, dflist):
     """
     oris : oris code
@@ -1425,23 +1445,23 @@ def get_monitoring_plan(oris, mid, mrequest, date1, dflist):
     date1 : date to request
     dflist : in/out  list of tuples [(oris, mid, stackht)]
     """
-    # adds to list of oris, mid, stackht which will later be turned into 
+    # adds to list of oris, mid, stackht which will later be turned into
     # a dataframe with that information.
-    status_code = 204    
-    iii=0
+    status_code = 204
+    iii = 0
     mhash = None
     for mr in mrequest:
-            print('Get Monitoring Plan ' + mr)
-            plan = MonitoringPlan(str(oris), mr, date1)
-            status_code = plan.status_code
-            mhash = plan.to_dict(mid)
+        print("Get Monitoring Plan " + mr)
+        plan = MonitoringPlan(str(oris), mr, date1)
+        status_code = plan.status_code
+        mhash = plan.to_dict(mid)
     if mhash:
         if len(mhash) > 1:
             print(
                 "CEMS class WARNING: more than one \
                   Monitoring location for this unit\n"
             )
-            print(str(oris) + ' ' +  str(mid) + '---')
+            print(str(oris) + " " + str(mid) + "---")
             for val in mhash.keys():
                 print(val, mhash[val])
             sys.exit()
@@ -1452,16 +1472,17 @@ def get_monitoring_plan(oris, mid, mrequest, date1, dflist):
         stackht = None
         istr = "\n" + "Could not retrieve stack height from monitoring plan \n"
         istr += "Please enter stack height (in meters) \n"
-        istr += "for oris " + str(oris) + ' and unit' + str(mid)+ " \n"
+        istr += "for oris " + str(oris) + " and unit" + str(mid) + " \n"
         test = input(istr)
         try:
-           stackht = float(test)
+            stackht = float(test)
         except:
-           stackht = None
+            stackht = None
     dflist.append((str(oris), mid, stackht))
     return dflist
 
-def add_data_area(rdate, area, verbose=True): 
+
+def add_data_area(rdate, area, verbose=True):
     fac = FacilitiesData()
     llcrnr = (area[0], area[1])
     urcrnr = (area[2], area[3])
@@ -1509,22 +1530,19 @@ class CEMS:
         statuslist = []
         for ndate in datelist:
             quarter = findquarter(ndate)
-            print(str(oris) + ' ' + str(mid) + ' Loading data for quarter ' + str(quarter))
-            status = self.emit.add(
-                oris,
-                mid,
-                ndate.year,
-                quarter,
+            print(
+                str(oris) + " " + str(mid) + " Loading data for quarter " + str(quarter)
             )
+            status = self.emit.add(oris, mid, ndate.year, quarter)
             if status == 200:
                 self.orislist.append((oris, mid))
                 write_status_message(status, oris, mid, quarter, "log.txt")
             else:
-                write_status_message(status, oris, 'no mp ' +
-                                 str(mid), quarter, "log.txt")
+                write_status_message(
+                    status, oris, "no mp " + str(mid), quarter, "log.txt"
+                )
             statuslist.append(status)
         return statuslist
-
 
     def add_data(self, rdate, alist, area=True, verbose=True):
         # CEMS class
@@ -1597,41 +1615,42 @@ class CEMS:
                 # to reduce number of requests, the monitoring plan is only
                 # requested for the first date which returns a valid monitoring
                 # plan.
-     
-                # find first valid monitoringplan by date. 
+
+                # find first valid monitoringplan by date.
                 mrequest = None
-                iii=0
+                iii = 0
                 for udate in datelist:
                     mrequest = fac.get_unit_request(oris, mid, udate)
-                    if mrequest: break
+                    if mrequest:
+                        break
                 # write to message file which monitoring plan was found.
-                if not mrequest: 
-                   with open('MESSAGE.txt', 'a') as fid :
-                       fid.write(' No monitoring plan for ')
-                       fid.write(' oris: ' +  str(oris))
-                       fid.write(' mid: ' +  str(mid))
-                       fid.write(' date: ' +  datelist[0].strftime("%y %m/%d") )
-                       fid.write('\n')
+                if not mrequest:
+                    with open("MESSAGE.txt", "a") as fid:
+                        fid.write(" No monitoring plan for ")
+                        fid.write(" oris: " + str(oris))
+                        fid.write(" mid: " + str(mid))
+                        fid.write(" date: " + datelist[0].strftime("%y %m/%d"))
+                        fid.write("\n")
                 else:
-                    with open('MESSAGE.txt', 'a') as fid:
-                       fid.write(' EXISTS  monitoring plan for ')
-                       fid.write(' oris: ' +  str(oris))
-                       fid.write(' mid: ' +  str(mid))
-                       fid.write(' date: ' +  datelist[0].strftime("%y %m/%d") )
-                       fid.write('\n')
+                    with open("MESSAGE.txt", "a") as fid:
+                        fid.write(" EXISTS  monitoring plan for ")
+                        fid.write(" oris: " + str(oris))
+                        fid.write(" mid: " + str(mid))
+                        fid.write(" date: " + datelist[0].strftime("%y %m/%d"))
+                        fid.write("\n")
 
                     # update dflist from the monitoring plan.
                     dflist = get_monitoring_plan(oris, mid, mrequest, udate, dflist)
-                    
+
                     # add emissions for each quarter list.
                     rvalue = self.add_emissions(oris, mid, datelist)
 
         # create dataframe from dflist.
         stackdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])
-       
+
         # keep only the following columns
         # there was a problem when more than one request_string per unit
-        facdf = facdf[['oris','unit','facility_name','latitude','longitude']]    
+        facdf = facdf[["oris", "unit", "facility_name", "latitude", "longitude"]]
 
         # merge stackdf with facdf to get  latitude longitude facility_name
         # information
@@ -1654,75 +1673,80 @@ class CEMS:
         c2 = emitdf.columns.values
         jlist = [x for x in c1 if x in c2]
 
-        if emitdf.empty: return emitdf
-        emitdf = emitdf.dropna(axis=0, subset=['so2_lbs'])
+        if emitdf.empty:
+            return emitdf
+        emitdf = emitdf.dropna(axis=0, subset=["so2_lbs"])
 
         def badrow(rrr):
-            test1=True
-            test2=True
-            if rrr['so2_lbs'] == 0: test1 = False
-            if not rrr['so2_lbs'] : test1 = False
-            
-            if rrr['time local'] == pd.NaT: test2=False
- 
-            return (test1 or test2)
+            test1 = True
+            test2 = True
+            if rrr["so2_lbs"] == 0:
+                test1 = False
+            if not rrr["so2_lbs"]:
+                test1 = False
+
+            if rrr["time local"] == pd.NaT:
+                test2 = False
+
+            return test1 or test2
 
         # False if no so2_lbs (0 or Nan) and date is NaT.
-        emitdf['goodrow'] = emitdf.apply(badrow, axis=1)
-        emitdf = emitdf[emitdf['goodrow']]
+        emitdf["goodrow"] = emitdf.apply(badrow, axis=1)
+        emitdf = emitdf[emitdf["goodrow"]]
 
-        rowsbefore =  emitdf.shape[0]
-        if not emitdf.empty: 
+        rowsbefore = emitdf.shape[0]
+        if not emitdf.empty:
             # merge data from the facilties DataFrame into the Emissions DataFrame
             emitdf = pd.merge(
                 emitdf,
                 facdf,
                 how="left",
-                #left_on=["oris", "unit"],
-                #right_on=["oris", "unit"],
+                # left_on=["oris", "unit"],
+                # right_on=["oris", "unit"],
                 left_on=jlist,
                 right_on=jlist,
             )
-        rowsafter =  emitdf.shape[0]
+        rowsafter = emitdf.shape[0]
         if rowsafter != rowsbefore:
-           print('WARNING: merge changed number of rows')
-           sys.exit()
+            print("WARNING: merge changed number of rows")
+            sys.exit()
 
-        diag=False
+        diag = False
         if diag:
             for ccc in emitdf.columns.values:
                 try:
                     tempdf = emitdf.dropna(axis=0, subset=[ccc])
-                    print(ccc + ' na dropped', tempdf.shape)
+                    print(ccc + " na dropped", tempdf.shape)
                 except:
-                    print(ccc + ' cannot drop error')            
-        #print('stackht is na ---------------------------------') 
-        #tempdf = emitdf[emitdf['stackht'].isnull()]
-        #print(tempdf[['oris','so2_lbs','unit','time local','stackht']])
-        #emitdf = emitdf.dropna(axis=0, subset=['so2_lbs'])
-        #print('Rows after dropna', emitdf.shape)
-        #tempdf = dropna(axis=0, how='any', inplace=True)
-        #print('Rows after dropna 2', tempdf)
-        #temp = emitdf[not emitdf['so2_lbs']]
-        #print('not so2lbs', temp)
-        #temp = emitdf[not emitdf['stackht']]
-        #print('not stackht', temp)
+                    print(ccc + " cannot drop error")
+        # print('stackht is na ---------------------------------')
+        # tempdf = emitdf[emitdf['stackht'].isnull()]
+        # print(tempdf[['oris','so2_lbs','unit','time local','stackht']])
+        # emitdf = emitdf.dropna(axis=0, subset=['so2_lbs'])
+        # print('Rows after dropna', emitdf.shape)
+        # tempdf = dropna(axis=0, how='any', inplace=True)
+        # print('Rows after dropna 2', tempdf)
+        # temp = emitdf[not emitdf['so2_lbs']]
+        # print('not so2lbs', temp)
+        # temp = emitdf[not emitdf['stackht']]
+        # print('not stackht', temp)
 
-        emitdf = emitdf.dropna(axis=0, subset=['so2_lbs'])
+        emitdf = emitdf.dropna(axis=0, subset=["so2_lbs"])
+
         def remove_nans(x):
             if np.isnan(x):
-               return False
+                return False
             elif pd.isna(x):
-               return False
+                return False
             else:
-               return True
-        emitdf['keep'] = emitdf.apply(lambda row: remove_nans(row['so2_lbs']),
-                         axis=1)
-        emitdf = emitdf[emitdf['keep']==True]
-        emitdf.drop(['keep'], axis=1, inplace=True) 
-        #emitdf.fillna(0, inplace=True)
-        #r_duplicates = tempdf.duplicated()
-        #if not np.all(r_duplicates):
+                return True
+
+        emitdf["keep"] = emitdf.apply(lambda row: remove_nans(row["so2_lbs"]), axis=1)
+        emitdf = emitdf[emitdf["keep"] == True]
+        emitdf.drop(["keep"], axis=1, inplace=True)
+        # emitdf.fillna(0, inplace=True)
+        # r_duplicates = tempdf.duplicated()
+        # if not np.all(r_duplicates):
         #   print('Warning: Duplicate rows in the emitdf dataframe')
         #   print(tempdf[tempdf[r_duplicates]])
         #   print('-------------HERE ')
@@ -1735,7 +1759,7 @@ class CEMS:
         #   print(type(temp.values[0]))
         #   print(pd.isna(temp.values[0]))
         #   print(tempdf[tempdf['so2_lbs'].isna()])
-        #   #sys.exit()  
+        #   #sys.exit()
         return emitdf
 
 

@@ -227,10 +227,6 @@ def get_date_fmt(date, verbose=False):
     return fmt
 
 
-
-
-
-
 class CEMSftp(object):
     """
     Class for data from continuous emission monitoring systems (CEMS).
@@ -270,15 +266,15 @@ class CEMSftp(object):
         self.df = pd.DataFrame()
         self.namehash = {}  # if columns are renamed keeps track of original names.
         self.orislist = []
-        
+
         # Each facility may have more than one unit which is specified by the
         # unit id.
 
     def __str__(self):
         return self.info
 
-    #def add_data(self, rdate, states=["md"], download=False, verbose=True):
-    def add_data(self, rdate, alist, area=True, download=True,verbose=True):
+    # def add_data(self, rdate, states=["md"], download=False, verbose=True):
+    def add_data(self, rdate, alist, area=True, download=True, verbose=True):
         """
            gets the ftp url from the retrieve method and then
            loads the data from the ftp site using the load method.
@@ -310,13 +306,13 @@ class CEMSftp(object):
         # ms is 2049 (problem)
         self.fac = FacilitiesData()
         if area:
-           llcrnr = (alist[0], alist[1])
-           urcrnr = (alist[2], alist[3]) 
-           orislist = self.fac.oris_by_area(llcrnr, urcrnr)
-           states = self.fac.state_from_oris(orislist) 
+            llcrnr = (alist[0], alist[1])
+            urcrnr = (alist[2], alist[3])
+            orislist = self.fac.oris_by_area(llcrnr, urcrnr)
+            states = self.fac.state_from_oris(orislist)
         else:
-           orislist = alist
-           states = self.fac.state_from_oris(orislist) 
+            orislist = alist
+            states = self.fac.state_from_oris(orislist)
         self.orislist.extend(orislist)
 
         if isinstance(states, str):
@@ -344,9 +340,8 @@ class CEMSftp(object):
             for st in states:
                 url = self.retrieve(rd, st, download=download, verbose=verbose)
                 self.load(url, verbose=verbose)
-        self.df['SO2MODC'] = 2
+        self.df["SO2MODC"] = 2
         return self.df
-
 
     def retrieve(self, rdate, state, download=True, verbose=False):
         """Short summary.
@@ -395,10 +390,6 @@ class CEMSftp(object):
             efile = fname
         self.info += "File retrieved :" + efile + "\n"
         return efile
-
-
-
-
 
     def columns_rename(self, columns, verbose=False):
         """
@@ -475,64 +466,57 @@ class CEMSftp(object):
 
     def add_info(self, dftemp, datelist):
         if not self.orislist:
-            orislist = dftemp['oris'].unique()
+            orislist = dftemp["oris"].unique()
         else:
             orislist = self.orislist
-            print('ORIS available in ftp download', dftemp['oris'].unique())
-            dftemp = dftemp[dftemp['oris'].isin(orislist)]
-        print('orislist to retrieve', orislist)
-        facdf = self.fac.df[self.fac.df["oris"].isin(map(str,orislist))]
+            print("ORIS available in ftp download", dftemp["oris"].unique())
+            dftemp = dftemp[dftemp["oris"].isin(orislist)]
+        print("orislist to retrieve", orislist)
+        facdf = self.fac.df[self.fac.df["oris"].isin(map(str, orislist))]
         dflist = []
         for oris in orislist:
-            t1 = dftemp[dftemp['oris']==oris]
-            unitsA = t1['unit'].unique()
+            t1 = dftemp[dftemp["oris"] == oris]
+            unitsA = t1["unit"].unique()
             unitsB = self.fac.get_units(oris)
-            print('---------------------------------------')
-            print('ORIS: ' , oris)
-            print('units in FacilitiesData', unitsB)
-            print('units in ftp data', unitsA)
+            print("---------------------------------------")
+            print("ORIS: ", oris)
+            print("units in FacilitiesData", unitsB)
+            print("units in ftp data", unitsA)
             print(datelist)
-            print('---------------------------------------')
+            print("---------------------------------------")
             for mid in unitsA:
-                mrequest = None 
-                iii=0
+                mrequest = None
+                iii = 0
                 for udate in datelist:
                     mrequest = self.fac.get_unit_request(oris, mid, udate)
-                    if mrequest: break
+                    if mrequest:
+                        break
                 if mrequest:
-                   dflist = get_monitoring_plan(oris, mid, mrequest, udate,
-                                                dflist) 
-        stackdf =  pd.DataFrame(dflist, columns = ["oris","unit","stackht"])
-        facdf = facdf[['oris','unit','facility_name','latitude','longitude']]
+                    dflist = get_monitoring_plan(oris, mid, mrequest, udate, dflist)
+        stackdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])
+        facdf = facdf[["oris", "unit", "facility_name", "latitude", "longitude"]]
         facdf = facdf.drop_duplicates()
         facdf = pd.merge(
-                   stackdf,
-                   facdf,
-                   how="left",
-                   left_on=["oris","unit"], 
-                   right_on=["oris","unit"], 
-                )
+            stackdf,
+            facdf,
+            how="left",
+            left_on=["oris", "unit"],
+            right_on=["oris", "unit"],
+        )
         # get facility name from the api.
-        dftemp.drop(['facility_name'],inplace=True, axis=1)
+        dftemp.drop(["facility_name"], inplace=True, axis=1)
         c1 = facdf.columns.values
         c2 = dftemp.columns.values
         jlist = [x for x in c1 if x in c2]
-        #ftemp = facdf[['oris','latitude','longitude','unit','stackht']]
-        #ftemp = ftemp[ftemp['oris']=='1571']
-        #print(ftemp)
-        #print('merging on', jlist)
-        #print(dftemp.dtypes)
-        #print('---')
-        #print(facdf.dtypes)
-        emitdf = pd.merge(
-                     dftemp,
-                     facdf,
-                     how='left',
-                     left_on = jlist,
-                     right_on = jlist,
-                    ) 
+        # ftemp = facdf[['oris','latitude','longitude','unit','stackht']]
+        # ftemp = ftemp[ftemp['oris']=='1571']
+        # print(ftemp)
+        # print('merging on', jlist)
+        # print(dftemp.dtypes)
+        # print('---')
+        # print(facdf.dtypes)
+        emitdf = pd.merge(dftemp, facdf, how="left", left_on=jlist, right_on=jlist)
         return emitdf
-
 
     def load(self, efile, verbose=True):
         """
@@ -546,16 +530,17 @@ class CEMSftp(object):
         """
 
         # pandas read_csv can read either from a file or url.
-        chash={"ORISPL_CODE":str}
-        dftemp = pd.read_csv(efile, sep=",", index_col=False, header=0,
-                             converters=chash)
+        chash = {"ORISPL_CODE": str}
+        dftemp = pd.read_csv(
+            efile, sep=",", index_col=False, header=0, converters=chash
+        )
         columns = list(dftemp.columns.values)
         columns = self.columns_rename(columns, verbose)
         dftemp.columns = columns
-        print('zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz')
-        print('Loading from ftp ' + efile)
+        print("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")
+        print("Loading from ftp " + efile)
         print(columns)
-        print('zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz')
+        print("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")
         if verbose:
             print(columns)
         dfmt = get_date_fmt(dftemp["date"][0], verbose=verbose)
@@ -578,7 +563,7 @@ class CEMSftp(object):
         dftime = dftime.tolist()
         datelist = get_datelist([dftime[0], dftime[-1]])
         dftemp = self.add_info(dftemp, datelist)
-        verbose=True 
+        verbose = True
         if ["year"] in columns:
             dftemp.drop(["year"], axis=1, inplace=True)
         if self.df.empty:

@@ -93,172 +93,172 @@ def create_map(fignum):
 
 
 class ConfigFile(NameList):
+    def __init__(self, fname, working_directory="./"):
+        self.lorder = None
 
-    def __init__(self, fname, working_directory="./"): 
-          self.lorder = None
+        super().__init__(fname, working_directory)
 
-          super().__init__(fname, working_directory)
+        # self.fname
+        # self.nlist  # dictionary
+        # self.descrip
+        # self.wdir   # working directory
+        self.runtest = False
 
-          # self.fname
-          # self.nlist  # dictionary
-          # self.descrip
-          # self.wdir   # working directory
-          self.runtest = False
+        self.bounds = None
+        self.drange = "2106:1:1:2016:2:1"
+        self.hdir = "./"
+        self.tdir = "./"
+        self.quiet = 0
 
-          self.bounds = None
-          self.drange = "2106:1:1:2016:2:1"
-          self.hdir = './'
-          self.tdir = './'
-          self.quiet = 0           
+        # attributes for CEMS data
+        self.cems = True
+        self.heat = 0
+        self.emit_area = 0
+        self.chunks = 5  # number of days in each emittimes file
+        self.spnum = True  # different species for MODC flags
+        self.byunit = True  # split emittimes by unit
+        self.cunits = "PPB"  # ppb or ug/m3
+        self.orislist = "None"
+        self.cemsource = "api"  # get cems data from API or from ftp download
 
-          # attributes for CEMS data
-          self.cems = True
-          self.heat = 0
-          self.emit_area = 0
-          self.chunks = 5        # number of days in each emittimes file
-          self.spnum = True      # different species for MODC flags
-          self.byunit = True     # split emittimes by unit
-          self.cunits = 'PPB'    # ppb or ug/m3
-          self.orislist = "None"
-          self.cemsource = 'api'  #get cems data from API or from ftp download
+        # attributes for obs data
+        self.obs = True
 
-          # attributes for obs data
-          self.obs = True
+        self.tag = "test_run"
+        self.metfmt = "/pub/archives/wrf27km/%Y/wrfout_d01_%Y%m%d.ARL"
 
-          self.tag = 'test_run'         
-          self.metfmt = '/pub/archives/wrf27km/%Y/wrfout_d01_%Y%m%d.ARL'
-     
-          self.write_scripts = None
- 
-          self.create_runs = False
-          self.defaults = False
-          self.results = False
-          if os.path.isfile(fname):      
-              self.read(case_sensitive=False)
-              self.hash2att()
-              self.fileread=True
-          else:
-              self.fileread=False 
+        self.write_scripts = None
+
+        self.create_runs = False
+        self.defaults = False
+        self.results = False
+        if os.path.isfile(fname):
+            self.read(case_sensitive=False)
+            self.hash2att()
+            self.fileread = True
+        else:
+            self.fileread = False
 
     def _load_descrip(self):
         lorder = []
-        sp10 = ' ' * 11
+        sp10 = " " * 11
 
         hstr = "daterange in form YYYY:M:D:YYYY:M:D"
-        self.descrip['DRANGE'] = hstr
-        lorder.append('DRANGE')
+        self.descrip["DRANGE"] = hstr
+        lorder.append("DRANGE")
 
-        hstr="bounding box for data lat:lon:lat:lon \n"
-        hstr+=sp10+ "First pair describes lower left corner. \n"
-        hstr+=sp10+ "Second pair describes upper right corner."
-        self.descrip['AREA'] = hstr
-        lorder.append('AREA')
+        hstr = "bounding box for data lat:lon:lat:lon \n"
+        hstr += sp10 + "First pair describes lower left corner. \n"
+        hstr += sp10 + "Second pair describes upper right corner."
+        self.descrip["AREA"] = hstr
+        lorder.append("AREA")
 
-        hstr = ' path for hysplit executable'
-        self.descrip['hysplitdir'] = hstr
-        lorder.append('hysplitdir')
+        hstr = " path for hysplit executable"
+        self.descrip["hysplitdir"] = hstr
+        lorder.append("hysplitdir")
 
-        hstr = 'top level directory path for outputs'
-        self.descrip['outdir'] = hstr
-        lorder.append('outdir')
-    
-        hstr = 'string. run tag for naming output files such as bash scripts.'
-        self.descrip['tag'] = hstr
-        lorder.append('tag')
+        hstr = "top level directory path for outputs"
+        self.descrip["outdir"] = hstr
+        lorder.append("outdir")
 
-        hstr="int 0 - 2. 0 show all graphs. The graphs will pop up in\n"
+        hstr = "string. run tag for naming output files such as bash scripts."
+        self.descrip["tag"] = hstr
+        lorder.append("tag")
+
+        hstr = "int 0 - 2. 0 show all graphs. The graphs will pop up in\n"
         hstr += sp10 + "groups of 10, \n"
         hstr += sp10 + "1 only show maps, \n"
         hstr += sp10 + "(2) show no graphs"
-        self.descrip['quiet'] = hstr
-        lorder.append('quiet')
+        self.descrip["quiet"] = hstr
+        lorder.append("quiet")
 
+        self.descrip["CEMS"] = "(False) or True"
+        lorder.append("CEMS")
 
-        self.descrip['CEMS'] = '(False) or True'
-        lorder.append('CEMS')
+        hstr = (
+            "(True) or False. Create different species dependent on MODC flag values."
+        )
+        self.descrip["Species"] = hstr
+        lorder.append("Species")
 
-        hstr="(True) or False. Create different species dependent on MODC flag values."
-        self.descrip['Species'] = hstr
-        lorder.append('Species')
-  
-        hstr="value to use in heat field for EMITIMES file"
-        self.descrip['heat'] = hstr
-        lorder.append('heat')
+        hstr = "value to use in heat field for EMITIMES file"
+        self.descrip["heat"] = hstr
+        lorder.append("heat")
 
-        hstr="value to use in area field for EMITIMES file"
-        self.descrip['EmitArea'] = hstr
-        lorder.append('EmitArea')
-   
-        hstr="List of ORIS codes to retrieve data for \n"
-        hstr+= sp10 + "If this value is not set then data for all ORIS codes found \n"
-        hstr+= sp10 + "in the defined area will be retrieved.\n"
-        hstr+= sp10 + "separate multiple codes with : (e.g. 8042:2712:7213)\n"
-        self.descrip['oris'] = hstr
-        lorder.append('oris')
+        hstr = "value to use in area field for EMITIMES file"
+        self.descrip["EmitArea"] = hstr
+        lorder.append("EmitArea")
 
-        hstr="(True) or False). Create EMITIMES for each unit."
-        self.descrip['ByUnit'] = hstr
-        lorder.append('ByUnit')
-       
-        hstr="(5) Integer. Number of days in an EMITIMES file."
-        self.descrip['emitdays'] = hstr
-        lorder.append('emitdays')
-     
-        hstr="(api) Download CEMS data from API or use ftp site. values are api"
+        hstr = "List of ORIS codes to retrieve data for \n"
+        hstr += sp10 + "If this value is not set then data for all ORIS codes found \n"
+        hstr += sp10 + "in the defined area will be retrieved.\n"
+        hstr += sp10 + "separate multiple codes with : (e.g. 8042:2712:7213)\n"
+        self.descrip["oris"] = hstr
+        lorder.append("oris")
+
+        hstr = "(True) or False). Create EMITIMES for each unit."
+        self.descrip["ByUnit"] = hstr
+        lorder.append("ByUnit")
+
+        hstr = "(5) Integer. Number of days in an EMITIMES file."
+        self.descrip["emitdays"] = hstr
+        lorder.append("emitdays")
+
+        hstr = "(api) Download CEMS data from API or use ftp site. values are api"
         hstr += sp10 + "or ftp"
-        self.descrip['cemsource'] = hstr
-        lorder.append('cemsource')
+        self.descrip["cemsource"] = hstr
+        lorder.append("cemsource")
 
-        hstr="(PPB) or ug/m3. If PPB will cause ichem=6 to be set for HYSPLIT runs."
-        self.descrip['unit'] = hstr
-        lorder.append('unit')
+        hstr = "(PPB) or ug/m3. If PPB will cause ichem=6 to be set for HYSPLIT runs."
+        self.descrip["unit"] = hstr
+        lorder.append("unit")
 
-        hstr= '(False) or True. Retrieve AQS data'
-        self.descrip['OBS'] = hstr
-        lorder.append('OBS')
+        hstr = "(False) or True. Retrieve AQS data"
+        self.descrip["OBS"] = hstr
+        lorder.append("OBS")
 
-        hstr="(False) or True. write a default CONTROL.0 and SETP.0 file to \n"
+        hstr = "(False) or True. write a default CONTROL.0 and SETP.0 file to \n"
         hstr += sp10 + "the top level directory"
-        self.descrip['DEFAULTS'] = hstr
-        lorder.append('DEFAULTS')
+        self.descrip["DEFAULTS"] = hstr
+        lorder.append("DEFAULTS")
 
-        hstr="(False) or True. Use CONTROL and SETUP in top level directory to\n" 
-        hstr+=sp10 + "write CONTROL and SETUP files in subdirectories which \n"
-        hstr+=sp10 + "will call EMITIMES files. Also create bash run scripts\n"
-        hstr+=sp10 + "to run hysplit and then c2datem"
-        self.descrip['RUN'] = hstr
-        lorder.append('RUN')
+        hstr = "(False) or True. Use CONTROL and SETUP in top level directory to\n"
+        hstr += sp10 + "write CONTROL and SETUP files in subdirectories which \n"
+        hstr += sp10 + "will call EMITIMES files. Also create bash run scripts\n"
+        hstr += sp10 + "to run hysplit and then c2datem"
+        self.descrip["RUN"] = hstr
+        lorder.append("RUN")
 
-        hstr="Meteorological files to use.\n"
+        hstr = "Meteorological files to use.\n"
         hstr += sp10 + "Format should use python datetime formatting symbols.\n"
         hstr += sp10 + "Examples:\n"
-        hstr += sp10 + '/TopLevelDirectory/wrf27km/%Y/wrfout_d01_%Y%m%d.ARL\n'
-        hstr += sp10 + '/TopLevelDirectory/gdas1/gdas1.%b%y.week\n'
+        hstr += sp10 + "/TopLevelDirectory/wrf27km/%Y/wrfout_d01_%Y%m%d.ARL\n"
+        hstr += sp10 + "/TopLevelDirectory/gdas1/gdas1.%b%y.week\n"
         hstr += sp10 + 'use the word "week" to indicate when files are by week\n'
-        hstr += sp10 + 'week will be replaced by w1, w2, w3... as appropriate.\n'
-        self.descrip['metfile'] = hstr
-        lorder.append('metfile')
+        hstr += sp10 + "week will be replaced by w1, w2, w3... as appropriate.\n"
+        self.descrip["metfile"] = hstr
+        lorder.append("metfile")
 
-        hstr="(False) or True. The bash scripts for running HYSPLIT and then \n"
-        hstr += sp10 + "c2datem must be run first.\n" 
-        hstr+=sp10 + "reads datem output and creates graphs."
-        self.descrip['RESULTS'] = hstr
-        lorder.append('RESULTS')
+        hstr = "(False) or True. The bash scripts for running HYSPLIT and then \n"
+        hstr += sp10 + "c2datem must be run first.\n"
+        hstr += sp10 + "reads datem output and creates graphs."
+        self.descrip["RESULTS"] = hstr
+        lorder.append("RESULTS")
 
         self.lorder = lorder
 
     def test(self, key, original):
         if key in self.nlist.keys():
-           return self.nlist[key]
+            return self.nlist[key]
         else:
-           return original
+            return original
 
-    def str2bool(self,val):
+    def str2bool(self, val):
         if isinstance(val, bool):
             rval = val
-        elif 'true' in val.lower(): 
-            rval =  True
-        elif 'false' in  val.lower(): 
+        elif "true" in val.lower():
+            rval = True
+        elif "false" in val.lower():
             rval = False
         else:
             rval = False
@@ -268,74 +268,72 @@ class ConfigFile(NameList):
         cs = self.cemsource
         cs = cs.lower()
         cs = cs.strip()
-        if cs not in ['ftp','api']:
-           print('Source for CEMS data is not valid')
-           print('Must choose api or ftp')
-           sys.exit()
+        if cs not in ["ftp", "api"]:
+            print("Source for CEMS data is not valid")
+            print("Must choose api or ftp")
+            sys.exit()
         return cs
 
     def process_oris(self):
-        return self.orislist.split(':')
- 
+        return self.orislist.split(":")
+
     def hash2att(self):
-        self.bounds = self.test('area', self.bounds)
-        self.drange = self.test('drange', self.drange)
-        self.tag = self.test('tag',self.tag)
+        self.bounds = self.test("area", self.bounds)
+        self.drange = self.test("drange", self.drange)
+        self.tag = self.test("tag", self.tag)
 
-        self.emit_area = self.test('emitarea', self.emit_area)
+        self.emit_area = self.test("emitarea", self.emit_area)
         self.emit_area = float(self.emit_area)
-        self.heat = self.test('heat', self.heat)
+        self.heat = self.test("heat", self.heat)
         self.heat = float(self.heat)
-        self.cunits = self.test('unit',self.cunits)
-        #------------------------------------------------------ 
-        self.orislist = self.test('oris',self.orislist)
-        self.orislist = self.process_oris()  
-        self.hdir = self.test('hysplitdir', self.hdir)
-        self.tdir = self.test('outdir', self.tdir)
+        self.cunits = self.test("unit", self.cunits)
+        # ------------------------------------------------------
+        self.orislist = self.test("oris", self.orislist)
+        self.orislist = self.process_oris()
+        self.hdir = self.test("hysplitdir", self.hdir)
+        self.tdir = self.test("outdir", self.tdir)
 
-        self.quiet = self.test('quiet', self.quiet)
+        self.quiet = self.test("quiet", self.quiet)
         self.quiet = int(self.quiet)
 
-        self.cemsource = self.test('cemsource', self.cemsource)
+        self.cemsource = self.test("cemsource", self.cemsource)
         self.cemsource = self.process_cemsource()
 
-           
-    
-        self.chunks = self.test('emitdays', self.chunks)
+        self.chunks = self.test("emitdays", self.chunks)
         self.chunks = int(self.chunks)
 
-        self.write_scripts = self.test('scripts', self.write_scripts)
-        self.metfmt = self.test('metfile', self.metfmt)
-       
+        self.write_scripts = self.test("scripts", self.write_scripts)
+        self.metfmt = self.test("metfile", self.metfmt)
+
         # booleans
-        self.byunit = self.str2bool(self.test('byunit', self.byunit))
-        self.spnum = self.str2bool(self.test('species', self.spnum))
-        self.cems = self.str2bool(self.test('cems', self.cems))
-        self.obs = self.str2bool(self.test('obs', self.obs))
-        self.create_runs = self.str2bool(self.test('run', self.create_runs))
-        self.results = self.str2bool(self.test('results', self.results))
-        self.defaults = self.str2bool(self.test('defaults', self.results))
+        self.byunit = self.str2bool(self.test("byunit", self.byunit))
+        self.spnum = self.str2bool(self.test("species", self.spnum))
+        self.cems = self.str2bool(self.test("cems", self.cems))
+        self.obs = self.str2bool(self.test("obs", self.obs))
+        self.create_runs = self.str2bool(self.test("run", self.create_runs))
+        self.results = self.str2bool(self.test("results", self.results))
+        self.defaults = self.str2bool(self.test("defaults", self.results))
 
 
-#options = ConfigFile('CONFIG.S')
+# options = ConfigFile('CONFIG.S')
 
 parser = OptionParser()
-#parser.add_option(
+# parser.add_option(
 #    "-a", type="string", dest="state", default="ND", help="two letter state code (ND)"
-#)
+# )
 parser.add_option(
     "-i",
     type="string",
     dest="configfile",
-    default='CONFIG.S',
-    help="Name of configuration file"
+    default="CONFIG.S",
+    help="Name of configuration file",
 )
 parser.add_option(
     "-p",
     action="store_true",
     dest="print_help",
     default=False,
-    help="Print help for configuration file"
+    help="Print help for configuration file",
 )
 
 (opts, args) = parser.parse_args()
@@ -343,15 +341,15 @@ parser.add_option(
 options = ConfigFile(opts.configfile)
 
 if opts.print_help:
-   print('-------------------------------------------------------------')
-   print('Configuration file options (key words are not case sensitive)')
-   print('-------------------------------------------------------------')
-   print(options.print_help(order=options.lorder))
-   sys.exit()
+    print("-------------------------------------------------------------")
+    print("Configuration file options (key words are not case sensitive)")
+    print("-------------------------------------------------------------")
+    print(options.print_help(order=options.lorder))
+    sys.exit()
 
 if not options.fileread:
-   print('configuration file ' + opts.configfile + ' not found.\ngoodbye')
-   sys.exit()
+    print("configuration file " + opts.configfile + " not found.\ngoodbye")
+    sys.exit()
 
 
 temp = options.drange.split(":")
@@ -389,8 +387,8 @@ if options.runtest and options.cems:
     area = (latll, lonll, latur, lonur)
 
 
-#states = []
-#if options.state:
+# states = []
+# if options.state:
 #    temp = options.state.split(":")
 #    for tt in temp:
 #        states.append(tt.lower())
@@ -437,49 +435,64 @@ ncycle = source_chunks
 if options.defaults:
     from monet.util.svhy import default_setup
     from monet.util.svhy import default_control
-    print('writing control and setup')
+
+    print("writing control and setup")
     # if units='ppb' then ichem=6 is set to output mixing ratios.
     default_setup("SETUP.0", options.tdir, units=options.cunits)
     default_control("CONTROL.0", options.tdir, run_duration, d1, area=area)
 
 if options.results:
-    #from monet.util.svhy import create_runlist
-    #from monet.util.svresults import results
-    #from monet.util.svresults import CemsObs
+    # from monet.util.svhy import create_runlist
+    # from monet.util.svresults import results
+    # from monet.util.svresults import CemsObs
     from monet.util.svresults2 import SVresults
-    from monet.util.svcems import SourceSummary 
+    from monet.util.svcems import SourceSummary
 
     sss = SourceSummary()
     df = sss.load()
     orislist = sss.check_oris(10)
-    svr = SVresults(options.tdir, orislist=orislist, daterange=[d1,d2])
-    #svr.fill_hash()
-    datemfile = options.tag + 'DATEM.txt'
+    svr = SVresults(options.tdir, orislist=orislist, daterange=[d1, d2])
+    # svr.fill_hash()
+    datemfile = options.tag + "DATEM.txt"
+    print("writing datem ", datemfile)
     svr.writedatem(datemfile)
+    sys.exit()
     svr.fill_hash()
-    print('PLOTTING')
+    print("PLOTTING")
     svr.plotall()
-    #runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
-    #results("outfile.txt", runlist)
+    # runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
+    # results("outfile.txt", runlist)
 
 rfignum = 1
 if options.cems:
     from monet.util.svcems import SEmissions
+
     print(options.orislist[0])
     if options.orislist[0] != "None":
-       alist = options.orislist
-       byarea = False
+        alist = options.orislist
+        byarea = False
     else:
-       alist = area
-       byarea= True
-    ef = SEmissions([d1, d2], alist, area=byarea,  tdir=options.tdir, spnum=options.spnum,
-                    tag = options.tag, cemsource=options.cemsource)
+        alist = area
+        byarea = True
+    ef = SEmissions(
+        [d1, d2],
+        alist,
+        area=byarea,
+        tdir=options.tdir,
+        spnum=options.spnum,
+        tag=options.tag,
+        cemsource=options.cemsource,
+    )
     ef.find()
-    if options.quiet ==0: 
+    if options.quiet == 0:
         ef.nowarning_plot(save=True, quiet=False)
     ef.create_emitimes(
-        ef.d1, schunks=source_chunks, tdir=options.tdir, unit=options.byunit,
-                       heat=options.heat, emit_area=options.emit_area
+        ef.d1,
+        schunks=source_chunks,
+        tdir=options.tdir,
+        unit=options.byunit,
+        heat=options.heat,
+        emit_area=options.emit_area,
     )
     rfignum = ef.fignum
     if options.quiet == 1:
@@ -498,30 +511,30 @@ if options.obs:
     import sys
     from monet.util.svobs import SObs
 
-    obs = SObs([d1, d2], area,  tdir=options.tdir)
+    obs = SObs([d1, d2], area, tdir=options.tdir)
     obs.fignum = rfignum
-    obs.find(pload=True, tdir=options.tdir, test=options.runtest,
-              units=options.cunits)
+    obs.find(pload=True, tdir=options.tdir, test=options.runtest, units=options.cunits)
+    obs.check()
     try:
         obs.check()
     except BaseException:
         print("No met data for stations.")
     obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir)
 
-
     # output file with distances and directons from power plants to aqs sites.
     obsfile = obs.csvfile
-    sumfile = 'source_summary.csv'
-    cemsfile = 'cems.csv'
+    sumfile = "source_summary.csv"
+    cemsfile = "cems.csv"
     t1 = os.path.isfile(obsfile)
     t2 = os.path.isfile(sumfile)
     t3 = os.path.isfile(cemsfile)
     if t1 and t2 and t3:
-          from monet.util.svresults import CemsObs
-          from monet.util.svresults import gpd2csv
-          cando = CemsObs(obsfile, cemsfile, sumfile)
-          osum, gsum = cando.make_sumdf()
-          gpd2csv(osum, 'geometry.csv')
+        from monet.util.svresults import CemsObs
+        from monet.util.svresults import gpd2csv
+
+        cando = CemsObs(obsfile, cemsfile, sumfile)
+        osum, gsum = cando.make_sumdf()
+        gpd2csv(osum, "geometry.csv")
 
     obs.plot(save=True, quiet=options.quiet)
     fignum = obs.fignum
@@ -544,23 +557,32 @@ if options.create_runs:
     from monet.util.svhy import RunScript
 
     runlist = create_controls(
-        options.tdir, options.hdir, d1, d2, source_chunks, options.metfmt, units=options.cunits
+        options.tdir,
+        options.hdir,
+        d1,
+        d2,
+        source_chunks,
+        options.metfmt,
+        units=options.cunits,
     )
-    rs = RunScript(options.tag + '.sh', runlist, options.tdir)
+    rs = RunScript(options.tag + ".sh", runlist, options.tdir)
 
 if options.write_scripts:
     from monet.util.svhy import DatemScript
-    if not runlist: 
+
+    if not runlist:
         from monet.util.svhy import create_runlist
+
         runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
-    rs = DatemScript('p1datem_' + options.tag + '.sh', runlist, options.tdir,
-                      options.cunits, poll=1)
-    rs = DatemScript('p2datem_' + options.tag + '.sh', runlist, options.tdir,
-                      options.cunits, poll=2)
-    rs = DatemScript('p3datem_' + options.tag + '.sh', runlist, options.tdir,
-                      options.cunits, poll=3)
-
-
+    rs = DatemScript(
+        "p1datem_" + options.tag + ".sh", runlist, options.tdir, options.cunits, poll=1
+    )
+    rs = DatemScript(
+        "p2datem_" + options.tag + ".sh", runlist, options.tdir, options.cunits, poll=2
+    )
+    rs = DatemScript(
+        "p3datem_" + options.tag + ".sh", runlist, options.tdir, options.cunits, poll=3
+    )
 
 
 ##------------------------------------------------------##

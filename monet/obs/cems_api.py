@@ -346,6 +346,7 @@ class EpaApiObject:
         self.status_code = None
         self.df = pd.DataFrame()
         self.fname = fname
+<<<<<<< HEAD
         self.datefmt = "%Y %m %d %H:%M"
         if fdir:
             self.fdir = fdir
@@ -353,6 +354,14 @@ class EpaApiObject:
             self.fdir = "./apifiles/"
         if self.fdir[-1] != "/":
             self.fdir += "/"
+=======
+        if fdir:
+            self.fdir = fdir
+        else:
+            self.fdir = './apifiles/'
+        if self.fdir[-1] != '/':
+            self.fdir += '/'
+>>>>>>> develop
         # returns None if filename does not exist.
         # if prompt True then will ask for new filename if does not exist.
         fname2 = get_filename(self.fdir + fname, prompt)
@@ -472,6 +481,7 @@ class EmissionsCall(EpaApiObject):
         chash = {"mid": str, "oris": str, "unit": str}
         df = pd.read_csv(self.fname, index_col=[0], converters=chash, parse_dates=False)
         # if not df.empty:
+<<<<<<< HEAD
         if not df.empty:
             self.status_code = 200
             print("SO2 DATA EXISTS")
@@ -505,6 +515,27 @@ class EmissionsCall(EpaApiObject):
             df["time local"] = df.apply(newdate, axis=1)
             # if 'DateHour' in df.columns:
             #    df = df.drop(['DateHour'], axis=1)
+=======
+        if convert and not df.empty:
+            # check for  two date formats.
+            def newdate(x):
+                #datefmt = "%Y-%m-%d %H:%M:%S"
+                datefmt2 = "%Y %m %d %H:%M:%S"
+                rval = x["time local"]
+                rval = rval.replace('-', ' ')
+                rval = rval.strip()
+                try:
+                    rval = datetime.datetime.strptime(rval, datefmt2)
+                except:
+                    print(self.fname)
+                    print('Could not parse date ' + rval)
+                    sys.exit()
+                return rval
+
+            df["time local"] = df.apply(newdate, axis=1)
+            if 'DateHour' in df.columns:
+                df = df.drop(['DateHour'], axis=1)
+>>>>>>> develop
         # df = pd.read_csv(self.fname, index_col=[0])
         else:
             print("NO SO2 DATA in FILE")

@@ -584,13 +584,13 @@ class NameList:
 
     def print_help(self, order=None, sep=':'):
         rstr = ""
-        if not order: order = self.descrip.keys()
+        if not order:
+            order = self.descrip.keys()
         for key in order:
             rstr += key.ljust(10) + sep
             rstr += self.descrip[key]
             rstr += '\n'
-        return rstr 
-
+        return rstr
 
     def add_n(self, nlist):
         """
@@ -616,34 +616,34 @@ class NameList:
         """creates dictionary with description of namelist parameters
         """
         self.descrip["ichem"] = (
-            "Chemistry conversion modules.\n"+
+            "Chemistry conversion modules.\n" +
             "0:none, 1:matrix , 2:convert, 3:dust"
         )
         self.descrip["qcycle"] = "Cycling of emission hours"
         self.descrip["delt"] = (
-            "integration time step\n" + 
+            "integration time step\n" +
             " (0=autoset, >0= constant ,<0=minimum)"
         )
         self.descrip["kmixd"] = (
-            "Mixed layer obtained from \n"+
+            "Mixed layer obtained from \n" +
             " 0:input, 1:temperature, 2: TKE",
         )
         self.descrip["kmix0"] = "mixing depth. 250 minimum"
         self.descrip["kzmis"] = (
-            "Vertical mixing profile.",
-            " 0:No adjustments.",
-            " 1: vertical diffusivity in PBL single",
-            " average value",
+            "Vertical mixing profile." +
+            " 0:No adjustments." +
+            " 1: vertical diffusivity in PBL single" +
+            " average value"
         )
         self.descrip["kbls"] = (
-            "Stability computed by" "(1) Heat and momentum fluxes,",
-            " 2: Wind and temperature profiles",
+            "Stability computed by" "(1) Heat and momentum fluxes," +
+            " 2: Wind and temperature profiles" +
         )
         self.descrip["kblt"] = (
-            "Flag to set vertical turbulence computational",
-            "method. 1:Beljaars/Holtslag",
-            "(2):Kanthar/Clayson ",
-            " 3:TKE field 4:Velocity Variances",
+            "Flag to set vertical turbulence computational" +
+            "method. 1:Beljaars/Holtslag" +
+            "(2):Kanthar/Clayson " +
+            " 3:TKE field 4:Velocity Variances"
         )
         self.descrip["initd"] = "defines particle or puff mode"
 
@@ -683,7 +683,8 @@ class NameList:
             if "=" in line:
                 temp = line.strip().split("=")
                 key = temp[0].strip()
-                if not case_sensitive: key = key.lower()
+                if not case_sensitive:
+                    key = key.lower()
                 self.nlist[key] = temp[1].strip(",")
 
     def write(self, order=None, gem=False, verbose=False):

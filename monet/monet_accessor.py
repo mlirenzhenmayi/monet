@@ -465,7 +465,12 @@ class MONETAccessor(object):
         out = resample.resample_xesmf(source, target, method=method, **kwargs)
         return _rename_to_monet_latlon(out)
 
-    def combine_point(self, data, col=None, pyresample=False, **kwargs):
+    def combine_point(self,
+                      data,
+                      col=None,
+                      suffix=None,
+                      pyresample=False,
+                      **kwargs):
         """Short summary.
 
         Parameters
@@ -492,7 +497,7 @@ class MONETAccessor(object):
                 if pyresample:
                     return combine_da_to_df()
                 return combine_da_to_df_xesmf(
-                    self.obj, data, col=col, **kwargs)
+                    self.obj, data, col=col, suffix=suffix, **kwargs)
             except RuntimeError:
                 print('Must enter col...')
         else:
@@ -962,13 +967,13 @@ class MONETAccessorDataset(object):
         except ImportError:
             print('Window functionality is unavailable without pyresample')
 
-    def combine_point(self, df, mapping_table=None, **kwargs):
+    def combine_point(self, data, col=None, suffix=None, **kwargs):
         """Short summary.
 
         Parameters
         ----------
-        df : type
-            Description of parameter `df`.
+        data : type
+            Description of parameter `data`.
         mapping_table : type
             Description of parameter `mapping_table`.
         radius : type
@@ -980,7 +985,5 @@ class MONETAccessorDataset(object):
             Description of returned object.
 
         """
-        # from .util.combinetool import combine_da_to_df_xesmf
-        for key, val in mapping_table.items():
-            df = self.obj[key].monet.combine_point(df, col=val, **kwargs)
-        return df
+        from .util.combinetool import combine_da_to_df_xesmf
+        return combine_da_to_df_xesmf(self.obj, data, suffix=suffix, **kwargs)

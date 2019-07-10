@@ -637,7 +637,7 @@ class NameList:
         )
         self.descrip["kbls"] = (
             "Stability computed by" "(1) Heat and momentum fluxes," +
-            " 2: Wind and temperature profiles" +
+            " 2: Wind and temperature profiles" 
         )
         self.descrip["kblt"] = (
             "Flag to set vertical turbulence computational" +

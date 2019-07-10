@@ -323,7 +323,6 @@ def get_so2(df):
         "longitude",
     ]
     df = keepcols(df, keep)
-    print(df)
     if not df.empty:
         df = df[df["oris"] != "None"]
     return df
@@ -532,7 +531,9 @@ class EmissionsCall(EpaApiObject):
         cols = []
         tra = []
         for line in data.iter_lines(decode_unicode=True):
-
+            #if iii < 5:
+               #print('LINE')
+               #print(line)
             # 1. Process First line
             if iii == 0:
                 tcols = line.split(",")
@@ -676,11 +677,12 @@ class EmissionsCall(EpaApiObject):
         df["so2_lbs"] = df.apply(lambda row: getmass(row[optime], row[cname]), axis=1)
         temp = df[["time local", "so2_lbs", cname, optime]]
         temp = df[df["OperatingTime"] > 1.0]
-        print("Operating Time greater than 1 ")
-        print(
-            temp[
-                ["oris", "unit", "OperatingTime", "time local", "so2_lbs", self.so2name]
-            ]
+        if not temp.empty:
+            print("Operating Time greater than 1 ")
+            print(
+                temp[
+                    ["oris", "unit", "OperatingTime", "time local", "so2_lbs", self.so2name]
+                 ]
         )
         # -------------------------------------------------------------
         # these were checks to see what values the fields were holding.
@@ -1385,12 +1387,9 @@ class FacilitiesData(EpaApiObject):
                 dlist.extend(blist)
 
         df = pd.DataFrame(dlist)
-        print(unitdf[0:10])
-        print(df[0:10])
         df = pd.merge(
             df, unitdf, how="left", left_on=["unit", "oris"], right_on=["unit", "oris"]
         )
-        print(df[0:10])
         return df
 
 

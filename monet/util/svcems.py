@@ -33,8 +33,6 @@ methods:
   find
   get_so2_sources
   get_heat
-  get_stackvalues
-  check_oris
   get_sources
   create_emitimes
   emit_subroutine
@@ -478,35 +476,35 @@ class SEmissions(object):
         sources = sources * mult
         return sources
 
-    def get_stackvalues(self, unit=False):
-        """
-        return dataframe with string which has stack diamter, temperature
-        velocity  obtained from the ptinv file.
-        """
-        sources = self.get_sources(stype="stack values", unit=unit)
-        # mult = 1.055e9 / 3600.0  #mmbtu to watts
-        # mult=0  ##the heat input from the CEMS files is not the correct value to
+    #def get_stackvalues(self, unit=False):
+    #    """
+    #    return dataframe with string which has stack diamter, temperature
+    #    velocity  obtained from the ptinv file.
+    #    """
+    #    sources = self.get_sources(stype="stack values", unit=unit)
+    #    # mult = 1.055e9 / 3600.0  #mmbtu to watts
+    #    # mult=0  ##the heat input from the CEMS files is not the correct value to
         # use.
         # sources = sources * mult
-        return sources
+    #    return sources
 
-    def check_oris(self, series, oris):
-        """
-        Only model sources for which maxval is above the set threshold.
-        """
-        print(oris, "CHECK COLUMN---------------------------")
-        nanum = series.isna().sum()
-        series.dropna(inplace=True)
-        maxval = np.max(series)
-        print("Number of Nans", nanum)
-        print("Max value", maxval)
-        rval = False
-        if maxval > self.ethresh:
-            rval = True
-        else:
-            print("DROPPING")
-        return rval
-
+    #def check_oris(self, series, oris):
+    #    """
+    #    Only model sources for which maxval is above the set threshold.
+    #    """
+    #    print(oris, "CHECK COLUMN---------------------------")
+    #    nanum = series.isna().sum()
+    #    series.dropna(inplace=True)
+    #    maxval = np.max(series)
+    #    print("Number of Nans", nanum)
+    #    print("Max value", maxval)
+    #    rval = False
+    #    if maxval > self.ethresh:
+    #        rval = True
+    #    else:
+    #        print("DROPPING")
+    #    return rval
+#
     def get_sources(self, stype="so2_lbs", unit=True, verbose=True):
         """
         Returns a dataframe with rows indexed by date.
@@ -629,15 +627,11 @@ class SEmissions(object):
         # unit in csv file is kg
         self.make_csv(df.copy())
         print("CREATE EMITIMES in SVCEMS")
-        # print(df[0:72])
         # placeholder. Will later add routine to get heat for plume rise
         # calculation.
-
         dfheat = df.copy() * 0 + heat
         # dfheat = self.get_heat(unit=unit)
-        # if unit:
-        #    dfstack = self.get_stackvalues(unit=unit)
-        # locs = df.columns.values
+
         done = False
         iii = 0
         d1 = edate

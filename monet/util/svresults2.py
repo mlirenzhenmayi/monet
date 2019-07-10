@@ -38,8 +38,6 @@ We could also possibly use the HYSPLIT reader for this.
 
 """
 
-
-
 def make_gpd(df, latstr, lonstr):
     
     geometry = [Point(xy) for xy in zip(df[lonstr], df[latstr])]
@@ -63,7 +61,6 @@ def generate_cems(cemsfile, orislist, spnum='P1'):
         except:
             new.append(temp)
     cems.columns = new
-    print(new)
     for col in cems.columns:
         for oris in orislist:
             if str(oris) in col and  spnum in col:
@@ -288,11 +285,12 @@ class SVresults:
     
     """
     def __init__(self, tdirpath, orislist=None, daterange=None): 
+        print('INIT')
         ## inputs
         self.tdirpath = tdirpath 
         self.orislist = orislist 
         self.daterange = daterange
-
+        self.orislist=[None]
         ## outputs
         self.df = pd.DataFrame() 
         self.sidlist = [] 
@@ -300,21 +298,22 @@ class SVresults:
 
         ## internal use
         self.plist = ['p1','p2','p3']
+        self.plist = [None]
         self.chash = {}  #dict. key is oris code. value is a color.
         self.set_colors()
  
     def fill_hash(self): 
         for oris in self.orislist: 
            for poll in self.plist:
+               print('filling hash', str(oris), str(poll))
                flist = self.find_files(oris, poll=poll) 
+               print(flist)
                df = self.fromdataA(flist) 
                self.dhash[(str(oris),poll)] = df 
-               if not df.empty: sidlist = df['sid'].unique() 
-               self.sidlist.extend(sidlist) 
+               if not df.empty: 
+                  sidlist = df['sid'].unique() 
+                  self.sidlist.extend(sidlist) 
         self.sidlist = list(set(self.sidlist))              
-
-
-
 
     def dirpath2date(self, dirpath):
         temp = dirpath.split('/')
@@ -383,16 +382,18 @@ class SVresults:
                 else:  test3 = poll in fl
                 
                 if test1 and test2 and test3: 
+                    print('found', fl)
                     dataA_files.append(dirpath + '/' + fl)
                     print(dirpath + '/' + fl)
         return dataA_files 
 
-    def writedatem(self, dfile, bymonth=True):
-        flist = self.find_files(oris=None)
+    def writedatem(self, dfile, bymonth=True, poll=None):
+        bymonth=True
+        flist = self.find_files(oris=None, poll=poll)
+        print('FLIST', flist)
         df = self.fromdataA(flist)
         #df.set_index('date', inplace=True)
         if df.empty: return
-        print(df[0:10])
         #df = self.massage_df(df)
         #df = df.resample("H").asfreq()
         #df = df.reset_index()
@@ -400,7 +401,9 @@ class SVresults:
         #print('WRITING--------------------------')
         #print(df[0:10])
         sidlist = df['sid'].unique()
+        print('SID', sidlist)
         for sid in sidlist:
+            print('SID', str(sid))
             dftemp = df[df['sid'] == sid] 
             dftemp.set_index('date', inplace=True)
             #dftemp = dftemp.resample("H").asfreq()
@@ -418,13 +421,19 @@ class SVresults:
             if bymonth:
                 dftemp["month"] = dftemp["date"].map(lambda x: x.month)
                 mnths = dftemp['month'].unique()
-                print('MONTHS', mnths)
+                #print('MONTHS', mnths)
             else:
                 mnths = []
             for mmm in mnths:
+        
                 dfile2 = str(sid) + ".month" + str(mmm) + "." + dfile
-                #dftemp["month"] = dftemp["date"].map(lambda x: x.month)
+                print('DATEMFILE', dfile2)  
+               #dftemp["month"] = dftemp["date"].map(lambda x: x.month)
                 dfmonth= dftemp[dftemp["month"] == mmm]
+                dfmonth.set_index('date', inplace=True)
+                dfmonth = dfmonth.resample("H").asfreq()
+                dfmonth.reset_index(inplace=True)
+                dfmonth.fillna(0, inplace=True)
                 frame2datem(dfile2, dfmonth, 
                     cnames=['date','duration','lat', 'lon',
                            'obs','model','sid','altitude'] )
@@ -506,8 +515,10 @@ class SVresults:
         return chash 
  
     def plotall(self):
+        print('Plotting all in svresults2')
         sns.set()
         for sid in self.sidlist:
+            print(str(sid))
             figa = plt.figure(1)
             figb = plt.figure(3)
             figc = plt.figure(4)

@@ -233,7 +233,10 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
                 # print('NRECS', nrecs)
                 # sys.exit()
                 #sdate = et.cycle_list[0].sdate
-                sdate = dir2date(tdirpath, dirpath)
+                try: 
+                    sdate = dir2date(tdirpath, dirpath)
+                except:
+                    continue
                 if sdate < dstart or sdate > dend:
                     continue
                 suffix = fl[4:8]
@@ -283,6 +286,92 @@ def find_numpar(emitfile, controlfile):
     return np.ceil(numpar)
 
 
+def read_vmix(tdirpath, sdate, edate, timchunks, sid=None):
+    from monet.utilhysplit import vmixing
+    dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks)
+    vmix = vmixing.VmixingData()
+    for dirpath in dtree:
+        print(dirpath)
+        for (d1, dirnames, filenames) in walk(dirpath):
+             for fl in filenames:
+                 if 'STABILITY' in fl:
+                     if not sid or str(sid) in fl:
+                         vmix.add_data(fl)
+    return vmix.df
+
+def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
+    """
+    read the base control file in tdirpath CONTROL.0
+    """
+    from os import walk
+    from monet.utilhysplit import emitimes
+    # from arlhysplit.runh import getmetfiles
+    from monet.util.svdir import dirtree
+    from monet.util.svdir import date2dir
+    from monet.util.svdir import dir2date
+    from monet.util.datem import read_datem_file
+
+    dstart = sdate
+    dend = edate
+    ##determines meteorological files to use.
+    met_files = MetFiles(metfmt) 
+    runlist = []  #list of RunDescriptor Objects
+    hysplitdir = hdirpath + "/exec/"
+    #landusedir = hdirpath + "/bdyfiles/"
+
+    dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks)
+    vstr = ''
+    runlist = []
+    for dirpath in dtree:
+        print(dirpath)
+        for (d1, dirnames, filenames) in walk(dirpath):
+            for fl in filenames:
+                #if iii == 0:
+                #    firstdirpath = dirpath
+                if fl=="datem.txt":
+                    print(d1, dirnames, fl)
+                   # read the datem.txt file
+                    cols=['year','month','day','hour','duration','lat','lon','val','sid','ht']
+                    dfdatem = read_datem_file(d1 + fl, colra=cols, header=2) 
+                    dfdatem = dfdatem[['lat','lon','sid']]
+                    dfdatem = dfdatem.drop_duplicates()
+                    for index, row  in dfdatem.iterrows():
+                        lat = row['lat']
+                        lon = row['lon']
+                        pid = int(row['sid'])
+                        print('PID', str(pid))
+                        ##Write a control file for this emitimes file
+                        suffix = 'V' + str(pid)
+                        control = HycsControl(fname='CONTROL.V',
+                                  working_directory=d1, rtype='vmixing')
+                        #control.read()
+                        control.date = sdate
+                        ##remove all the locations first and then add
+                        ##locations that correspond to emittimes file.
+                        control.remove_locations()
+                        control.add_location(latlon=(lat, lon))
+                        control.rename('CONTROL.' + suffix, working_directory=d1)
+                        control.remove_metfile(rall=True)
+                        ###Add the met files.
+                        control.add_duration(timechunks)
+                        mfiles = met_files.get_files(control.date, timechunks)
+                        for mf in mfiles:
+                            if os.path.isfile(mf[0] + mf[1]):
+                                control.add_metfile(mf[0], mf[1])
+                        #for cg in control.concgrids:
+                        #    cg.outfile += "." + suffix
+                        if control.num_met > 12: metgrid=True
+                        else: metgrid=False 
+                        control.write(metgrid=metgrid)
+                        run = RunDescriptor(d1, suffix, hysplitdir, "vmixing",
+                                             parinit='None')
+                        runlist.append(run)
+                        #vstr += 'cd ' + dirnames + '\n'
+                        #vstr += '$MDL/vmixing -p' + suffix + '-a2'
+                        #vstr += '\n' 
+    return runlist
+
+
 def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units="ppb",
                     ):
     """
@@ -323,7 +412,6 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
     """
     from os import walk
     from monet.utilhysplit import emitimes
-
     # from arlhysplit.runh import getmetfiles
     from monet.util.svdir import dirtree
     from monet.util.svdir import date2dir
@@ -339,8 +427,6 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
     hysplitdir = hdirpath + "/exec/"
     landusedir = hdirpath + "/bdyfiles/"
 
-    base_control = HycsControl(fname="CONTROL.0", working_directory=tdirpath)
-    base_setup = NameList("SETUP.0", working_directory=tdirpath)
     dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks)
     iii = 0
     # for (dirpath, dirnames, filenames) in walk(tdirpath):
@@ -539,28 +625,38 @@ class RunScriptClass:
 
     def main(self):
         rstr = self.make_hstr()
-        rstr += "MDL=" + self.runlist[0].hysplitdir + "\n"
-        #rstr += unit_mult(units=units)
-        iii=0
-        for runstr in self.mainstr_generator():
-            rstr += runstr
+        if self.runlist: 
+            rstr += "MDL=" + self.runlist[0].hysplitdir + "\n"
+            #rstr += unit_mult(units=units)
+            iii=0
+            for runstr in self.mainstr_generator():
+                rstr += runstr
         with open(self.tdirpath + "/" + self.scriptname, "w") as fid:
             fid.write(rstr)
 
     def mainstr_generator(self):
         iii = 0
         prev_directory = ' '
-        for run in runlist:
+        for run in self.runlist:
+            dstr = ''
             if run.directory != prev_directory:
                dstr += "cd " + run.directory + "\n\n"
             dstr += self.mstr(run)
             prev_directory = run.directory
             iii += 1
-            yield '# bash script output'
+            yield dstr
        
-
     def mstr(self, run):
         return run.directory
+
+
+class VmixScript(RunScriptClass):
+
+    def mstr(self, run):
+        rstr= '$MDL/vmixing -a2 -p' + run.suffix
+        rstr += '\n'
+        return rstr
+
 
 class DatemScript(RunScriptClass):
     """

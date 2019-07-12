@@ -231,6 +231,7 @@ def read_datem_file(
     fname,
     dummy=False,
     verbose=False,
+    header=None,
     colra=[
         "year",
         "month",
@@ -255,7 +256,7 @@ def read_datem_file(
        returns pandas dataframe.
     """
     dtp = {"year": int, "month": int, "day": int, "hour": int}
-    datem = pd.read_csv(fname, names=colra, header=None, delimiter=r"\s+", dtype=dtp)
+    datem = pd.read_csv(fname, names=colra, header=header, delimiter=r"\s+", dtype=dtp)
     datem.columns = colra
     datem["minute"] = datem["hour"] % 100
     datem["hour"] = datem["hour"] / 100
@@ -272,4 +273,7 @@ def read_datem_file(
 
     datem["date"] = datem.apply(getdate, axis=1)
     datem.drop(["year", "month", "day", "hour", "minute"], axis=1, inplace=True)
+    #colrb = [x for x in colra if x not in ["year","month","day","hour","minute"]]
+    #colrb = ['date'].extend(colrb)
+    #datem.columns = colrb 
     return datem

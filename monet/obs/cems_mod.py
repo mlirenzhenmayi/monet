@@ -75,7 +75,7 @@ def max_stackht(df, meters=True, verbose=False):
         if iii == 0:
             df2 = dftemp.copy()
         else:
-            df2 = pd.concat([df2, dftemp], axis=0)
+            df2 = pd.concat([df2, dftemp], axis=0, sort=True)
         iii += 1
         if verbose:
             print("ORISPL", orispl, maxval, slist)
@@ -492,7 +492,7 @@ class CEMSftp(object):
                     if mrequest:
                         break
                 if mrequest:
-                    dflist = get_monitoring_plan(oris, mid, mrequest, udate, dflist)
+                    dflist, method = get_monitoring_plan(oris, mid, mrequest, udate, dflist)
         stackdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])
         facdf = facdf[["oris", "unit", "facility_name", "latitude", "longitude"]]
         facdf = facdf.drop_duplicates()
@@ -553,7 +553,7 @@ class CEMSftp(object):
             ),
             axis=1,
         )
-        dftemp = pd.concat([dftime, dftemp], axis=1)
+        dftemp = pd.concat([dftime, dftemp], axis=1,sort=True)
         dftemp.rename(columns={0: "time local"}, inplace=True)
         dftemp.drop(["date", "hour"], axis=1, inplace=True)
 

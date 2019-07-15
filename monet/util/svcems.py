@@ -55,7 +55,6 @@ def remove_negs(df, stype):
             return 0
         else:
             return x
-
     df[stype] = df.apply(lambda row: remove_negs(row[stype]), axis=1)
     return df
 
@@ -97,8 +96,10 @@ def get_timezone(lat, lon):
 
 
 class SourceSummary:
+
     def __init__(self, tdir="./", fname="source_summary.csv", data=pd.DataFrame()):
 
+        self.commentchar = "#"
         if not data.empty:
             self.sumdf = self.create(data)
         else:
@@ -108,7 +109,6 @@ class SourceSummary:
                 self.sumdf = pd.DataFrame()
         self.tdir = tdir
         self.fname = fname
-        self.commentchar = "#"
 
     def check_oris(self, threshold):
         """
@@ -184,6 +184,8 @@ class SourceSummary:
         # data1 = cems_api.keepcols(data1, keep)
         # data1.fillna({'stackht':0}, inplace=True)
         data1.fillna(0, inplace=True)
+        if data1.empty: 
+           return pd.DataFrame()
         remove_negs(data1, "so2_lbs")
         # data1.dropna(axis=0, inplace=True, subset=["so2_lbs"])
         # data1.dropna(inplace=True)
@@ -229,23 +231,35 @@ class SourceSummary:
             df = pd.read_csv(tdir + name, comment=self.commentchar)
         else:
             df = pd.DataFrame()
+
+        # get rid of spaces in column values
+        cols = df.columns.values
+        newc = []
+        for val in cols:
+            newc.append(val.strip())
+        df.columns = newc
+
+
         return df
 
     def print(self, tdir="./", name="source_summary.csv"):
-        fname = tdir + name
-        cols = self.sumdf.columns.values.copy()
-        cols[8] = cols[8].replace("lbs", "tons")
-        orislist = self.sumdf["ORIS"].unique()
-        with open(fname, "w") as fid:
-            rstr = ""
-            for val in cols:
-                rstr += str(val) + " ,    "
-            rstr += "\n"
-            fid.write(rstr)
-            for oris in orislist:
-                tempdf = self.sumdf[self.sumdf["ORIS"] == oris]
-                rstr = self.create_string(tempdf)
+        if self.sumdf.empty:
+           print('No Source Summary Data')
+        else:
+            fname = tdir + name
+            cols = self.sumdf.columns.values.copy()
+            cols[8] = cols[8].replace("lbs", "tons")
+            orislist = self.sumdf["ORIS"].unique()
+            with open(fname, "w") as fid:
+                rstr = ""
+                for val in cols:
+                    rstr += str(val) + " ,    "
+                rstr += "\n"
                 fid.write(rstr)
+                for oris in orislist:
+                    tempdf = self.sumdf[self.sumdf["ORIS"] == oris]
+                    rstr = self.create_string(tempdf)
+                    fid.write(rstr)
 
     def create_string(self, sumdf):
         total = 0
@@ -446,10 +460,11 @@ class SEmissions(object):
 
         # all these copy statements are to avoid the warning - a value is trying
         # to be set ona copy of a dataframe.
-        print("AAAA", self.df[0:10])
+        print("DATA CHECK", self.df[0:10])
         self.df["time"] = self.df.apply(
             lambda row: loc2utc(row["time local"], row["oris"], tzhash), axis=1
         )
+        print(self.df.columns.values)
         temp = self.df[self.df.time == "None"]
         if not temp.empty:
             print("TEMP with None time\n", temp[0:20])
@@ -845,6 +860,11 @@ class SEmissions(object):
 
         # sometimes negative emissions are associated with higher MODC
         # not sure why this is.
+
+        # in cems_api
+        # When emissions are retrieved from hourlyfuel, set the MODC=-90
+        # When MODC value not defined and formula code is F-23 set MODC=-900
+        # both of these are considered reliable estimates
         """
         df = dfin.copy()
 
@@ -859,7 +879,7 @@ class SEmissions(object):
             except:
                 optime = 99
 
-            if val in [1, 2, 3, 4]:
+            if val in [1, 2, 3, 4, -90, -900]:
                 return 1
             if val in [6, 7]:
                 return 2
@@ -884,7 +904,7 @@ class SEmissions(object):
             warnings.simplefilter("ignore")
             self.plot(save, quiet, maxfig)
 
-    def plot(self, save=True, quiet=True, maxfig=10, byunit=False):
+    def plot(self, save=True, quiet=True, maxfig=10, byunit=True):
         """plot time series of emissions"""
         if self.df.empty:
             print("PLOT EMPTY")
@@ -900,8 +920,9 @@ class SEmissions(object):
         data1 = pd.pivot_table(
             df, index=["time"], values="so2_lbs", columns=cols, aggfunc=np.sum
         )
+        print('PLOTTING SO2MODC PIVOT', df.columns.values)
         data2 = pd.pivot_table(
-            df, index=["time"], values="SO2MODC", columns=cols, aggfunc=np.sum
+            df, index=["time"], values="SO2MODC", columns=cols, aggfunc=np.max
         )
         # data1.fillna(0, inplace=True)
         dft = data1.reset_index()
@@ -938,10 +959,10 @@ class SEmissions(object):
             ax = fig.add_subplot(2, 1, 1)
             ax2 = fig.add_subplot(2, 1, 2)
             data = data1[ky] * self.lbs2kg
-            print("plotting----------------")
-            print(data[0:20])
-            print(data[-20:])
-            print("-----------------plotting")
+            #print("plotting----------------")
+            #print(data[0:20])
+            #print(data[-20:])
+            #print("-----------------plotting")
             ax.plot(data, clr)
             try:
                 ax2.plot(data2[ky], clr)

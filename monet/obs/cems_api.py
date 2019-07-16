@@ -463,7 +463,7 @@ class EmissionsCall(EpaApiObject):
             self.so2name = "SO2CEMReportedSO2MassRate"
         elif calltype.upper().strip() == "LME":
             # this should probably be so2mass??? TO DO.
-            self.so2name = "SO2CEMReportedSO2MassRate"
+            self.so2name = "LMEReportedSO2Mass"
         else:
             self.so2name = "SO2CEMReportedSO2MassRate"
 
@@ -478,6 +478,8 @@ class EmissionsCall(EpaApiObject):
          
         if self.calltype.upper().strip() == "AD":
             estr = "emissions/hourlyFuelData/csv"
+        elif self.calltype.upper().strip() == "LME":
+            estr = "emissions/hourlyData/csv"
         else:        
             estr = "emissions/hourlyData/csv"
         getstr = quote(
@@ -561,8 +563,9 @@ class EmissionsCall(EpaApiObject):
                #print(line)
             # 1. Process First line
             temp = line.split(',')
-            if temp[-1]: 
+            if temp[-1] and self.calltype=='LME': 
                 print(line)
+                
             if iii == 0:
                 tcols = line.split(",")
                 # add columns for unit id and oris code
@@ -730,7 +733,10 @@ class EmissionsCall(EpaApiObject):
         # if operating time is zero then map to 0 (it is '' in file)
         optime = "OperatingTime"
         cname = self.so2name
-        df["so2_lbs"] = df.apply(lambda row: getmass(row[optime], row[cname]), axis=1)
+        if self.calltype=='LME':
+           df["so2_lbs"] = df[self.so2name]
+        else:
+           df["so2_lbs"] = df.apply(lambda row: getmass(row[optime], row[cname]), axis=1)
         temp = df[["time local", "so2_lbs", cname, optime]]
         temp = df[df["OperatingTime"] > 1.0]
         if not temp.empty:
@@ -1866,17 +1872,17 @@ class CEMS:
 
         emitdf = emitdf.dropna(axis=0, subset=["so2_lbs"])
 
-        def remove_nans(x):
-            if np.isnan(x):
-                return False
-            elif pd.isna(x):
-                return False
-            else:
-                return True
+        #def remove_nans(x):
+        #    if np.isnan(x):
+        #        return False
+        #    elif pd.isna(x):
+        #        return False
+        #    else:
+        #        return True
 
-        emitdf["keep"] = emitdf.apply(lambda row: remove_nans(row["so2_lbs"]), axis=1)
-        emitdf = emitdf[emitdf["keep"] == True]
-        emitdf.drop(["keep"], axis=1, inplace=True)
+        #emitdf["keep"] = emitdf.apply(lambda row: remove_nans(row["so2_lbs"]), axis=1)
+        #emitdf = emitdf[emitdf["keep"] == True]
+        #emitdf.drop(["keep"], axis=1, inplace=True)
         # emitdf.fillna(0, inplace=True)
         # r_duplicates = tempdf.duplicated()
         # if not np.all(r_duplicates):

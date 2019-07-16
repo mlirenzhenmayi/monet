@@ -921,9 +921,13 @@ class SEmissions(object):
             df, index=["time"], values="so2_lbs", columns=cols, aggfunc=np.sum
         )
         print('PLOTTING SO2MODC PIVOT', df.columns.values)
-        data2 = pd.pivot_table(
-            df, index=["time"], values="SO2MODC", columns=cols, aggfunc=np.max
-        )
+        try:
+            data2 = pd.pivot_table(
+                df, index=["time"], values="SO2MODC", columns=cols, aggfunc=np.max
+            )
+        except:
+            print('Problem with creating pivot table for SO2MODC')
+            data2 = pd.DataFrame()
         # data1.fillna(0, inplace=True)
         dft = data1.reset_index()
         # ---------------

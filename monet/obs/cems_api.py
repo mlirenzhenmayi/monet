@@ -447,8 +447,8 @@ class EmissionsCall(EpaApiObject):
         self.mid = mid  # monitoring location id.
         self.year = str(year)
         self.quarter = str(quarter)
-        if calltype=='F23': calltype='AD'
         calltype = calltype.upper().strip()
+        if calltype=='F23': calltype='AD'
         if not fname:
             fname = "Emissions." + self.year + ".q" + self.quarter
             if calltype=='AD':
@@ -457,10 +457,12 @@ class EmissionsCall(EpaApiObject):
         self.dfall = pd.DataFrame()
 
         self.calltype= calltype
-        if calltype.upper().strip() == "CEM":
-            self.so2name = "SO2CEMReportedSO2MassRate"
-        elif calltype.upper().strip() == "AD":
+        if calltype.upper().strip() == "AD":
             self.so2name = "SO2ADReportedSO2MassRate"
+        elif calltype.upper().strip() == "CEM":
+            self.so2name = "SO2CEMReportedSO2MassRate"
+        else:
+            self.so2name = "SO2CEMReportedSO2MassRate"
 
         self.so2nameB = "UnadjustedSO2"
         super().__init__(fname, save, prompt)
@@ -651,12 +653,14 @@ class EmissionsCall(EpaApiObject):
             return df
 
         def checkmodc(formula, so2modc, so2_lbs):
+            # if F-23 is the formula code and
+            # so2modc is Nan then change so2modc to -900.
             if not so2_lbs or so2_lbs==0:
                return so2modc
-            if so2modc:
+            if so2modc or not formula:
                return so2modc
             else:
-               if 'F-23' in formula:
+               if 'F-23' in str(formula):
                    return -900
                else:
                    return -1000
@@ -1055,7 +1059,7 @@ class MonitoringPlan(EpaApiObject):
             dhash["stackname"] = stackname
             for att in unithash["locationAttributes"]:
                 if "stackHeight" in att.keys():
-                    print("stackheight" + name)
+                    print("stackheight " + name)
                     print(att["stackHeight"])
 
                     try:
@@ -1074,8 +1078,10 @@ class MonitoringPlan(EpaApiObject):
             # each monitoringLocation has list of monitoringMethods
             iii=0
             for method in unithash["monitoringMethods"]:
-                if method["parameterCode"] == "SO2":
-                   dhash["parameterCode"] = "SO2"
+                print('METHOD LIST', method)
+                if 'SO2' in method["parameterCode"]:
+                   print('SO2 data')
+                   dhash["parameterCode"] = method["parameterCode"]
                    dhash["methodCode"] = method["methodCode"]
                    dhash["beginDateHour"] = method["beginDateHour"]
                    dhash["endDateHour"] = method["endDateHour"]
@@ -1100,6 +1106,19 @@ class MonitoringPlan(EpaApiObject):
                    print(dhash)
                    print('------------------')
                    dlist.append(copy.deepcopy(dhash))
+                   iii+=1
+        # if there is no monitoring method for SO2
+        if iii==0:
+           dhash["parameterCode"] = 'None' 
+           dhash["methodCode"] = 'None'
+           dhash["beginDateHour"] = 'None'
+           dhash["endDateHour"] = 'None'
+           dhash["oris"] = self.oris
+           dhash["mid"] = self.mid
+           dhash["request_date"] = self.date
+
+           dlist.append(copy.deepcopy(dhash))
+            
         print(dlist)
         df = pd.DataFrame(dlist)
         print('DF1 ------------------')

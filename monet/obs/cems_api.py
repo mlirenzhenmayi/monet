@@ -641,7 +641,10 @@ class EmissionsCall(EpaApiObject):
         df = get_so2(df)
         if self.calltype == 'AD':
            df['SO2MODC'] = -90
-
+        # the LME data sometimes has duplicate rows.
+        # causing emissions to be over-estimated.
+        if self.calltype == 'LME':
+           df = df.drop_duplicates()
         return df
 
     # ----------------------------------------------------------------------------------------------
@@ -737,6 +740,13 @@ class EmissionsCall(EpaApiObject):
                     rval = np.NaN
             return rval
 
+        def lme_getmass(cname):
+            try:
+                rval = float(cname)
+            except BaseException:
+                rval = np.NaN
+            return rval
+
         # map OperatingTime to a float
         df["OperatingTime"] = df["OperatingTime"].map(simpletofloat)
         # map Adjusted Flow to a float
@@ -748,7 +758,7 @@ class EmissionsCall(EpaApiObject):
         optime = "OperatingTime"
         cname = self.so2name
         if self.calltype=='LME':
-           df["so2_lbs"] = df[self.so2name]
+           df["so2_lbs"] = df.apply(lambda row: lme_getmass(row[cname]), axis=1)
         else:
            df["so2_lbs"] = df.apply(lambda row: getmass(row[optime], row[cname]), axis=1)
         temp = df[["time local", "so2_lbs", cname, optime]]
@@ -1628,8 +1638,9 @@ def get_monitoring_plan(oris, mid, mrequest, date1, dflist):
     print('METHODS returned', method, mid, str(oris))
     # catchall so do not double count.
     # currently CEM and CEMF23 result in same EmissionCall request string.
-    if 'CEM' in method and 'CEMF23' in method:
-        method = 'CEM'
+    if method:
+        if 'CEM' in method and 'CEMF23' in method:
+            method = 'CEM'
     dflist.append((str(oris), mid, stackht))
     
     return dflist, method
@@ -1831,7 +1842,9 @@ class CEMS:
         if emitdf.empty:
             return emitdf
         emitdf = emitdf.dropna(axis=0, subset=["so2_lbs"])
-
+        # The LME data sometimes has duplicate rows.
+        # causing emissions to be over-estimated.
+        #emitdf = emitdf.drop_duplicates()
         def badrow(rrr):
             test1 = True
             test2 = True

@@ -48,6 +48,20 @@ sendrequest
 getkey
 
 """
+def test_end(endtime, current):
+    # if endtime None return True
+    if isinstance(endtime, pd._libs.tslibs.nattype.NaTType):
+        return True
+    elif not endtime:
+        return True
+    # if endtime greater than current return true
+    elif endtime >= current:
+        return True
+    # if endtime less than current time return true
+    elif endtime < current:
+        return False
+    else:
+        return True
 
 
 def get_filename(fname, prompt):
@@ -948,6 +962,7 @@ class MonitoringPlan(EpaApiObject):
         self.mid = mid  # monitoring location id.
         self.date = date  # date
         self.dfall = pd.DataFrame()
+        self.dfmt="%Y-%m-%dT%H:%M:%S"
         super().__init__(fname, save, prompt)
 
     def to_dict(self, unit=None):
@@ -976,8 +991,20 @@ class MonitoringPlan(EpaApiObject):
 
     def get_method(self, unit, daterange):
         # TO DO. pick method code based on dates.
-        df = self.df[self.df["name"] == unit]
-        method = df['methodCode'].unique()
+        temp = self.df[self.df["name"] == unit]
+        sdate = daterange[0]
+        edate = daterange[1]
+
+        temp = temp[temp["beginDateHour"] <= sdate]
+        if temp.empty:
+            return None
+
+        temp["testdate"] = temp.apply(
+            lambda row: test_end(row["endDateHour"], edate), axis=1
+        )
+        temp = temp[temp["testdate"] == True]
+        method = temp['methodCode'].unique()
+
         return method 
 
     def load(self):
@@ -988,7 +1015,22 @@ class MonitoringPlan(EpaApiObject):
         # return pd.DataFrame(), True
         # df = super().load()
         chash = {"mid": str, "oris": str, "name": str}
-        df = pd.read_csv(self.fname, index_col=[0], converters=chash)
+        def parsedate(x, sfmt):
+            if not x:
+               return pd.NaT 
+            elif x=='None':
+               return pd.NaT 
+            else:
+               try:
+                  return pd.to_datetime(x, format=sfmt)
+               except:
+                  print('time value', x)
+                  return pd.NaT
+ 
+        df = pd.read_csv(self.fname, index_col=[0], converters=chash,
+                         parse_dates=['beginDateHour','endDateHour'],
+                         date_parser=lambda x: parsedate(x, self.dfmt))
+
         self.dfall = df.copy()
         df = df[df["oris"] == self.oris]
         df = df[df["mid"] == self.mid]
@@ -999,7 +1041,7 @@ class MonitoringPlan(EpaApiObject):
     def save(self):
         # do not want to overwrite other mplans in the file.
         df = pd.DataFrame()
-        subset=["oris","name","request_date","methodCode"]
+        subset=["oris","name","request_date","methodCode","beginDateHour","endDateHour"]
         try:
             df, bval = self.load()
         except BaseException:
@@ -1110,22 +1152,10 @@ class MonitoringPlan(EpaApiObject):
                    print('SO2 data')
                    dhash["parameterCode"] = method["parameterCode"]
                    dhash["methodCode"] = method["methodCode"]
-                   dhash["beginDateHour"] = method["beginDateHour"]
-                   dhash["endDateHour"] = method["endDateHour"]
-                   iii+=1
-            # dhash["subDataCode"] = method["subDataCode"]
-            # dhash["parameterCodeDesc"] = method["parameterCodeDesc"]
-            # for method in unithash["emissionsFormulas"]:
-            #    if method["parameterCode"] == "SO2":
-            #        elist = [
-            #            "formulaId",
-            #            "parameterCode",
-            #            "equationCode",
-            #            "formulaEquation",
-            #            "equationCodeDesc",
-            #        ]
-            #       for val in elist:
-            #           dhash[val] = method[val]
+                   dhash["beginDateHour"] =\
+                         pd.to_datetime(method["beginDateHour"], format=self.dfmt)
+                   dhash["endDateHour"] = \
+                         pd.to_datetime(method["endDateHour"], format=self.dfmt)
                    dhash["oris"] = self.oris
                    dhash["mid"] = self.mid
                    dhash["request_date"] = self.date
@@ -1138,8 +1168,8 @@ class MonitoringPlan(EpaApiObject):
             if iii==0:
                dhash["parameterCode"] = 'None' 
                dhash["methodCode"] = 'None'
-               dhash["beginDateHour"] = 'None'
-               dhash["endDateHour"] = 'None'
+               dhash["beginDateHour"] = pd.NaT
+               dhash["endDateHour"] = pd.NaT
                dhash["oris"] = self.oris
                dhash["mid"] = self.mid
                dhash["request_date"] = self.date
@@ -1383,24 +1413,6 @@ class FacilitiesData(EpaApiObject):
         temp = temp[temp["begin time"] <= sdate]
         if temp.empty:
             return None
-        # TEMPORARY PRINT STATEMENT
-        # print(temp)
-
-        def test_end(endtime, current):
-            # if endtime None return True
-            if isinstance(endtime, pd._libs.tslibs.nattype.NaTType):
-                return True
-            elif not endtime:
-                return True
-            # if endtime greater than current return true
-            elif endtime >= current:
-                return True
-            # if endtime less than current time return true
-            elif endtime < current:
-                return False
-            else:
-                return True
-
         temp["testdate"] = temp.apply(
             lambda row: test_end(row["end time"], sdate), axis=1
         )
@@ -1612,8 +1624,12 @@ def get_monitoring_plan(oris, mid, mrequest, date1, dflist):
             stackht = float(test)
         except:
             stackht = None
-    method = plan.get_method(mid, date1)
+    method = plan.get_method(mid, [date1, date1])
     print('METHODS returned', method, mid, str(oris))
+    # catchall so do not double count.
+    # currently CEM and CEMF23 result in same EmissionCall request string.
+    if 'CEM' in method and 'CEMF23' in method:
+        method = 'CEM'
     dflist.append((str(oris), mid, stackht))
     
     return dflist, method
@@ -1778,7 +1794,7 @@ class CEMS:
 
                     # update dflist from the monitoring plan.
                     dflist, method  = get_monitoring_plan(oris, mid, mrequest, udate, dflist)
-
+                    if not method: method=[]
                     # add emissions for each quarter list.
                     for meth in method:
                         rvalue = self.add_emissions(oris, mid, datelist, meth)

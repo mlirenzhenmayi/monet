@@ -51,6 +51,9 @@ SourceSummary class
 
 def remove_negs(df, stype):
     def remove_negs(x):
+        if isinstance(x, str):
+           print('string value found', x)
+           return 0
         if x < 0:
             return 0
         else:

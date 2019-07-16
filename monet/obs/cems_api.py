@@ -461,6 +461,9 @@ class EmissionsCall(EpaApiObject):
             self.so2name = "SO2ADReportedSO2MassRate"
         elif calltype.upper().strip() == "CEM":
             self.so2name = "SO2CEMReportedSO2MassRate"
+        elif calltype.upper().strip() == "LME":
+            # this should probably be so2mass??? TO DO.
+            self.so2name = "SO2CEMReportedSO2MassRate"
         else:
             self.so2name = "SO2CEMReportedSO2MassRate"
 
@@ -915,7 +918,22 @@ class MonitoringPlan(EpaApiObject):
     # oris
     # mid
     # stack height
-
+    ------------------------------------------------------------------------------ 
+    6.0 Monitoring Method Data March 11, 2015
+    Environmental Protection Agency Monitoring Plan Reporting Instructions -- Page
+    37
+ 
+    If a location which has an SO2 monitor combusts both high sulfur fuel (e.g., coal
+    or oil)
+    and a low sulfur fuel, and uses a default SO2 emission rate in conjunction with
+    Equation
+    F-23 for hours in which very low sulfur fuel is combusted (see ?75.11(e)(1)),
+    report one
+    monitor method record for parameter SO2 with a monitoring methodology code 
+    CEMF23. If only low-sulfur fuel is combusted and the F-23 calculation is used
+    for every
+    hour, report the SO2 monitoring method as F23
+    ------------------------------------------------------------------------------ 
 
     """
 
@@ -943,7 +961,9 @@ class MonitoringPlan(EpaApiObject):
 
 
     def get_stackht(self, unit):
+        print(self.df)
         df = self.df[self.df["name"] == unit]
+        print(df)
         stackhts = df['stackht'].unique()
         print('get stackht', stackhts)
         return stackhts
@@ -1047,8 +1067,9 @@ class MonitoringPlan(EpaApiObject):
         # next through the monitoringLocations
         for unithash in ihash["monitoringLocations"]:
             dhash = {}
-
+          
             name = unithash["name"]
+            print('NAME ', name)
             dhash["name"] = name
             if name in shash.keys():
                 dhash["stackunit"] = shash[name]
@@ -1078,7 +1099,7 @@ class MonitoringPlan(EpaApiObject):
             # each monitoringLocation has list of monitoringMethods
             iii=0
             for method in unithash["monitoringMethods"]:
-                print('METHOD LIST', method)
+                #print('METHOD LIST', method)
                 if 'SO2' in method["parameterCode"]:
                    print('SO2 data')
                    dhash["parameterCode"] = method["parameterCode"]
@@ -1108,16 +1129,18 @@ class MonitoringPlan(EpaApiObject):
                    dlist.append(copy.deepcopy(dhash))
                    iii+=1
         # if there is no monitoring method for SO2
-        if iii==0:
-           dhash["parameterCode"] = 'None' 
-           dhash["methodCode"] = 'None'
-           dhash["beginDateHour"] = 'None'
-           dhash["endDateHour"] = 'None'
-           dhash["oris"] = self.oris
-           dhash["mid"] = self.mid
-           dhash["request_date"] = self.date
-
-           dlist.append(copy.deepcopy(dhash))
+            if iii==0:
+               dhash["parameterCode"] = 'None' 
+               dhash["methodCode"] = 'None'
+               dhash["beginDateHour"] = 'None'
+               dhash["endDateHour"] = 'None'
+               dhash["oris"] = self.oris
+               dhash["mid"] = self.mid
+               dhash["request_date"] = self.date
+               print('DHASH ------------------')
+               print(dhash)
+               print('------------------')
+               dlist.append(copy.deepcopy(dhash))
             
         print(dlist)
         df = pd.DataFrame(dlist)

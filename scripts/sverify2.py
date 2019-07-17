@@ -486,6 +486,8 @@ if options.cems:
     ef.find()
     if options.quiet == 0:
         ef.nowarning_plot(save=True, quiet=False)
+    else:
+        ef.nowarning_plot(save=True, quiet=True)
     ef.create_emitimes(
         ef.d1,
         schunks=source_chunks,
@@ -514,24 +516,22 @@ if options.obs:
     obs = SObs([d1, d2], area, tdir=options.tdir)
     obs.fignum = rfignum
     obs.find(pload=True, tdir=options.tdir, test=options.runtest, units=options.cunits)
-    obs.check()
-    try:
-        obs.check()
-    except BaseException:
-        print("No met data for stations.")
+    #try:
+    #    obs.check()
+    #except BaseException:
+    #    print("No met data for stations.")
     obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir)
 
     # output file with distances and directons from power plants to aqs sites.
     obsfile = obs.csvfile
     sumfile = "source_summary.csv"
-    cemsfile = "cems.csv"
+    cemsfile = options.tag + ".cems.csv"
     t1 = os.path.isfile(obsfile)
     t2 = os.path.isfile(sumfile)
     t3 = os.path.isfile(cemsfile)
     if t1 and t2 and t3:
-        from monet.util.svresults import CemsObs
-        from monet.util.svresults import gpd2csv
-
+        from monet.util.svresults2 import CemsObs
+        from monet.util.svresults2 import gpd2csv
         cando = CemsObs(obsfile, cemsfile, sumfile)
         osum, gsum = cando.make_sumdf()
         gpd2csv(osum, "geometry.csv")
@@ -554,7 +554,9 @@ if options.obs:
 runlist = []
 if options.create_runs:
     from monet.util.svhy import create_controls
+    from monet.util.svhy import create_vmix_controls
     from monet.util.svhy import RunScript
+    from monet.util.svhy import VmixScript
 
     runlist = create_controls(
         options.tdir,
@@ -563,9 +565,22 @@ if options.create_runs:
         d2,
         source_chunks,
         options.metfmt,
-        units=options.cunits,
+        units = options.cunits
     )
+
     rs = RunScript(options.tag + ".sh", runlist, options.tdir)
+
+    runlist = create_vmix_controls(
+        options.tdir,
+        options.hdir,
+        d1,
+        d2,
+        source_chunks,
+        options.metfmt,
+    )
+
+    rs = VmixScript(options.tag + '.vmix.sh', runlist, options.tdir)
+
 
 if options.write_scripts:
     from monet.util.svhy import DatemScript

@@ -3,6 +3,8 @@ import sys
 import subprocess
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import datetime
 import seaborn as sns
@@ -888,9 +890,9 @@ class SEmissions(object):
         # not sure why this is.
 
         # in cems_api
-        # When emissions are retrieved from hourlyfuel, set the MODC=-90
+        # When emissions are retrieved from hourlyfuel (methodCode=AD), set the MODC=-8
         # When emissions are retrieved with LME method, set the MODC=-9
-        # When MODC value not defined and formula code is F-23 set MODC=-900
+        # When MODC value not defined and formula code is F-23 set MODC=-7
         # both of these are considered reliable estimates
         """
         df = dfin.copy()
@@ -906,7 +908,7 @@ class SEmissions(object):
             except:
                 optime = 99
 
-            if val in [1, 2, 3, 4, -9, -90, -900]:
+            if val in [1, 2, 3, 4, -9, -8, -7]:
                 return 1
             if val in [6, 7]:
                 return 2
@@ -932,6 +934,28 @@ class SEmissions(object):
             warnings.simplefilter("ignore")
             self.plot(save, quiet, maxfig)
 
+
+    def plotA(self, data, sdate, edate, clr, namehash, save, quiet):
+        for ky in data.keys():
+            oris = ky
+            fig = plt.figure(self.fignum)
+            fig.set_size_inches(9,5)
+            ax = fig.add_subplot(1, 1, 1)
+            ax.plot(data[ky], clr)
+            ax.set_ylabel("SO2 mass kg")
+            ax.set_xlim(sdate, edate)
+            plt.setp(ax.get_xticklabels(), rotation=30, ha='right')  
+            self.fignum +=1
+ 
+            yearstr=sdate.strftime("%Y ")
+            plt.title(yearstr + 'Total for ' + str(oris) + " " + namehash[oris])
+            plt.tight_layout()
+            if save:
+                figname = self.tdir + "/cems." + str(oris) + ".jpg"
+                plt.savefig(figname)
+            if quiet==0:
+                plt.show()
+
     def plot(self, save=True, quiet=True, maxfig=10, byunit=True):
         """plot time series of emissions"""
         if self.df.empty:
@@ -948,7 +972,6 @@ class SEmissions(object):
         data1 = pd.pivot_table(
             df, index=["time"], values="so2_lbs", columns=cols, aggfunc=np.sum
         )
-        print('PLOTTING SO2MODC PIVOT', df.columns.values)
         try:
             data2 = pd.pivot_table(
                 df, index=["time"], values="SO2MODC", columns=cols, aggfunc=np.max
@@ -956,22 +979,24 @@ class SEmissions(object):
         except:
             print('Problem with creating pivot table for SO2MODC')
             data2 = pd.DataFrame()
-        # data1.fillna(0, inplace=True)
-        dft = data1.reset_index()
-        # ---------------
-        # data1 = cems_api.cemspivot(self.df,
-        #    ("so2_lbs"), cols=['oris'], daterange=[self.d1, self.d2], verbose=False)
-        # print("SVCEMS plot method")
-        # print("*****************")
-        # print(data1.columns)
-        # print("*****************")
+
+        sdate, edate = self.plotB(data1, data2, byunit, namehash, save, quiet)
+ 
+        alldata = pd.pivot_table(df, index=["time"], values="so2_lbs",
+                                  columns=["oris"], aggfunc=np.sum)
+        self.plotA(alldata, sdate, edate, '.k', namehash, save, quiet)
+
+
+
+
+    def plotB(self, data1, data2, byunit, namehash, save, quiet):
+        maxfig=10
         clrs = ["b.", "g.", "r."]
         jjj = 0
         ploc = 0
         unit = 0
         punit = 0
-        print('D1key', data1.keys())
-        print('d2key', data2.keys())
+
         for ky in data1.keys():
             loc = ky[0]
             spnum = ky[1]
@@ -994,10 +1019,6 @@ class SEmissions(object):
             ax = fig.add_subplot(2, 1, 1)
             ax2 = fig.add_subplot(2, 1, 2)
             data = data1[ky] * self.lbs2kg
-            #print("plotting----------------")
-            #print(data[0:20])
-            #print(data[-20:])
-            #print("-----------------plotting")
             ax.plot(data, clr)
             md2 = True
             try:
@@ -1009,8 +1030,8 @@ class SEmissions(object):
             ax.set_ylabel("SO2 mass kg")
             ax2.set_ylabel("SO2 MODC value")
             plt.sca(ax)
-
             d1 = data.index.tolist()
+
             if md2:
                 d2 = data2[ky].index.tolist()
                 if d1[0] < d2[0]:
@@ -1027,24 +1048,17 @@ class SEmissions(object):
 
             ax.set_xlim(sdate, edate)
             ax2.set_xlim(sdate, edate)
-
-          
-            #ptools.set_date_ticks(ax)
-            #ptools.set_date_ticks(ax2)
-            #fig.autofmt_xdate()
-            #plt.setp(ax.get_xticklabels(), rotation=30, ha='right')  
             ax.xaxis.set_major_formatter(plt.NullFormatter())
             plt.setp(ax2.get_xticklabels(), rotation=30, ha='right')  
-
             yearstr=sdate.strftime("%Y ")
             if byunit:
                 locstr = str(loc) + "." + str(unit).strip()
             else:
                 locstr = str(loc)
             plt.title(yearstr + locstr + " " + namehash[loc])
-
-            
+             
             if save:
+                locstr = locstr.replace('*','a')
                 figname = self.tdir + "/cems." + locstr + ".jpg"
                 plt.savefig(figname)
             if self.fignum > maxfig:
@@ -1055,8 +1069,11 @@ class SEmissions(object):
             ploc = loc
             punit = unit
             jjj += 1
-        plt.show()
-        # self.fignum += 1
+        self.fignum+=1
+        return sdate, edate
+
+
+
 
     def map(self, ax):
         """plot location of emission sources"""

@@ -636,13 +636,13 @@ class EmissionsCall(EpaApiObject):
         df = pd.DataFrame(tra, columns=cols)
         df.apply(pd.to_numeric, errors="ignore")
         df = self.manage_date(df)
+        if self.calltype == 'AD':
+           df['SO2MODC'] = -8
+        if self.calltype == 'LME':
+           df['SO2MODC'] = -9
         df = self.convert_cols(df)
         df = self.manage_so2modc(df)
         df = get_so2(df)
-        if self.calltype == 'AD':
-           df['SO2MODC'] = -90
-        if self.calltype == 'LME':
-           df['SO2MODC'] = -9
         # the LME data sometimes has duplicate rows.
         # causing emissions to be over-estimated.
         if self.calltype == 'LME':
@@ -679,16 +679,16 @@ class EmissionsCall(EpaApiObject):
 
         def checkmodc(formula, so2modc, so2_lbs):
             # if F-23 is the formula code and
-            # so2modc is Nan then change so2modc to -900.
+            # so2modc is Nan then change so2modc to -7.
             if not so2_lbs or so2_lbs==0:
                return so2modc
-            if so2modc or not formula:
+            if so2modc!=0 or not formula:
                return so2modc
             else:
                if 'F-23' in str(formula):
-                   return -900
+                   return -7
                else:
-                   return -1000
+                   return -10
 
         df["SO2MODC"] = df.apply(lambda row:
                         checkmodc(row["SO2CEMSO2FormulaCode"],
@@ -749,6 +749,8 @@ class EmissionsCall(EpaApiObject):
                 rval = np.NaN
             return rval
 
+
+        df["SO2MODC"] = df["SO2MODC"].map(simpletofloat)
         # map OperatingTime to a float
         df["OperatingTime"] = df["OperatingTime"].map(simpletofloat)
         # map Adjusted Flow to a float
@@ -896,10 +898,6 @@ class Emissions:
         import matplotlib.pyplot as plt
 
         df = self.df.copy()
-        # print(df['date'][0:10])
-        # print(df['USO2'][0:10])
-        # print(type(df['USO2'][0]))
-        # plt.plot(df['date'][0:100], df['USO2'][0:100], '-b.')
         temp1 = df[df["date"].dt.year != 1700]
         sns.set()
         for unit in df["unit"].unique():
@@ -994,11 +992,11 @@ class MonitoringPlan(EpaApiObject):
 
 
     def get_stackht(self, unit):
-        print(self.df)
+        #print(self.df)
         df = self.df[self.df["name"] == unit]
-        print(df)
+        #print(df)
         stackhts = df['stackht'].unique()
-        print('get stackht', stackhts)
+        #print('get stackht', stackhts)
         return stackhts
 
     def get_method(self, unit, daterange):
@@ -1171,7 +1169,7 @@ class MonitoringPlan(EpaApiObject):
                    dhash["oris"] = self.oris
                    dhash["mid"] = self.mid
                    dhash["request_date"] = self.date
-                   print('DHASH ------------------')
+                   print('Monitoring Location ------------------')
                    print(dhash)
                    print('------------------')
                    dlist.append(copy.deepcopy(dhash))
@@ -1185,15 +1183,15 @@ class MonitoringPlan(EpaApiObject):
                dhash["oris"] = self.oris
                dhash["mid"] = self.mid
                dhash["request_date"] = self.date
-               print('DHASH ------------------')
+               print('Monitoring Location ------------------')
                print(dhash)
                print('------------------')
                dlist.append(copy.deepcopy(dhash))
             
-        print(dlist)
+        #print(dlist)
         df = pd.DataFrame(dlist)
-        print('DF1 ------------------')
-        print(df[['oris','name','methodCode','beginDateHour']]) 
+        #print('DF1 ------------------')
+        #print(df[['oris','name','methodCode','beginDateHour']]) 
         nseries = df.set_index("name")
         nseries = nseries["stackht"]
         nhash = nseries.to_dict()
@@ -1863,7 +1861,7 @@ class CEMS:
         # False if no so2_lbs (0 or Nan) and date is NaT.
         emitdf["goodrow"] = emitdf.apply(badrow, axis=1)
         emitdf = emitdf[emitdf["goodrow"]]
-
+       
         rowsbefore = emitdf.shape[0]
         if not emitdf.empty:
             # merge data from the facilties DataFrame into the Emissions DataFrame

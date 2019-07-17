@@ -9,7 +9,7 @@ import seaborn as sns
 from monet.obs import cems_api
 from monet.obs import cems_mod
 import monet.obs.obs_util as obs_util
-import monet.util.ptools as ptools
+#import monet.util.ptools as ptools
 
 # from arlhysplit import runh
 from monet.util.svdir import date2dir

@@ -641,6 +641,8 @@ class EmissionsCall(EpaApiObject):
         df = get_so2(df)
         if self.calltype == 'AD':
            df['SO2MODC'] = -90
+        if self.calltype == 'LME':
+           df['SO2MODC'] = -9
         # the LME data sometimes has duplicate rows.
         # causing emissions to be over-estimated.
         if self.calltype == 'LME':

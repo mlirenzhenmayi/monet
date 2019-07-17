@@ -9,6 +9,7 @@ import seaborn as sns
 from monet.obs import cems_api
 from monet.obs import cems_mod
 import monet.obs.obs_util as obs_util
+import monet.util.ptools as ptools
 
 # from arlhysplit import runh
 from monet.util.svdir import date2dir
@@ -47,6 +48,25 @@ methods:
 
 SourceSummary class
 """
+
+def remove_strings(df, stype):
+    def remove_str(x):
+        if isinstance(x, str):
+           try:
+               x = float(x)
+           except:
+               print('string value found ', x)
+               return 0
+        elif isinstance(x, float):
+           return x 
+        elif isinstance(x, int):
+           return x 
+        else:
+           print('unexpected type found ', type(x), x)
+           return x 
+
+    df[stype] = df.apply(lambda row: remove_str(row[stype]), axis=1)
+    return df
 
 
 def remove_negs(df, stype):
@@ -869,6 +889,7 @@ class SEmissions(object):
 
         # in cems_api
         # When emissions are retrieved from hourlyfuel, set the MODC=-90
+        # When emissions are retrieved with LME method, set the MODC=-9
         # When MODC value not defined and formula code is F-23 set MODC=-900
         # both of these are considered reliable estimates
         """
@@ -885,7 +906,7 @@ class SEmissions(object):
             except:
                 optime = 99
 
-            if val in [1, 2, 3, 4, -90, -900]:
+            if val in [1, 2, 3, 4, -9, -90, -900]:
                 return 1
             if val in [6, 7]:
                 return 2
@@ -897,6 +918,7 @@ class SEmissions(object):
 
         # print('USE SPNUM', self.use_spnum)
         # if self.use_spnum:
+        df = remove_strings(df, 'SO2MODC') 
         df["spnum"] = df.apply(sort_modc, axis=1)
         # else:
         #    df["spnum"] = 1
@@ -948,6 +970,8 @@ class SEmissions(object):
         ploc = 0
         unit = 0
         punit = 0
+        print('D1key', data1.keys())
+        print('d2key', data2.keys())
         for ky in data1.keys():
             loc = ky[0]
             spnum = ky[1]
@@ -966,6 +990,7 @@ class SEmissions(object):
                 self.fignum += 1
                 jjj = 0
             fig = plt.figure(self.fignum)
+            fig.set_size_inches(9,5)
             ax = fig.add_subplot(2, 1, 1)
             ax2 = fig.add_subplot(2, 1, 2)
             data = data1[ky] * self.lbs2kg
@@ -974,18 +999,51 @@ class SEmissions(object):
             #print(data[-20:])
             #print("-----------------plotting")
             ax.plot(data, clr)
+            md2 = True
             try:
                 ax2.plot(data2[ky], clr)
             except:
-                pass
+                print('Problem with plotting so2modc: ', ky)
+                md2 = False
+ 
             ax.set_ylabel("SO2 mass kg")
             ax2.set_ylabel("SO2 MODC value")
             plt.sca(ax)
+
+            d1 = data.index.tolist()
+            if md2:
+                d2 = data2[ky].index.tolist()
+                if d1[0] < d2[0]:
+                   sdate = d1[0]
+                else:
+                   sdate = d1[0]
+                if d1[-1] < d2[-1]:
+                   edate = d2[-1]
+                else:
+                   edate = d1[-1]
+            else:
+                sdate = d1[0]
+                edate = d1[-1]
+
+            ax.set_xlim(sdate, edate)
+            ax2.set_xlim(sdate, edate)
+
+          
+            #ptools.set_date_ticks(ax)
+            #ptools.set_date_ticks(ax2)
+            #fig.autofmt_xdate()
+            #plt.setp(ax.get_xticklabels(), rotation=30, ha='right')  
+            ax.xaxis.set_major_formatter(plt.NullFormatter())
+            plt.setp(ax2.get_xticklabels(), rotation=30, ha='right')  
+
+            yearstr=sdate.strftime("%Y ")
             if byunit:
                 locstr = str(loc) + "." + str(unit).strip()
             else:
                 locstr = str(loc)
-            plt.title(locstr + " " + namehash[loc])
+            plt.title(yearstr + locstr + " " + namehash[loc])
+
+            
             if save:
                 figname = self.tdir + "/cems." + locstr + ".jpg"
                 plt.savefig(figname)

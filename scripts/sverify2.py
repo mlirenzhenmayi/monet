@@ -624,8 +624,8 @@ if options.create_runs:
         units = options.cunits
     )
     if not runlist: 
-        print('No  CONTROL files created. Check if EMITIMES files have been\
-               created.')
+        print('No  CONTROL files created') 
+        print('Check if EMITIMES files have been created')
     else:
         rs = RunScript(options.tag + ".sh", runlist, options.tdir)
 
@@ -639,7 +639,7 @@ if options.create_runs:
         options.metfmt,
     )
     if not runlist: 
-        print('No vmixing control files created. Check if datem.txt files exist')
+        print('No vmixing CONTROL files created. Check if datem.txt files exist')
     else:
         rs = VmixScript(options.tag + '.vmix.sh', runlist, options.tdir)
 

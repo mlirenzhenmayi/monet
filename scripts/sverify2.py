@@ -613,6 +613,7 @@ if options.create_runs:
     from monet.util.svhy import RunScript
     from monet.util.svhy import VmixScript
 
+    print('Creating CONTROL files')
     runlist = create_controls(
         options.tdir,
         options.hdir,
@@ -622,9 +623,13 @@ if options.create_runs:
         options.metfmt,
         units = options.cunits
     )
+    if not runlist: 
+        print('No  CONTROL files created. Check if EMITIMES files have been\
+               created.')
+    else:
+        rs = RunScript(options.tag + ".sh", runlist, options.tdir)
 
-    rs = RunScript(options.tag + ".sh", runlist, options.tdir)
-
+    print('Creating CONTROL files for vmixing')
     runlist = create_vmix_controls(
         options.tdir,
         options.hdir,
@@ -633,8 +638,10 @@ if options.create_runs:
         source_chunks,
         options.metfmt,
     )
-
-    rs = VmixScript(options.tag + '.vmix.sh', runlist, options.tdir)
+    if not runlist: 
+        print('No vmixing control files created. Check if datem.txt files exist')
+    else:
+        rs = VmixScript(options.tag + '.vmix.sh', runlist, options.tdir)
 
 
 if options.write_scripts:

@@ -325,7 +325,6 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
     vstr = ''
     runlist = []
     for dirpath in dtree:
-        print(dirpath)
         for (d1, dirnames, filenames) in walk(dirpath):
             for fl in filenames:
                 #if iii == 0:
@@ -434,7 +433,6 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
     iii = 0
     # for (dirpath, dirnames, filenames) in walk(tdirpath):
     for dirpath in dtree:
-        print(dirpath)
         for (d1, dirnames, filenames) in walk(dirpath):
             for fl in filenames:
                 if iii == 0:

@@ -101,8 +101,6 @@ def get_stackheight_hash(df):
     for oris in orislist:
         df2 = dftemp[dftemp["oris"] == oris]
         stackhts = df2["stackht"].unique()
-        print("Stack Heights for oris " + str(oris))
-        print(stackhts)
         sh = np.max(stackhts)
         shash[oris] = sh
     return shash
@@ -112,7 +110,7 @@ def get_timezone(lat, lon):
     """ returns time difference in hours"""
     tf = TimezoneFinder()
     tz = tf.closest_timezone_at(lng=lon, lat=lat)
-    print("TZ-------------", tz, lat, lon)
+    #print("TZ-------------", tz, lat, lon)
     dtest = datetime.datetime(2010, 2, 1, 0)
     t1 = pd.Timestamp(dtest).tz_localize(tz)  # local time
     t2 = t1.tz_convert("utc")  # utc time
@@ -125,7 +123,8 @@ def get_timezone(lat, lon):
 
 class SourceSummary:
 
-    def __init__(self, tdir="./", fname="source_summary.csv", data=pd.DataFrame()):
+    def __init__(self, tdir="./", fname="source_summary.csv",
+                 data=pd.DataFrame()):
 
         self.commentchar = "#"
         if not data.empty:
@@ -270,15 +269,15 @@ class SourceSummary:
 
         return df
 
-    def print(self, tdir="./", name="source_summary.csv"):
+    def print(self, tdir="./", fname="source_summary.csv"):
         if self.sumdf.empty:
            print('No Source Summary Data')
         else:
-            fname = tdir + name
+            name = tdir + fname
             cols = self.sumdf.columns.values.copy()
             cols[8] = cols[8].replace("lbs", "tons")
             orislist = self.sumdf["ORIS"].unique()
-            with open(fname, "w") as fid:
+            with open(name, "w") as fid:
                 rstr = ""
                 for val in cols:
                     rstr += str(val) + " ,    "
@@ -445,26 +444,18 @@ class SEmissions(object):
             print("NO SO2 data found. Exiting program")
             sys.exit()
 
-        # print('check A0')
-        # temp = data[['time local','so2_lbs','oris','unit']]
-        # for mid in temp['unit'].unique():
-        #    utemp = temp[temp['unit'] == mid]
-        #    print(temp[temp['unit'] == mid][0:10])
-        #    print(' ***  ')
-        # print(data.columns.values)
-
-        source_summary = SourceSummary(data=data)
+        tag = self.tag
+        if not tag: tag = '' 
+        source_summary = SourceSummary(fname = tag + '.source_summary.csv', data=data)
         self.meanhash = df2hash(source_summary.sumdf, "ORIS", "Max(lbs)")
+
         # remove sources which do not have high enough emissions.
         self.goodoris = source_summary.check_oris(self.ethresh)
         self.df = data[data["oris"].isin(self.goodoris)].copy()
 
-        # print('check A1')
-        # temp = self.df[['time local','so2_lbs','oris','unit']]
-        # print(temp[0:10])
-
         lathash = df2hash(self.df, "oris", "latitude")
         lonhash = df2hash(self.df, "oris", "longitude")
+
         # convert time to utc
         tzhash = {}
         for oris in self.df["oris"].unique():
@@ -501,7 +492,7 @@ class SEmissions(object):
         # get the source summary for the dates of interest
         df = obs_util.timefilter(self.df, [self.d1, self.d2])
         source_summary2 = SourceSummary(data=df)
-        source_summary2.print()
+        source_summary2.print(fname= tag + '.source_summary.csv')
 
     def get_so2_sources(self, unit=True):
         sources = self.get_sources(stype="so2_lbs", unit=unit)

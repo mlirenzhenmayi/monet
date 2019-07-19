@@ -285,18 +285,22 @@ def find_numpar(emitfile, controlfile):
         numpar = 1000
     return np.ceil(numpar)
 
-
-def read_vmix(tdirpath, sdate, edate, timchunks, sid=None):
+def read_vmix(tdirpath, sdate, edate, timechunks, sid=None, verbose=False):
+    from os import walk
     from monet.utilhysplit import vmixing
+    from monet.util.svdir import dirtree
     dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks)
     vmix = vmixing.VmixingData()
     for dirpath in dtree:
-        print(dirpath)
         for (d1, dirnames, filenames) in walk(dirpath):
              for fl in filenames:
                  if 'STABILITY' in fl:
                      if not sid or str(sid) in fl:
-                         vmix.add_data(fl)
+                         temp = fl.split('.')
+                         xsid = temp[1]
+                         xsid = int(xsid.replace('V',''))
+                         vmix.add_data(fl, vdir=dirpath, sid=xsid,
+                                       verbose=verbose)
     return vmix.df
 
 def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
@@ -304,12 +308,10 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
     read the base control file in tdirpath CONTROL.0
     """
     from os import walk
-    from monet.utilhysplit import emitimes
     # from arlhysplit.runh import getmetfiles
     from monet.util.svdir import dirtree
-    from monet.util.svdir import date2dir
-    from monet.util.svdir import dir2date
     from monet.util.datem import read_datem_file
+    from monet.util.svdir import dir2date
 
     dstart = sdate
     dend = edate
@@ -317,7 +319,7 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
     met_files = MetFiles(metfmt) 
     runlist = []  #list of RunDescriptor Objects
     hysplitdir = hdirpath + "/exec/"
-    #landusedir = hdirpath + "/bdyfiles/"
+    landusedir = hdirpath + "/bdyfiles/"
 
     dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks)
     vstr = ''
@@ -329,22 +331,23 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
                 #if iii == 0:
                 #    firstdirpath = dirpath
                 if fl=="datem.txt":
-                    print(d1, dirnames, fl)
+                   #  print(d1, dirnames, fl)
                    # read the datem.txt file
                     cols=['year','month','day','hour','duration','lat','lon','val','sid','ht']
                     dfdatem = read_datem_file(d1 + fl, colra=cols, header=2) 
                     dfdatem = dfdatem[['lat','lon','sid']]
                     dfdatem = dfdatem.drop_duplicates()
+                    writelanduse(landusedir=landusedir, working_directory=d1)
                     for index, row  in dfdatem.iterrows():
                         lat = row['lat']
                         lon = row['lon']
                         pid = int(row['sid'])
-                        print('PID', str(pid))
-                        ##Write a control file for this emitimes file
+                        #print('PID', str(pid))
                         suffix = 'V' + str(pid)
                         control = HycsControl(fname='CONTROL.V',
                                   working_directory=d1, rtype='vmixing')
                         #control.read()
+                        sdate = dir2date(tdirpath, dirpath)
                         control.date = sdate
                         ##remove all the locations first and then add
                         ##locations that correspond to emittimes file.

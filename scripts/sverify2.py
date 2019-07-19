@@ -97,7 +97,7 @@ class ConfigFile(NameList):
         self.lorder = None
 
         super().__init__(fname, working_directory)
-
+        # the following are in the NameList class
         # self.fname
         # self.nlist  # dictionary
         # self.descrip
@@ -132,12 +132,18 @@ class ConfigFile(NameList):
         self.create_runs = False
         self.defaults = False
         self.results = False
+
+        # attributes for met data
+        self.vmix = 0 
+
         if os.path.isfile(fname):
             self.read(case_sensitive=False)
             self.hash2att()
             self.fileread = True
         else:
             self.fileread = False
+
+
 
     def _load_descrip(self):
         lorder = []
@@ -225,7 +231,14 @@ class ConfigFile(NameList):
         hstr = "(False) or True. Use CONTROL and SETUP in top level directory to\n"
         hstr += sp10 + "write CONTROL and SETUP files in subdirectories which \n"
         hstr += sp10 + "will call EMITIMES files. Also create bash run scripts\n"
-        hstr += sp10 + "to run hysplit and then c2datem"
+        hstr += sp10 + "to run hysplit and then c2datem\n"
+        hstr += sp10 + "\n"
+        hstr += sp10 + "If a datem file with observations exists in the\n"
+        hstr += sp10 + "subdirectories then will also create CONTROL\n"
+        hstr += sp10 + "files for vmixing (CONTROL.V(stationid).\n"
+        hstr += sp10 + "and will create a script tag.vmix.sh for running\n"
+        hstr += sp10 + "vmixing.\n"
+        hstr += sp10 + "See the VMIX option for reading vmixing output.\n"
         self.descrip["RUN"] = hstr
         lorder.append("RUN")
 
@@ -238,6 +251,12 @@ class ConfigFile(NameList):
         hstr += sp10 + "week will be replaced by w1, w2, w3... as appropriate.\n"
         self.descrip["metfile"] = hstr
         lorder.append("metfile")
+
+        hstr = "Data from vmixing \n"
+        hstr += sp10 + 'if 1 create csv file and plots from vmixing output in\n'
+        hstr += sp10 + 'subdirectories'
+        self.descrip['vmix'] = hstr
+        lorder.append('vmix')
 
         hstr = "(False) or True. The bash scripts for running HYSPLIT and then \n"
         hstr += sp10 + "c2datem must be run first.\n"
@@ -278,6 +297,10 @@ class ConfigFile(NameList):
         return self.orislist.split(":")
 
     def hash2att(self):
+        ## should be all lower case here.
+        ## namelist is not case sensitive and
+        ## all keys are converted to lower case.
+
         self.bounds = self.test("area", self.bounds)
         self.drange = self.test("drange", self.drange)
         self.tag = self.test("tag", self.tag)
@@ -305,6 +328,8 @@ class ConfigFile(NameList):
         self.write_scripts = self.test("scripts", self.write_scripts)
         self.metfmt = self.test("metfile", self.metfmt)
 
+        self.vmix = self.test('vmix', self.vmix)
+        self.vmix = int(self.vmix)
         # booleans
         self.byunit = self.str2bool(self.test("byunit", self.byunit))
         self.spnum = self.str2bool(self.test("species", self.spnum))
@@ -435,19 +460,14 @@ ncycle = source_chunks
 if options.defaults:
     from monet.util.svhy import default_setup
     from monet.util.svhy import default_control
-
     print("writing control and setup")
     # if units='ppb' then ichem=6 is set to output mixing ratios.
     default_setup("SETUP.0", options.tdir, units=options.cunits)
     default_control("CONTROL.0", options.tdir, run_duration, d1, area=area)
 
 if options.results:
-    # from monet.util.svhy import create_runlist
-    # from monet.util.svresults import results
-    # from monet.util.svresults import CemsObs
     from monet.util.svresults2 import SVresults
     from monet.util.svcems import SourceSummary
-
     sss = SourceSummary()
     df = sss.load()
     orislist = sss.check_oris(10)
@@ -456,12 +476,35 @@ if options.results:
     datemfile = options.tag + "DATEM.txt"
     print("writing datem ", datemfile)
     svr.writedatem(datemfile)
-    sys.exit()
+    #sys.exit()
     svr.fill_hash()
     print("PLOTTING")
     svr.plotall()
-    # runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
-    # results("outfile.txt", runlist)
+
+if options.vmix==1:
+   from monet.util.svhy import read_vmix
+   from monet.util.svobs import SObs
+   from monet.util.svobs import vmixing2metobs
+   df = read_vmix(options.tdir, d1, d2, source_chunks, sid=None)
+
+   if not df.empty:
+      # start getting obs data to compare with.
+      obs = SObs([d1, d2], area, tdir=options.tdir)
+      obs.find(tdir=options.tdir, test=options.runtest, units=options.cunits)
+      #met = obs.met
+
+      vmet = vmixing2metobs(df,obs.obs)
+      sites = vmet.get_sites()
+      pstr=''
+      for sss in sites:
+           pstr += str(sss) + ' ' 
+      print('Plotting met data for sites ' + pstr)
+      vmet.plot_ts(quiet=False, save=True) 
+      vmet.nowarning_plothexbin(quiet=False, save=True) 
+      vmet.to_csv(options.tdir, csvfile = 'vmixing.' + options.tag + '.csv')
+
+   else:
+      print('No vmixing data available')
 
 rfignum = 1
 if options.cems:
@@ -515,13 +558,13 @@ if options.obs:
 
     obs = SObs([d1, d2], area, tdir=options.tdir)
     obs.fignum = rfignum
-    obs.find(pload=True, tdir=options.tdir, test=options.runtest, units=options.cunits)
-    #try:
-    #    obs.check()
-    #except BaseException:
-    #    print("No met data for stations.")
+    obs.find(tdir=options.tdir, test=options.runtest, units=options.cunits)
+    meto = obs.get_met_data()
+    meto.to_csv(options.tdir, csvfile = obs.csvfile)
+    
     obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir)
 
+    ################################################################################ 
     # output file with distances and directons from power plants to aqs sites.
     obsfile = obs.csvfile
     sumfile = "source_summary.csv"
@@ -535,6 +578,7 @@ if options.obs:
         cando = CemsObs(obsfile, cemsfile, sumfile)
         osum, gsum = cando.make_sumdf()
         gpd2csv(osum, "geometry.csv")
+    ################################################################################ 
 
     obs.plot(save=True, quiet=options.quiet)
     fignum = obs.fignum
@@ -550,6 +594,17 @@ if options.obs:
     plt.savefig(options.tdir + "map.jpg")
     if options.quiet < 2:
         plt.show()
+    
+    sites = meto.get_sites()
+    pstr=''
+    for sss in sites:
+        pstr += str(sss) + ' ' 
+    print('Plotting met data for sites ' + pstr)
+  
+    if options.quiet < 2:
+        meto.nowarning_plothexbin(quiet=False, save=True)
+    else:
+        meto.nowarning_plothexbin(quiet=True, save=True)
 
 runlist = []
 if options.create_runs:

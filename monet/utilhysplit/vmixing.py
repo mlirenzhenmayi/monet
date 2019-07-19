@@ -77,12 +77,17 @@ class VmixingData:
         self.units = None
         self.df = pd.DataFrame()
 
-    def add_data(self, fname,  vdir='./', century=2000, verbose=True):
+    def add_data(self, fname,  vdir='./', century=2000, verbose=False, sid=None):
             df = self.readfile(fname, vdir, century, verbose)   
+            if sid:
+               df['sid'] = sid
             if self.df.empty:
                self.df = df
             else:
                self.df = pd.concat([self.df, df], axis=0)
+               #print(self.df)
+               #import sys
+               #sys.exit()
             return self.df
 
     def make_dummies(self, data_ra=[-999]):
@@ -115,10 +120,14 @@ class VmixingData:
         units.extend(temp3)
         return cols, units
 
+
     def readfile(self,  fname, vdir='./', century=2000, verbose=False):
         """Reads file and returns True if the file exists.
            returns False if file is not found"""
+
+        df = pd.DataFrame()
         if path.isfile(vdir + fname):
+            if verbose: print('Adding', vdir + fname)
             data = []
             with open(vdir + fname, "r") as fid:
                  head1 = fid.readline()
@@ -128,19 +137,27 @@ class VmixingData:
                  cols, units = self.parse_header(head2,head3)
                  for line in fid.readlines():
                      # get the date for the line
+                     temp = line.split()
                      try:
                         vals = [self.line2date(line, century)]
                      except:
                         return False
-                     temp = line.split()
-                     vals.extend(temp[6:]) 
+                     temp2=[] 
+                     for val in temp[6:]:
+                         try:
+                            temp2.append(float(val))
+                         except:
+                            temp2.append(val) 
+                     vals.extend(temp2) 
                      data.append(vals) 
-        df = pd.DataFrame.from_records(data)
-        df.columns = cols
-        df['latitude'] = lat
-        df['longitude'] = lon
-        df['met'] = met
-        self.units = zip(cols, units)
+            df = pd.DataFrame.from_records(data)
+            df.columns = cols
+            df['latitude'] = lat
+            df['longitude'] = lon
+            df['met'] = met
+            self.units = zip(cols, units)
+        else: 
+            if verbose: print('Cannot Find ', vdir + fname)
         return df
 
     def line2date(self, line, century):
@@ -154,65 +171,5 @@ class VmixingData:
         vdate = datetime.datetime(year, month, day , hour, minute)
         return vdate
 
-class Script:
-
-    def mksh(self, coord, xname, mdir, metname, interpolate=False,  multra=[], runsh=False, verbose=False,
-             hysplitdir = '-99'):
-        """writes shell script which will run xtrct_stn
-           coord is lat lon in string format e.g. '34 -119'
-           mdir is the directory of the meteorological file.
-           metname is the name of the meteorological file."""
-       
-        valra = list(zip(*self.valra))[0]
-        levra = list(zip(*self.valra))[1]
-        if interpolate:
-           interp = '1 \n'
-        else:
-           interp = '0 \n'
-        if hysplitdir == '-99':
-           hysplitdir = ''
-        elif hysplitdir[-1] != '/':
-           hysplitdir += '/'
-        with open(xname, 'w') as fid:
-             if verbose: print('writing to ', xname)
-             fid.write(hysplitdir + 'xtrct_stn -i << EOF \n')
-             fid.write(mdir + '\n')
-             fid.write(metname + '\n')
-             fid.write(str(len(valra)) + '\n')
-             if len(levra) != len(valra):
-                levra = ['01'] * len(valra)
-             if multra==[]:
-                ##this block will pick the amount to multiply the value by. 
-                for zval in valra:
-                    if zval in  ['U10M', 'V10M', 'T02M', 'PRSS','PBLH','SHGT','PRECIP','LHTF','DSWF','LHTF']:
-                        multra.append('1')
-                    elif zval in ['USTR']:  
-                        multra.append('100')
-                    elif zval in ['SPHU']:  
-                        multra.append('1000')
-                    elif zval in ['TPP1', 'TPPT', 'TPP6', 'DIFR']:
-                        ##this will put precip in um
-                        multra.append('1000000')
-                    else:
-                        multra.append('1')
-                    #print zval, multra
-             outra = list(zip(valra, levra, multra))
-             for val in outra:
-                 fid.write(val[0].strip() + ' ' + val[1].strip() + ' ' + val[2].strip() + '\n')
-             fid.write(coord + '\n')
-             fid.write(interp)
-             fid.write(self.fname + '\n')
-             fid.write('1\n')          #record number to start with
-             fid.write('99999\n')      #record number to end with
-             fid.write('EOF')
-        if runsh:
-           callstr = "chmod u+x " + './' + xname
-           if verbose: print('CALLING', callstr)
-           subprocess.call(callstr, shell=True) 
-
-           callstr = './' + xname
-           if verbose: print(callstr)
-           subprocess.call(callstr, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return callstr            
  
 

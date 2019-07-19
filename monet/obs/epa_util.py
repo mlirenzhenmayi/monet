@@ -218,7 +218,7 @@ def write_table(self,
                     dt['Region'] = i.replace(' ', '_')
                     dt['Label'] = label
                     dft = pd.DataFrame(dt, index=[0])
-                    dd = pd.concat([dd, dft])
+                    dd = pd.concat([dd, dft], sort=True)
                 except KeyError:
                     pass
         pd.options.display.float_format = '{:,.3f}'.format
@@ -233,7 +233,7 @@ def write_table(self,
                 index_col=0,
                 sep='\s+',
                 names=stats)
-            dd = pd.concat([dd, dff]).sort_values(by=['Region'])
+            dd = pd.concat([dd, dff], sort=True).sort_values(by=['Region'])
 
         out = StringIO()
         dd.to_string(out, columns=stats)

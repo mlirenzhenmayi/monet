@@ -114,13 +114,6 @@ def long_to_wideB(df):
         columns=['variable','units']).reset_index()
     return wpivot
 
-def get_info(df):
-    rdf = df.drop(['obs','time','variable','units','time_local'],axis=1)
-    rdf.drop_duplicates(inplace=True)
-    #print('HEADER------')
-    #print(rdf.columns.values)
-    return rdf  
-
 
 def calc_8hr_rolling_max(df, col=None, window=None):
     df.index = df.time_local

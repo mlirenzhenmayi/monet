@@ -3,10 +3,13 @@ import os
 import pandas as pd
 import numpy as np
 import pickle as pickle
+import matplotlib
+matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import datetime
-#import sys
+import sys
 import seaborn as sns
+import warnings
 from monet.obs import aqs as aqs_mod
 from monet.obs import airnow
 import monet.obs.obs_util as obs_util
@@ -19,15 +22,53 @@ from monet.obs.epa_util import convert_epa_unit
 from monet.util import tools
 
 """
+FUNCTIONS
+
+find_obs_files
+
+
 WORKING ON:
 check method looks at correlation of wind with SO2
 
 """
+
+
+
+    
+
+
+def get_info(df):
+    rdf = df.drop(['obs','time','variable','units','time_local'],axis=1)
+    rdf.drop_duplicates(inplace=True)
+    #print('HEADER------')
+    #print(rdf.columns.values)
+    return rdf  
+
+def find_obs_files(tdirpath, sdate, edate, tag=None):
+    fnamelist = []
+    if tag:
+       fname = 'tag' + '.obs' '.csv'
+       if os.path.isfile(os.path.join(tdirpath,fname)):
+          fnamelist = [fname]
+    else:    
+        file_start = None
+        file_end = None
+        for item in os.listdir(tdirpath):
+            #if os.path.isfile(os.path.join(tdirpath,item)):
+               if item[0:3] == 'obs':
+                  temp = item.split('.')
+                  file_start = datetime.datetime.strptime(temp[0],"obs%Y%m%d")
+                  file_end = datetime.datetime.strptime(temp[1],"%Y%m%d")
+                  file_end += datetime.timedelta(hours=23)
+
+                  if sdate >=file_start and edate <=file_end:
+                     fnamelist.append(item)
+    return fnamelist
+
 def read_csv(name, hdrs=[0]):
     # print('in subroutine read_csv', name)
     def to_datetime(d):
         return datetime.datetime.strptime(d, "%Y-%m-%d %H:%M:%S")
-
     obs = pd.read_csv(name, sep=",", header=hdrs, converters={"time": to_datetime})
     return obs
 
@@ -62,8 +103,209 @@ def get_tseries(df, siteid, var="obs", svar="siteid", convert=False):
     series = df[var] * mult
     return series
 
+
+def vmixing2metobs(vmix, obs):
+    """
+    take vmixing dataframe and SO2 measurement dataframe and 
+    combine into a MetObs object.
+    """
+    print('--------------')
+    
+    obs = obs[['time','siteid','obs','mdl']]
+    #print(obs.dtypes)
+    #print(vmix.dtypes)
+    obs.columns = ['date','sid','so2','mdl']
+    print(obs['sid'].unique())
+    print(vmix['sid'].unique())
+
+
+    dfnew = pd.merge(obs,
+                     vmix,
+                     how='left',
+                     left_on=['date','sid'],
+                     right_on=['date','sid']
+                     )
+    dfnew = dfnew.drop_duplicates()
+    print(dfnew[0:10])
+    met = MetObs(tag='vmix')
+    met.from_vmix(dfnew)
+    return  met       
+ 
+     
+
+def heatmap(x,y, ax, bins=(50,50)):
+    heatmap, xedges, yedges = np.histogram2d(x,y, bins=(bins[0],bins[1]))
+    extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+    cb = ax.imshow(heatmap, extent=extent)
+    
+def hexbin(x,y,ax,sz=50,mincnt=1):
+    cm='Paired'
+    cb = ax.hexbin(x,y, gridsize=sz, cmap=cm, mincnt=mincnt)
+    plt.colorbar(cb)
+
+def jointplot(x, y, data, fignum=1):
+    fig = plt.figure(fignum)
+    #ax1 = fig.add_subplot(1, 3, 1)
+    #plt.set_gca(ax1)
+    ggg = sns.jointplot(x=x, y=y, data=df, kind="hex", color="b")
+    ggg.plot_joint(plt.scatter, c="m", s=30, linewidth=1, marker=".")
+
+class MetObs(object):
+
+    def __init__(self, tag=None):
+        self.df = pd.DataFrame()
+        self.columns_original = []
+        self.fignum = 1
+        self.tag = tag
+
+    def from_vmix(self,df):
+        self.df = df
+        self.columns_original = self.df.columns.values
+        self.rename_columns()
+       
+
+    def from_obs(self, obs):
+        print("Making metobs from obs")
+        self.df = tools.long_to_wideB(obs)  # pivot table
+        self.columns_original = self.df.columns.values
+        self.rename_columns()
+        # checking to see if there is met data in the file.
+        testcols = ['WD','RH','TEMP','WS']
+        overlap = [x for x in testcols if x in self.df.columns.values]
+        if not overlap:
+           self.df = pd.DataFrame()  
+           print('No Met Data Found') 
+        else:
+           self.df = self.df.dropna(axis=0, how='all', subset=overlap)
+
+
+    def to_csv(self,tdir, csvfile=None):
+        if self.df.empty: return -1
+        if not csvfile: csvfile = ''
+        df = self.df.copy()
+        df.columns = self.columns_original
+        df.to_csv(tdir + "met" + csvfile, header=True, float_format="%g")
+          
+ 
+    def rename_sub(self, istr):
+        rstr = istr
+        if 'WD' in istr: rstr = 'WDIR'
+        if 'RH' in istr: rstr = 'RH'
+        if 'T02M' in istr: rstr = 'TEMP'
+        if 'WS' in istr: rstr = 'WS'
+        if 'date' in istr: rstr = 'time'
+        if 'SO2' in istr.upper(): rstr = 'SO2'
+        if 'sid' in istr: rstr = 'siteid'
+        return rstr
+
+    def get_sites(self):
+        if self.df.empty: return []
+        return self.df['siteid'].unique()
+   
+    def rename_columns(self):
+        newc = []
+        for col in self.df.columns.values:
+            if isinstance(col, tuple):
+               if 'obs' not in col[0]:
+                   val = col[0].strip()
+               else:
+                   val = col[1].strip()
+            else:
+               val = col
+            newc.append(self.rename_sub(val))
+        self.df.columns = newc 
+        
+    def nowarning_plothexbin(self, save=True, quiet=True):
+        # get "Adding an axes using the same arguments as previous axes
+        # warnings. This is intended behavior so want to suppress warning.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.plothexbin(save, quiet)
+
+
+    def plot_ts(self, save=False, quiet=False):
+        if self.df.empty: return -1
+        sns.set()
+        slist = self.get_sites()
+        print('SSSSSSSSS ', slist)
+        for site in slist:
+            fig = plt.figure(self.fignum)
+            fig.set_size_inches(10,5)
+            # re-using these axis produces a warning.
+            ax1 = fig.add_subplot(1,1,1)
+            ax2 = ax1.twinx()
+
+            df = self.df[self.df['siteid'] == site]
+            df = df.set_index('time')
+            so2 = df['SO2']
+            wdir = df['WDIR']
+            ax2.plot(wdir, 'b.')
+            ax1.plot(so2, '-k')
+
+            ax1.set_ylabel('so2 (ppb)')
+            ax2.set_ylabel('Wind direction (degrees)')
+            plt.title(str(site))
+            if not quiet:
+                plt.show()
+            if save:
+                tag = self.tag
+                if not tag: tag = ''
+                plt.savefig(tag + str(site) + '.met_ts.jpg')
+            plt.close() 
+
+    def plothexbin(self, save=True, quiet=True): 
+        if self.df.empty: return -1
+        slist = self.get_sites()
+        print('SSSSSSSSS ', slist)
+        for site in slist:
+            fig = plt.figure(self.fignum)
+            fig.set_size_inches(10,5)
+            # re-using these axis produces a warning.
+            ax1 = fig.add_subplot(1,2,1)
+            ax2 = fig.add_subplot(1,2,2)
+
+            df = self.df[self.df['siteid'] == site]
+            print('HEXBIN for site ' , site) 
+            print(df[0:10])
+            #df.columns = self.met_header(df.columns)
+            #print(df.columns.values)
+            #xtest = df[("WD", "Degrees Compass")]
+       
+            xtest = df["WDIR"]
+            ytest = df["WS"]
+            ztest = df["SO2"]
+        
+            if np.isnan(xtest).all():
+                print('No data WDIR')
+                continue
+            if np.isnan(ztest).all():
+                print('No data so2')
+                continue
+    
+            hexbin(xtest, ztest, ax1)  
+            hexbin(ytest, ztest, ax2) 
+            ax1.set_xlabel('Wind Direction ')
+            ax2.set_xlabel('Wind Speed ')
+            ax1.set_ylabel('SO2 (ppb)')
+            plt.title(str(site))
+            plt.tight_layout() 
+            if save:
+                tag = self.tag
+                if not tag: tag = ''
+                plt.savefig(tag + str(site) + '.met_dist.jpg')
+            #self.fignum +=1
+            if not quiet:
+                plt.show()
+            # clearing the axes does not
+            # get rid of warning.
+            plt.cla()
+            plt.clf()
+            plt.close()  
+
+
 class SObs(object):
     """This class for running the SO2 HYSPLIT verification.
+    
 
        methods
        -------
@@ -73,7 +315,7 @@ class SObs(object):
        check
     """
 
-    def __init__(self, dates, area, tdir="./"):
+    def __init__(self, dates, area, tdir="./", tag=None):
         """
         area is a tuple or list of four floats
         states : list of strings
@@ -93,28 +335,35 @@ class SObs(object):
         # area to consider
         self.area = area
 
-        # name of pkl file to save data to.
-        self.pfile = (
-            "./"
-            + "obs"
-            + self.d1.strftime("%Y%m%d.")
-            + self.d2.strftime("%Y%m%d.")
-            + "pkl"
-        )
         # name of csv file to save data to.
-        self.csvfile = (
-            "obs" + self.d1.strftime("%Y%m%d.") + self.d2.strftime("%Y%m%d.") + "csv"
-        )
-
+        self.csvfile = None
+        self.pload = True
+        self.find_csv()
+        
         # keeps track of current figure number for plotting
         self.fignum = 1
 
         # self obs is a Dataframe returned by either the aqs or airnow MONET
         # class.
         self.obs = pd.DataFrame()
+        self.dfall = pd.DataFrame()
         # siteidlist is list of siteid's of measurement stations that we want to look at.
         # if emptly will look at all stations in the dataframe.
         self.siteidlist = []
+
+    def find_csv(self):
+         # checks to see if a downloaded csv file in the correct date range
+         # exists.
+         names = []
+         names =  find_obs_files(self.tdir, self.d1, self.d2, tag=None)
+         # if it exists then
+         if len(names) > 0:
+            self.csvfile = (names[0])
+            self.pload = True
+         else: 
+            self.csvfile = ("obs" + self.d1.strftime("%Y%m%d.") +
+                             self.d2.strftime("%Y%m%d.") + "csv")
+            self.pload = False
 
     def plumeplot(self):
         """
@@ -130,7 +379,7 @@ class SObs(object):
         #     df = df[df[svar] == siteid]
         #     val = df['obs']
 
-    def plot(self, save=True, quiet=True, maxfig=10):
+    def plot(self, save=True, quiet=True, maxfig=10 ):
         """plot time series of observations"""
         sra = self.obs["siteid"].unique()
         print("PLOT OBSERVATION SITES")
@@ -185,13 +434,24 @@ class SObs(object):
             met = pd.DataFrame()
         return(met)
 
-    def create_pickle(self, tdir="./"):
-        pickle.dump(self.obs, open(tdir + self.pfile, "wb"))
+    def runtest(self):
+        aqs = aqs_mod.AQS()
+        basedir = os.path.abspath(os.path.dirname(__file__))[:-4]
+        fn = "testaqs.csv"
+        fname = os.path.join(basedir, "data", fn)
+        df = aqs_mod.load_aqs_file(fname, None)
+        self.obs = aqs_mod.add_data2(df) 
+        print("--------------TEST1--------------------------------") 
+        print(self.obs[0:10])
+        rt = datetime.timedelta(hours=72)
+        self.obs = obs_util.timefilter(self.obs, [self.d1, self.d2 + rt])
+        print("--------------TEST2--------------------------------")
+        print(self.obs[0:10])
+        self.save(tdir, "testobs.csv")
 
     def find(
         self,
         verbose=False,
-        pload=True,
         getairnow=False,
         tdir="./",
         test=False,
@@ -201,49 +461,24 @@ class SObs(object):
         Parameters
         -----------
         verbose   : boolean
-        pload     : boolean
-                    if True try to load from csv file.
         getairnow : boolean
         tdir      : string
         test      : boolean
         """
         area = self.area
-
-        make_csv = True  # to create/load from a csv file set to TRUE
+   
         if test:
-            aqs = aqs_mod.AQS()
-            basedir = os.path.abspath(os.path.dirname(__file__))[:-4]
-            fn = "testaqs.csv"
-            fname = os.path.join(basedir, "data", fn)
-            df = aqs_mod.load_aqs_file(fname, None)
-            self.obs = aqs_mod.add_data2(df) 
-            print("--------------TEST1--------------------------------") 
-            print(self.obs[0:10])
-            rt = datetime.timedelta(hours=72)
-            self.obs = obs_util.timefilter(self.obs, [self.d1, self.d2 + rt])
-            print("--------------TEST2--------------------------------")
-            print(self.obs[0:10])
-            self.save(tdir, "testobs.csv")
-        elif pload:
-            try:
-                print("trying to load file")
-                print(tdir + self.csvfile)
-                self.obs = read_csv(tdir + self.csvfile, hdrs=[0])
-            except BaseException:
-                pload = False
+           runtest
+        elif self.pload:
+            self.obs = read_csv(tdir + self.csvfile, hdrs=[0])
+            print("Loaded csv file file " + tdir + self.csvfile)
             mload = True
             try:
                 met_obs = read_csv(tdir + "met" + self.csvfile, hdrs=[0, 1])
             except BaseException:
                 mload = False
                 print("did not load metobs from file")
-            # except:
-            #    print("No met file to load")
-            #    print(tdir + 'met' + self.csvfile)
-            # print('Failed to load')
-            if pload:
-                print("Loaded csv file file " + tdir + self.csvfile)
-        if not pload:
+        elif not self.pload:
             print("LOADING from EPA site. Please wait\n")
             if getairnow:
                 aq = airnow.AirNow()
@@ -258,49 +493,27 @@ class SObs(object):
             # aq.add_data([self.d1, self.d2], param=['SO2','WIND','TEMP'], download=False)
             #self.obs = aq.df.copy()
        
-        print("HEAD", self.obs.columns.values)
+        print("HEADERS in OBS: ", self.obs.columns.values)
         # filter by area.
         if area:
             self.obs = obs_util.latlonfilter(
                 self.obs, (area[0], area[1]), (area[2], area[3])
             )
+        # filter by time
         rt = datetime.timedelta(hours=72)
         self.obs = obs_util.timefilter(self.obs, [self.d1, self.d2 + rt])
-        # save all the data here.
-        if not pload:
-            if make_csv:
-                self.save(tdir, self.csvfile)
-                # now create a dataframe with met data.
-                # print(self.obs.columns.values)
-                print("saving to file ", tdir + "met" + self.csvfile)
-        # else:
-        # if not mload:
-        print("Making metobs from obs")
-        met_obs = tools.long_to_wideB(self.obs)  # pivot table
-        met_obs.to_csv(tdir + "met" + self.csvfile, header=True, float_format="%g")
 
+        # if the data was not loaded from a file then save all the data here.
+        if not self.pload:
+            self.save(tdir, self.csvfile)
+            print("saving to file ", tdir + "met" + self.csvfile)
+
+        self.dfall = self.obs.copy()
         # now create a dataframe with data for each site.
         # get rid of the meteorological (and other) variables in the file.
         self.obs = self.obs[self.obs["variable"] == "SO2"]
-        obs_info = tools.get_info(self.obs)
-        print("saving to file ", tdir + "info_" + self.csvfile)
-        obs_info.to_csv(tdir + "info_" + self.csvfile, float_format="%g")
-        self.met = met_obs
-        # this would be used for filtering by a list of siteid's.
-        siteidlist = np.array(self.siteidlist)
-        if siteidlist.size:
-            self.obs = self.obs[self.obs["siteid"].isin(siteidlist)]
-            iii = 0
-            sym = [["r.", "bd"], ["r.", "c."]]
-            # for sid in siteidlist:
-            #    print('HERE -------------------' + str(sid))
-            #    #self.obs.check_mdl(sid, sym=sym[iii])
-            #    iii+=1
-            #    plt.show()
         if verbose:
             obs_util.summarize(self.obs)
-        self.ohash = obs_util.get_lhash(self.obs, "siteid")
-
         # get rid of the meteorological variables in the file.
         #self.obs = self.obs[self.obs["variable"] == "SO2"]
         # convert units of SO2
@@ -308,77 +521,18 @@ class SObs(object):
         if units == "UG/M3":
             self.obs = convert_epa_unit(self.obs, obscolumn="obs", unit=units)
 
-    def met_header(self, cols):
-        newcols = []
-        for val in cols:
-            newval= val[0]
-            if 'WD' in val: 
-               newval='WD'
-            elif 'WS' in val: 
-               newval='WS'
-            elif 'SO2' in val: 
-               newval='SO2'
-            newcols.append(newval)
-        return newcols
-
-    def check(self):
+    def get_met_data(self):
         """
-        plot obs versus some of the met data available.
+        Returns a MetObs object.
         """
-        # print(type(self.met))
-        # print(self.met.columns.values)
-        cols = self.met.columns.values
-        for val in cols:
-            if "siteid" in val[0]:
-                cname = val
-        # cname = ('siteid', 'Unnamed: 2_level_1')
-        sra = self.met[cname].unique()
-        print(sra)
-        for site in sra:
-            df = self.met[self.met[cname] == site]
-            df.columns = self.met_header(df.columns)
-            print(df.columns.values)
-            print(site) 
-            #xtest = df[("WD", "Degrees Compass")]
-            xtest = df["WD"]
-            ytest = df["WS"]
-            ztest = df["SO2"]
-            y = df["SO2"]
-            x = df["WD"]
-            z = df["WS"]
+        print("Making metobs from obs")
+        meto = MetObs()
+        meto.from_obs(self.dfall)
+        return meto
 
-            if np.isnan(xtest).all():
-                continue
-            if np.isnan(ztest).all():
-                continue
-            # print(x[1:10])
-            # print(y[1:10])
-            # camp=sns.cubehelix_palette(as_cmap=True, dark=0, light=1,
-            #                           reverse=True)
-            fig = plt.figure(1)
-            #ax1 = fig.add_subplot(1, 3, 1)
-            #plt.set_gca(ax1)
-            ggg = sns.jointplot(x=x, y=y, data=df, kind="hex", color="b")
-            ggg.plot_joint(plt.scatter, c="m", s=30, linewidth=1, marker=".")
-            #ax2 = fig.add_subplot(1, 3, 2)
-            #plt.set_gca(ax2)
-            fig = plt.figure(2)
-            ggg = sns.jointplot(x=z, y=y, data=df, kind="hex", color="b")
-            ggg.plot_joint(plt.scatter, c="m", s=30, linewidth=1, marker=".")
-            #ax3 = fig.add_subplot(1, 3, 3)
-            #plt.set_gca(ax3)
-            ggg = sns.jointplot(x=x, y=z, data=df, kind="hex", color="b")
-            ggg.plot_joint(plt.scatter, c="m", s=30, linewidth=1, marker=".")
-
-            # sns.jointplot(x=x, y=y, kind="hex", camp=camp)
-            print(str(site) + "---------------")
-            # plt.plot(x,y, 'k.')
-            #plt.title(str(site), y=0.8)
-            plt.title(str(site))
-            plt.show()
-            # plt.scatter(xtest,ytest,c=ztest)
-            # plt.contourf([xtest,ytest],ztest)
-            # plt.show()
+    def bysiteid(self, siteidlist):
+        obs = self.obs[self.obs["siteid"].isin(siteidlist)]
+        return obs         
 
     def obs2datem(self, edate, ochunks=(1000, 1000), tdir="./"):
         """
@@ -416,26 +570,28 @@ class SObs(object):
                 done = True
                 print("WARNING: obs2datem, loop exceeded maxiii")
 
-    def old_obs2datem(self):
-        """
-        write datemfile.txt. observations in datem format
-        """
-        sdate = self.d1
-        edate = self.d2
-        obs_util.write_datem(self.obs, sitename="siteid", drange=[sdate, edate])
+    #def old_obs2datem(self):
+    #    """
+    #    write datemfile.txt. observations in datem format
+    #    """
+    #    sdate = self.d1
+    #    edate = self.d2
+    #    obs_util.write_datem(self.obs, sitename="siteid", drange=[sdate, edate])
 
     def get_map_info(self):
-        return self.ohash
+        ohash = obs_util.get_lhash(self.obs, "siteid")
+        return ohash
 
     def map(self, ax):
         """
         ax : map axes object?
         """
+        ohash = obs_util.get_lhash(self.obs, "siteid")
         plt.sca(ax)
         clr = sns.xkcd_rgb["cerulean"]
         # sns.set()
-        for key in self.ohash:
-            latlon = self.ohash[key]
+        for key in ohash:
+            latlon = ohash[key]
             plt.text(latlon[1], latlon[0], str(key), fontsize=7, color="red")
             plt.plot(latlon[1], latlon[0], color=clr, marker="*")
         return 1

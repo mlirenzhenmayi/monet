@@ -1809,7 +1809,7 @@ class CEMS:
                     # add emissions for each quarter list.
                     for meth in method:
                         rvalue = self.add_emissions(oris, mid, datelist, meth)
-        print(dflist)
+        #print(dflist)
         
         # create dataframe from dflist.
         stackdf = pd.DataFrame(dflist, columns=["oris", "unit", "stackht"])

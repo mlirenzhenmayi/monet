@@ -355,7 +355,7 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
                         control.rename('CONTROL.' + suffix, working_directory=d1)
                         control.remove_metfile(rall=True)
                         ###Add the met files.
-                        control.add_duration(timechunks)
+                        control.add_duration(timechunks-1)
                         mfiles = met_files.get_files(control.date, timechunks)
                         for mf in mfiles:
                             if os.path.isfile(mf[0] + mf[1]):

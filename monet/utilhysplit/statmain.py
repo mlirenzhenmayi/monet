@@ -126,7 +126,9 @@ class MatchedData(object):
         ##put them together into a pandas data frame matched by dates.
         ## remove points for which either and observation or a forecast is not available.
         #self.obsra = self.create_obsra(obs, fc)
+        self.stn = stn
         self.obsra = pd.DataFrame()
+       
         if not obs.empty and not fc.empty:
            self.obsra = self.create_obsra(obs, fc) 
 
@@ -214,6 +216,47 @@ class MatchedData(object):
         if obs: ax.plot(time, self.obsra['obs'], clrs[0], label='observations', linewidth=2)
         ax.plot(time, self.obsra['fc']*mult, clrs[1], label=lbl)
 
+
+    def computediff_degrees(self):
+        # finds absolute and smallest difference between two angles.
+        temp = self.obsra.copy()
+
+        def diff(cc, mm):
+            wdiff = (np.min([np.abs(cc-mm), 360-np.abs(cc-mm)]))
+            # if moving clockwise gives you the smallest angular difference
+            # then difference is positive. Otherwise negative.
+            if np.abs(cc-mm) > 360-np.abs(cc-mm):
+               wdiff = -1 * wdiff
+            return wdiff
+        temp['diff'] =  temp.apply(lambda row: diff(row['obs'],row['fc']),
+                                    axis=1)
+
+        return temp
+
+    def computediff(self):
+        # finds absolute and smallest difference between two angles.
+        temp = self.obsra.copy()
+        def diff(cc, mm):
+            wdiff  = cc - mm
+            return wdiff
+        temp['diff'] =  temp.apply(lambda row: diff(row['obs'],row['fc']),
+                                   axis=1)
+        return temp
+
+
+    def plotdiff(self, ax, wdir=False, ptype='scatter'):
+        if wdir:
+            temp = self.computediff_degrees()
+        else:
+            temp = self.computediff()
+        #temp.set_index('time', inplace=True)
+        temp = temp['diff']
+        if ptype=='scatter': 
+            ax.plot(temp) 
+            
+
+
+
     def plotscatter(self, ax):
         """
         plot obsra on x and fc array on y
@@ -285,6 +328,8 @@ def find_stats_function(mra, scale=1, thresh=0, bg=0):
     sqrc=0
     sqrb=0
     sqrd=0
+
+    wdiff=0
   
     #for bias
     sumf=0
@@ -297,6 +342,10 @@ def find_stats_function(mra, scale=1, thresh=0, bg=0):
         sqrc += cc*cc
         sqrb += mm*cc
         sqrd += (cc-mm)**2
+
+        # this is for units specifed in degrees (such as wind direction)
+        wdiff += (np.min([np.abs(cc-mm), 360-np.abs(cc-mm)]))**2
+
         sumf += (cc-mm)
         #mse += (pair[0] - pair[1])**2
         #nnn+=1
@@ -317,6 +366,7 @@ def find_stats_function(mra, scale=1, thresh=0, bg=0):
         cbar = sumc/float(sumk)
         numb = sumk
         rmse = (sqrd/float(sumk))**0.5
+        wrmse = (wdiff/float(sumk))**0.5
         bias = sumf/float(sumk)
         if mbar>0 and cbar>0:
            nmse = sqrd/mbar/cbar/float(sumk)
@@ -367,5 +417,6 @@ def find_stats_function(mra, scale=1, thresh=0, bg=0):
     dhash['corr'] = corr
     dhash['mbar'] = mbar
     dhash['cbar'] = cbar
+    dhash['wrmse'] = wrmse
     return dhash
 

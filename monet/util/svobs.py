@@ -13,6 +13,7 @@ import warnings
 from monet.obs import aqs as aqs_mod
 from monet.obs import airnow
 import monet.obs.obs_util as obs_util
+from monet.utilhysplit import statmain
 
 # from arlhysplit import runh
 from monet.util.svdir import date2dir
@@ -118,7 +119,6 @@ def vmixing2metobs(vmix, obs):
     print(obs['sid'].unique())
     print(vmix['sid'].unique())
 
-
     dfnew = pd.merge(obs,
                      vmix,
                      how='left',
@@ -130,7 +130,6 @@ def vmixing2metobs(vmix, obs):
     met = MetObs(tag='vmix')
     met.from_vmix(dfnew)
     return  met       
- 
      
 
 def heatmap(x,y, ax, bins=(50,50)):
@@ -150,6 +149,65 @@ def jointplot(x, y, data, fignum=1):
     ggg = sns.jointplot(x=x, y=y, data=df, kind="hex", color="b")
     ggg.plot_joint(plt.scatter, c="m", s=30, linewidth=1, marker=".")
 
+
+def metobs2matched(met1, met2):
+    """
+    met1 is set to obs in the MatchedData
+    met2 is set to fc in the MatchedData
+    a list of MatchedData objects is returned for
+    all columns with matching names.
+    """
+
+    head1 = met1.columns.values
+    head2 = met2.columns.values
+
+    sid1 = met1['siteid'].unique()
+    sid2 = met2['siteid'].unique()
+
+    samesid = [x for x in sid1 if x in sid2]
+    mdlist = []
+    samecols = [x for x in head1 if x in head2]
+    filtercols = ['WDIR', 'WS', 'TEMP']
+    samecols = [x for x in filtercols if x in samecols]
+ 
+    mdlist = []
+    for sss in samesid:
+        m1temp = met1[met1['siteid'] == sss]     
+        m2temp = met2[met2['siteid'] == sss]     
+
+        m1temp.sort_values(by=['time'], axis=0, inplace=True)
+        m2temp.sort_values(by=['time'], axis=0, inplace=True)
+        m1temp['dup'] = m1temp.duplicated(subset=['time'], keep=False)
+        m2temp['dup'] = m2temp.duplicated(subset=['time'], keep=False)
+
+
+        m1temp.set_index('time', inplace=True)
+        m2temp.set_index('time', inplace=True)
+        for ccc in samecols:
+            t1 = m1temp[ccc] 
+            t2 = m2temp[ccc]
+
+            #t1['dup'] = t1.duplicated(subset=['time'])
+            #t2['dup'] = t2.duplicated(subset=['time'])
+
+            #print('-------------------------')
+            #print('TIME DUPLICATED')
+            #print(t1[t1['dup']==True])
+            #print(t2[t1['dup']==True])
+            print(str(sss), str(ccc), '-------------------------')
+            print(t1[0:10], type(t1))
+            print(t2[0:10], type(t2))
+            if not t1.empty and not t2.empty:
+                print('MATCHED')
+                matched = statmain.MatchedData(obs=t1, fc=t2, stn=(sss,ccc)) 
+                print(matched.obsra[0:10])
+                print('-*-*-*-*')
+                if not matched.obsra.empty:
+                    mdlist.append(matched)
+            print('-*-*-*-*')
+    return mdlist 
+  
+
 class MetObs(object):
 
     def __init__(self, tag=None):
@@ -157,6 +215,7 @@ class MetObs(object):
         self.columns_original = []
         self.fignum = 1
         self.tag = tag
+
 
     def from_vmix(self,df):
         self.df = df
@@ -222,12 +281,16 @@ class MetObs(object):
             warnings.simplefilter("ignore")
             self.plothexbin(save, quiet)
 
+    def nowarning_plot_ts(self, save=False, quiet=False):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.plot_ts(save, quiet)
 
     def plot_ts(self, save=False, quiet=False):
         if self.df.empty: return -1
         sns.set()
         slist = self.get_sites()
-        print('SSSSSSSSS ', slist)
+        #print('SSSSSSSSS ', slist)
         for site in slist:
             fig = plt.figure(self.fignum)
             fig.set_size_inches(10,5)
@@ -239,12 +302,13 @@ class MetObs(object):
             df = df.set_index('time')
             so2 = df['SO2']
             wdir = df['WDIR']
-            ax2.plot(wdir, 'b.')
+            ax2.plot(wdir, 'b.', markersize=2)
             ax1.plot(so2, '-k')
 
             ax1.set_ylabel('so2 (ppb)')
             ax2.set_ylabel('Wind direction (degrees)')
             plt.title(str(site))
+            plt.tight_layout() 
             if not quiet:
                 plt.show()
             if save:
@@ -256,7 +320,6 @@ class MetObs(object):
     def plothexbin(self, save=True, quiet=True): 
         if self.df.empty: return -1
         slist = self.get_sites()
-        print('SSSSSSSSS ', slist)
         for site in slist:
             fig = plt.figure(self.fignum)
             fig.set_size_inches(10,5)
@@ -265,8 +328,8 @@ class MetObs(object):
             ax2 = fig.add_subplot(1,2,2)
 
             df = self.df[self.df['siteid'] == site]
-            print('HEXBIN for site ' , site) 
-            print(df[0:10])
+            #print('HEXBIN for site ' , site) 
+            #print(df[0:10])
             #df.columns = self.met_header(df.columns)
             #print(df.columns.values)
             #xtest = df[("WD", "Degrees Compass")]
@@ -385,6 +448,7 @@ class SObs(object):
         print("PLOT OBSERVATION SITES")
         print(sra)
         sns.set()
+        sns.set_style('whitegrid')
         dist = []
         if len(sra) > 20:
             if not quiet:

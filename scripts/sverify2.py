@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import os
 from monet.utilhysplit.hcontrol import NameList
 import sys
+import pandas as pd
 
 # imported in create_map
 # import cartopy.crs as ccrs
@@ -481,6 +482,7 @@ if options.results:
     print("PLOTTING")
     svr.plotall()
 
+vmetdf = pd.DataFrame()
 if options.vmix==1:
    from monet.util.svhy import read_vmix
    from monet.util.svobs import SObs
@@ -499,10 +501,13 @@ if options.vmix==1:
       for sss in sites:
            pstr += str(sss) + ' ' 
       print('Plotting met data for sites ' + pstr)
-      vmet.plot_ts(quiet=False, save=True) 
-      vmet.nowarning_plothexbin(quiet=False, save=True) 
+      quiet=True
+      if options.quiet < 2:
+          quiet=False
+      vmet.plot_ts(quiet=quiet, save=True) 
+      vmet.nowarning_plothexbin(quiet=quiet, save=True) 
       vmet.to_csv(options.tdir, csvfile = 'vmixing.' + options.tag + '.csv')
-
+      vmetdf = vmet.df
    else:
       print('No vmixing data available')
 
@@ -594,7 +599,8 @@ if options.obs:
     plt.savefig(options.tdir + "map.jpg")
     if options.quiet < 2:
         plt.show()
-    
+    else:
+       plt.close('all')
     sites = meto.get_sites()
     pstr=''
     for sss in sites:
@@ -605,6 +611,44 @@ if options.obs:
         meto.nowarning_plothexbin(quiet=False, save=True)
     else:
         meto.nowarning_plothexbin(quiet=True, save=True)
+   
+    plt.close('all')
+    
+    # compare vmixing output with met data from AQS. 
+    if not vmetdf.empty and not meto.df.empty:
+       from monet.util.svobs import metobs2matched
+       mdlist = metobs2matched(vmetdf, meto.df)
+       fignum=10
+       for md in mdlist:
+           print('MATCHED DATA CHECK')
+           print(md.stn)
+           print(md.obsra[0:10])
+           print('---------------------')
+           
+           fig = plt.figure(fignum)
+           ax = fig.add_subplot(1,1,1)
+           md.plotscatter(ax)
+           save_str = str(md.stn[0]) + '_' + str(md.stn[1])
+           plt.title(save_str)
+           plt.savefig(save_str + '.jpg')
+           fignum+=1
+           if str(md.stn[1])=='WDIR' or str(md.stn[1])=='WS':
+              fig = plt.figure(fignum)
+              ax = fig.add_subplot(1,1,1)
+              wdir=False
+              if md.stn[1] == 'WDIR': wdir=True
+              md.plotdiff(ax, wdir=wdir)
+              save_str = 'TS_' + str(md.stn[0]) + '_' + str(md.stn[1])
+              plt.savefig(save_str + '.jpg')
+              fignum+=1
+       if options.quiet < 2: 
+          plt.show()
+       else:
+          plt.close()
+
+
+
+
 
 runlist = []
 if options.create_runs:

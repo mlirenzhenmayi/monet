@@ -19,7 +19,7 @@ from monet.utilhysplit import statmain
 from monet.util.svdir import date2dir
 
 # from arlhysplit.models.datem import mk_datem_pkl
-from monet.obs.epa_util import convert_epa_unit
+#from monet.obs.epa_util import convert_epa_unit
 from monet.util import tools
 
 """
@@ -45,10 +45,10 @@ def get_info(df):
     #print(rdf.columns.values)
     return rdf  
 
-def find_obs_files(tdirpath, sdate, edate, tag=None):
+def find_obs_files(tdirpath, sdate, edate, ftype='obs', tag=None):
     fnamelist = []
     if tag:
-       fname = 'tag' + '.obs' '.csv'
+       fname = 'tag' + '.' + ftype +  '.csv'
        if os.path.isfile(os.path.join(tdirpath,fname)):
           fnamelist = [fname]
     else:    
@@ -56,9 +56,9 @@ def find_obs_files(tdirpath, sdate, edate, tag=None):
         file_end = None
         for item in os.listdir(tdirpath):
             #if os.path.isfile(os.path.join(tdirpath,item)):
-               if item[0:3] == 'obs':
+               if item[0:3] == ftype:
                   temp = item.split('.')
-                  file_start = datetime.datetime.strptime(temp[0],"obs%Y%m%d")
+                  file_start = datetime.datetime.strptime(temp[0],ftype+"%Y%m%d")
                   file_end = datetime.datetime.strptime(temp[1],"%Y%m%d")
                   file_end += datetime.timedelta(hours=23)
 
@@ -582,8 +582,8 @@ class SObs(object):
         #self.obs = self.obs[self.obs["variable"] == "SO2"]
         # convert units of SO2
         units = units.upper()
-        if units == "UG/M3":
-            self.obs = convert_epa_unit(self.obs, obscolumn="obs", unit=units)
+        #if units == "UG/M3":
+        #    self.obs = convert_epa_unit(self.obs, obscolumn="obs", unit=units)
 
     def get_met_data(self):
         """

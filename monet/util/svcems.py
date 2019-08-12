@@ -699,11 +699,11 @@ class SEmissions(object):
             #    )
             d1 = d2 + datetime.timedelta(hours=1)
             iii += 1
-            if iii > 24:
+            if iii > 48:
+                print('Hit loop limit in create_emittimes method')
                 done = True
             if d1 > self.d2:
                 done = True
-            iii += 1
 
     def emit_subroutine(
         self,
@@ -932,7 +932,8 @@ class SEmissions(object):
             fig = plt.figure(self.fignum)
             fig.set_size_inches(9,5)
             ax = fig.add_subplot(1, 1, 1)
-            ax.plot(data[ky], clr)
+            data2 = data[ky] * self.lbs2kg
+            ax.plot(data2, clr)
             ax.set_ylabel("SO2 mass kg")
             ax.set_xlim(sdate, edate)
             plt.setp(ax.get_xticklabels(), rotation=30, ha='right')  
@@ -1010,6 +1011,7 @@ class SEmissions(object):
             ax = fig.add_subplot(2, 1, 1)
             ax2 = fig.add_subplot(2, 1, 2)
             data = data1[ky] * self.lbs2kg
+            #data = data1[ky] * 1
             ax.plot(data, clr)
             md2 = True
             try:

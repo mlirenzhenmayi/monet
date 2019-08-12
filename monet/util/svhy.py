@@ -177,12 +177,12 @@ def default_control(name, tdirpath, runtime, sdate, cpack=1,
     wetdepstr = "1.24 0.0 0.0"
     for ky in  klist:
         particle = Species(
-           sphash[ky] , psize=0, rate=1, duration=1, wetdepstr=wetdepstr, vel=vel, density=0, shape=0
+           sphash[ky] , psize=0, rate=0, duration=0, wetdepstr=wetdepstr, vel=vel, density=0, shape=0
         )
         #particle.add_wetdep(wetdepstr)
         control.add_species(particle)
     control.add_location(latlon=(46, -105), alt=200, rate=0, area=0)
-    control.write()
+    control.write(query=True)
 
 
 def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
@@ -364,7 +364,7 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
                         #    cg.outfile += "." + suffix
                         if control.num_met > 12: metgrid=True
                         else: metgrid=False 
-                        control.write(metgrid=metgrid)
+                        control.write(metgrid=metgrid, query=True)
                         run = RunDescriptor(d1, suffix, hysplitdir, "vmixing",
                                              parinit='None')
                         runlist.append(run)
@@ -375,7 +375,7 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
 
 
 def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units="ppb",
-                    ):
+                    tcm=False):
     """
     read the base control file in tdirpath CONTROL.0
     read the base SETUP.0 file in tdirpath
@@ -428,7 +428,6 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
     runlist = []  #list of RunDescriptor Objects
     hysplitdir = hdirpath + "/exec/"
     landusedir = hdirpath + "/bdyfiles/"
-
     dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks)
     iii = 0
     # for (dirpath, dirnames, filenames) in walk(tdirpath):
@@ -458,7 +457,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     # number of locations is number of records
                     # in the emitimes file divided by number of speciess.
                     nrecs = et.cycle_list[0].nrecs / len(et.splist)
-
+                    ht = et.cycle_list[0].recordra[0].height
                     # print('NRECS', nrecs)
                     # sys.exit()
                     sdate = et.cycle_list[0].sdate
@@ -472,12 +471,15 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     ##Write a setup file for this emitimes file
                     setupfile = NameList("SETUP.0", working_directory=tdirpath)
                     setupfile.read()
-                    setupfile.add("EFILE", '"' + fl + '"')
                     setupfile.add("NDUMP", str(timechunks))
                     setupfile.add("NCYCL", str(timechunks))
                     setupfile.add("POUTF", '"PARDUMP.' + suffix + '"')
                     setupfile.add("PINPF", '"PARINIT.' + suffix + '"')
-                    setupfile.add("NINIT", "1")
+                    if not tcm:
+                        setupfile.add("NINIT", "1")
+                        setupfile.add("EFILE", '"' + fl + '"')
+                    else:
+                        setupfile.add("NINIT", "0")
                     # setupfile.add('DELT', '5')
                     setupfile.rename("SETUP." + suffix, working_directory=wdir + "/")
                     setupfile.write(verbose=False)
@@ -503,9 +505,10 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     ##locations that correspond to emittimes file.
                     control.remove_locations()
                     nlocs = control.nlocs
+                       
                     while nlocs != nrecs:
                         if nlocs < nrecs:
-                            control.add_location(latlon=(lat, lon))
+                            control.add_location(latlon=(lat, lon), alt=ht)
                         if nlocs > nrecs:
                             control.remove_locations(num=0)
                         nlocs = control.nlocs
@@ -534,7 +537,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
 
                     if dirpath == firstdirpath:
                         parinit = (None, None, None)
-                    else:
+                    elif not tcm:
                         sdate = dir2date(tdirpath, dirpath)
                         pdate = sdate - datetime.timedelta(hours=timechunks)
                         pdir = date2dir(tdirpath, pdate, dhour=timechunks)

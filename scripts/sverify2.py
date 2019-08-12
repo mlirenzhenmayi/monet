@@ -136,6 +136,7 @@ class ConfigFile(NameList):
 
         # attributes for met data
         self.vmix = 0 
+        self.ish = 0
 
         if os.path.isfile(fname):
             self.read(case_sensitive=False)
@@ -208,6 +209,9 @@ class ConfigFile(NameList):
         lorder.append("ByUnit")
 
         hstr = "(5) Integer. Number of days in an EMITIMES file."
+        hstr += sp10 + "if set to -1 will create CONTROL and SETUP.CFG files\n"
+        hstr += sp10 + "suitable for creating a TCM with forward runs.\n"
+        hstr += sp10 + "e.g. produce unit emissions every hour."
         self.descrip["emitdays"] = hstr
         lorder.append("emitdays")
 
@@ -223,6 +227,10 @@ class ConfigFile(NameList):
         hstr = "(False) or True. Retrieve AQS data"
         self.descrip["OBS"] = hstr
         lorder.append("OBS")
+  
+        hstr = "(0) or 1. Retrieve met data from Integrated Surface Database"
+        self.descrip["ISH"] = hstr
+        lorder.append("ISH")
 
         hstr = "(False) or True. write a default CONTROL.0 and SETP.0 file to \n"
         hstr += sp10 + "the top level directory"
@@ -258,6 +266,12 @@ class ConfigFile(NameList):
         hstr += sp10 + 'subdirectories'
         self.descrip['vmix'] = hstr
         lorder.append('vmix')
+
+        hstr = "Data from Integrated surface database\n"
+        hstr += sp10 + 'if 1 create csv file and summary file and\n'
+        hstr += sp10 + 'plot locations of measurements on map (blue crosses)'
+        self.descrip['ish'] = hstr
+        lorder.append('ish')
 
         hstr = "(False) or True. The bash scripts for running HYSPLIT and then \n"
         hstr += sp10 + "c2datem must be run first.\n"
@@ -331,6 +345,9 @@ class ConfigFile(NameList):
 
         self.vmix = self.test('vmix', self.vmix)
         self.vmix = int(self.vmix)
+  
+        self.ish = self.test('ish', self.ish)
+        self.ish = int(self.ish)
         # booleans
         self.byunit = self.str2bool(self.test("byunit", self.byunit))
         self.spnum = self.str2bool(self.test("species", self.spnum))
@@ -434,6 +451,10 @@ if options.runtest and options.cems:
 # tree structure. Since directories will be according to run start times.
 days = options.chunks
 source_chunks = 24 * days
+tcmrun=False
+if days < 0:
+   source_chunks = -1 * options.chunks
+   tcmrun = True
 
 # run_duration specifies how long each run lasts.
 # the last emissions will occur after the time specified in
@@ -446,6 +467,9 @@ run_duration = 24 * (days) + 2
 run_duration = source_chunks
 datemchunks = source_chunks
 ncycle = source_chunks
+
+if days < 0:
+   run_duration = 24
 
 # METHOD B
 # The run will need to extend beyond this time.
@@ -560,6 +584,7 @@ if options.cems:
 if options.obs:
     import sys
     from monet.util.svobs import SObs
+    from monet.util.svish import Mverify
 
     obs = SObs([d1, d2], area, tdir=options.tdir)
     obs.fignum = rfignum
@@ -595,16 +620,30 @@ if options.obs:
     print("map fig number  " + str(fignum))
     if options.cems:
         ef.map(axmap)
+    
+    if options.ish > 0:
+        print('FINDING ISH DATA')
+        ishdata = Mverify([d1, d2], area)
+        test = ishdata.from_csv(options.tdir)
+        if not test: ishdata.find_obs()
+        if not test: ishdata.save(options.tdir)
+        ishdata.map(axmap)
+        ishdata.print_summary('ISH_SUMMARY.csv')
+
     plt.sca(axmap)
     plt.savefig(options.tdir + "map.jpg")
     if options.quiet < 2:
         plt.show()
     else:
        plt.close('all')
+
+
+
     sites = meto.get_sites()
     pstr=''
     for sss in sites:
         pstr += str(sss) + ' ' 
+
     print('Plotting met data for sites ' + pstr)
   
     if options.quiet < 2:
@@ -665,7 +704,8 @@ if options.create_runs:
         d2,
         source_chunks,
         options.metfmt,
-        units = options.cunits
+        units = options.cunits,
+        tcm = tcmrun
     )
     if not runlist: 
         print('No  CONTROL files created') 

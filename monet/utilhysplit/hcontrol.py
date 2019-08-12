@@ -23,6 +23,26 @@ FUNCTIONS
    writelanduse - writes ASCDATA.CFG file.
 """
 
+def writeover(name, overwrite, query, verbose=False):
+    rval = 1
+    if path.isfile(name):
+          print('file already exists ' +  name)
+          fexists = True
+          if query:
+            istr= " Press y to overwrite file \n"
+            istr+= " Press any other key to continue without overwriting "
+            answer = input(istr)
+            if answer.strip().lower() != 'y':
+               overwrite=False 
+            else:
+               overwrite=True
+          if overwrite:
+             if verbose: print('overwriting existing file')
+             rval = 1
+          else:
+             if verbose: print('Continuing without overwriting file')
+             rval = -1   
+    return rval
 
 def writelanduse(landusedir, working_directory="./"):
     """writes an ASCDATA.CFG file in the outdir. The landusedir must
@@ -687,8 +707,15 @@ class NameList:
                     key = key.lower()
                 self.nlist[key] = temp[1].strip(",")
 
-    def write(self, order=None, gem=False, verbose=False):
+    def write(self, order=None, gem=False, verbose=False, overwrite=True,
+              query=False):
         """ if gem=True then will write &GENPARM at beginning of file rather than &SETUP"""
+
+        rval = writeover(self.wdir + self.fname, overwrite, query,
+                         verbose=verbose)
+        if rval==-1:
+           return rval
+
         if order is None:
             order = []
         if verbose:
@@ -939,15 +966,22 @@ class HycsControl(object):
         """will replace the duration if already exists"""
         self.run_duration = duration
 
-    def write(self, annotate=False, metgrid=False):
+    def write(self, annotate=False, metgrid=False, verbose=False, overwrite=True, query=False):
         """writes CONTROL file to text file
            self.wdir + self.fname
-
-
            metgrid option will write a 1 before the number of met files.
+           overwrite - if False then will not overwrite an exisitng file
+           query - if True will ask before overwriting an exisiting file.
         """
         note = ""
         sp28 = " " * 28
+ 
+        rval = writeover(self.wdir + self.fname, overwrite, query,
+                         verbose=verbose)
+        if rval==-1:
+           return rval
+                     
+
         with open(self.wdir + self.fname, "w") as fid:
             fid.write(self.date.strftime("%y %m %d %H %M"))
             if annotate:

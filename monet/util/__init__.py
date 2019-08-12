@@ -1,8 +1,9 @@
 import numpy as np
 
-from . import combinetool, interp_util, mystats, resample, tools
+from . import combinetool, interp_util, mystats, resample, tools, ptools, svish
 
-__all__ = ['mystats', 'tools', 'interp_util', 'resample', 'combinetool']
+__all__ = ['mystats', 'tools', 'ptools','interp_util', 'resample',
+           'combinetool', 'svish']
 
 #__name__ = 'util'
 

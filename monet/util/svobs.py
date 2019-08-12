@@ -38,12 +38,13 @@ check method looks at correlation of wind with SO2
     
 
 
-def get_info(df):
+def print_info(df, cname):
     rdf = df.drop(['obs','time','variable','units','time_local'],axis=1)
     rdf.drop_duplicates(inplace=True)
+    rdf.to_csv(cname, float_format="%g")
     #print('HEADER------')
     #print(rdf.columns.values)
-    return rdf  
+    return 1 
 
 def find_obs_files(tdirpath, sdate, edate, ftype='obs', tag=None):
     fnamelist = []
@@ -576,6 +577,8 @@ class SObs(object):
         # now create a dataframe with data for each site.
         # get rid of the meteorological (and other) variables in the file.
         self.obs = self.obs[self.obs["variable"] == "SO2"]
+        # added back in 8/12/2019
+        print_info(self.obs, tdir+ "/info_" + self.csvfile)
         if verbose:
             obs_util.summarize(self.obs)
         # get rid of the meteorological variables in the file.

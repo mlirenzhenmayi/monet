@@ -8,23 +8,19 @@ matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import datetime
 import seaborn as sns
-from monet.obs import cems_api
-from monet.obs import cems_mod
-import monet.obs.obs_util as obs_util
-#import monet.util.ptools as ptools
-
-# from arlhysplit import runh
-from monet.util.svdir import date2dir
 from timezonefinder import TimezoneFinder
-
-# from arlhysplit.runh import source_generator
-# from arlhysplit.runh import create_plume
-# from arlhysplit.tcm import TCM
-from monet.utilhysplit import emitimes
 from shapely.geometry import Point
 import geopandas as gpd
 import pandas as pd
 import warnings
+
+# MONET MODULES
+from monet.util.svdir import date2dir
+from monet.obs import cems_api
+from monet.obs import cems_mod
+import monet.obs.obs_util as obs_util
+from monet.utilhysplit import emitimes
+
 
 # from monet.obs.epa_util import convert_epa_unit
 
@@ -94,7 +90,7 @@ def get_stackheight_hash(df):
     """
 
     dftemp = df[["oris", "stackht"]]
-    dftemp.drop_duplicates(inplace=True)
+    dftemp = dftemp.drop_duplicates()
     orislist = dftemp["oris"].unique()
 
     shash = {}
@@ -162,7 +158,7 @@ class SourceSummary:
         keep.append("OperatingTime")
         data1 = cems_api.keepcols(data1, keep)
         optime = data1.groupby(grouplist).sum()
-        optime.reset_index(inplace=True)
+        optime = optime.reset_index()
         return optime
 
     def create(self, data1):
@@ -210,7 +206,7 @@ class SourceSummary:
         data1 = data1[keep]
         # data1 = cems_api.keepcols(data1, keep)
         # data1.fillna({'stackht':0}, inplace=True)
-        data1.fillna(0, inplace=True)
+        data1 = data1.fillna(0)
         if data1.empty: 
            return pd.DataFrame()
         remove_negs(data1, "so2_lbs")

@@ -26,7 +26,7 @@ Functions
 find_stats_function
 
 """
-######following methods create and analyze an obsra. Which is a pandas dataframe with matched observations and forecasts by date.
+
 
 def stepfunction(xstep, ystep, iii):
     """
@@ -46,6 +46,7 @@ def stepfunction(xstep, ystep, iii):
 
 
 def get_ds(n1, n2):
+    # see page 154 of Wilks
     # Note that for the time series data 
     # the measurements are not independent.
     # N1 and N2 should be number of independent measurments
@@ -62,6 +63,7 @@ def get_ds(n1, n2):
 
 def kstest(data1, data2):
     """
+    Kolmogorov-Smirnov test
     data1 : list of data
     dtata1 :  list of data
 
@@ -102,6 +104,18 @@ def kstest(data1, data2):
         difflist2.append(val2 - val1) 
     return difflist, difflist2
 
+def probof(data1, probval):
+    """
+    input 
+    data1: list of data.
+    probval: number from 0 to 1.
+    creates cdf and returns value which has
+    cumulative probability equal to probval.
+    """
+    cx1, cy1 = cdf(data1)  
+    return stepfunction(cy1, cx1, probval)
+    
+
 def kstest_answer(data1, data2):
     d1, d2 = kstest(data1, data2)
     return np.max([np.max(d1), np.max(d2)])
@@ -117,7 +131,7 @@ def cdf(data):
 def plot_cdf(sdata, y, ax):
     ax.step(sdata, y, '-r')
 
-
+######following methods create and analyze an obsra. Which is a pandas dataframe with matched observations and forecasts by date.
 class MatchedData(object):
 
     #def create_obsra(obs, fc):

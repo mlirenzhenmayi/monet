@@ -10,35 +10,36 @@ import datetime
 import sys
 import seaborn as sns
 import warnings
+
+
+from monet.utilhysplit import statmain
+#from monet.utilhysplit import sigprocess
 from monet.obs import aqs as aqs_mod
 from monet.obs import airnow
 import monet.obs.obs_util as obs_util
-from monet.utilhysplit import statmain
-
-# from arlhysplit import runh
 from monet.util.svdir import date2dir
-
-# from arlhysplit.models.datem import mk_datem_pkl
-#from monet.obs.epa_util import convert_epa_unit
-from monet.util import tools
+#from monet.util.svmet import MetObs
 
 """
 FUNCTIONS
 
 find_obs_files
+print_info 
+read_csv
+generate_obs
+get_tseries
 
-
-WORKING ON:
-check method looks at correlation of wind with SO2
+CLASSES
+SObs
 
 """
 
 
 
-    
-
-
 def print_info(df, cname):
+    """
+    creates the info_obs files.
+    """
     rdf = df.drop(['obs','time','variable','units','time_local'],axis=1)
     rdf.drop_duplicates(inplace=True)
     rdf.to_csv(cname, float_format="%g")
@@ -106,267 +107,6 @@ def get_tseries(df, siteid, var="obs", svar="siteid", convert=False):
     return series
 
 
-def vmixing2metobs(vmix, obs):
-    """
-    take vmixing dataframe and SO2 measurement dataframe and 
-    combine into a MetObs object.
-    """
-    print('--------------')
-    
-    obs = obs[['time','siteid','obs','mdl']]
-    #print(obs.dtypes)
-    #print(vmix.dtypes)
-    obs.columns = ['date','sid','so2','mdl']
-    print(obs['sid'].unique())
-    print(vmix['sid'].unique())
-
-    dfnew = pd.merge(obs,
-                     vmix,
-                     how='left',
-                     left_on=['date','sid'],
-                     right_on=['date','sid']
-                     )
-    dfnew = dfnew.drop_duplicates()
-    print(dfnew[0:10])
-    met = MetObs(tag='vmix')
-    met.from_vmix(dfnew)
-    return  met       
-     
-
-def heatmap(x,y, ax, bins=(50,50)):
-    heatmap, xedges, yedges = np.histogram2d(x,y, bins=(bins[0],bins[1]))
-    extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
-    cb = ax.imshow(heatmap, extent=extent)
-    
-def hexbin(x,y,ax,sz=50,mincnt=1):
-    cm='Paired'
-    cb = ax.hexbin(x,y, gridsize=sz, cmap=cm, mincnt=mincnt)
-    plt.colorbar(cb)
-
-def jointplot(x, y, data, fignum=1):
-    fig = plt.figure(fignum)
-    #ax1 = fig.add_subplot(1, 3, 1)
-    #plt.set_gca(ax1)
-    ggg = sns.jointplot(x=x, y=y, data=df, kind="hex", color="b")
-    ggg.plot_joint(plt.scatter, c="m", s=30, linewidth=1, marker=".")
-
-
-def metobs2matched(met1, met2):
-    """
-    met1 is set to obs in the MatchedData
-    met2 is set to fc in the MatchedData
-    a list of MatchedData objects is returned for
-    all columns with matching names.
-    """
-
-    head1 = met1.columns.values
-    head2 = met2.columns.values
-
-    sid1 = met1['siteid'].unique()
-    sid2 = met2['siteid'].unique()
-
-    samesid = [x for x in sid1 if x in sid2]
-    mdlist = []
-    samecols = [x for x in head1 if x in head2]
-    filtercols = ['WDIR', 'WS', 'TEMP']
-    samecols = [x for x in filtercols if x in samecols]
- 
-    mdlist = []
-    for sss in samesid:
-        m1temp = met1[met1['siteid'] == sss]     
-        m2temp = met2[met2['siteid'] == sss]     
-
-        m1temp.sort_values(by=['time'], axis=0, inplace=True)
-        m2temp.sort_values(by=['time'], axis=0, inplace=True)
-        m1temp['dup'] = m1temp.duplicated(subset=['time'], keep=False)
-        m2temp['dup'] = m2temp.duplicated(subset=['time'], keep=False)
-
-
-        m1temp.set_index('time', inplace=True)
-        m2temp.set_index('time', inplace=True)
-        for ccc in samecols:
-            t1 = m1temp[ccc] 
-            t2 = m2temp[ccc]
-
-            #t1['dup'] = t1.duplicated(subset=['time'])
-            #t2['dup'] = t2.duplicated(subset=['time'])
-
-            #print('-------------------------')
-            #print('TIME DUPLICATED')
-            #print(t1[t1['dup']==True])
-            #print(t2[t1['dup']==True])
-            print(str(sss), str(ccc), '-------------------------')
-            print(t1[0:10], type(t1))
-            print(t2[0:10], type(t2))
-            if not t1.empty and not t2.empty:
-                print('MATCHED')
-                matched = statmain.MatchedData(obs=t1, fc=t2, stn=(sss,ccc)) 
-                print(matched.obsra[0:10])
-                print('-*-*-*-*')
-                if not matched.obsra.empty:
-                    mdlist.append(matched)
-            print('-*-*-*-*')
-    return mdlist 
-  
-
-class MetObs(object):
-
-    def __init__(self, tag=None):
-        self.df = pd.DataFrame()
-        self.columns_original = []
-        self.fignum = 1
-        self.tag = tag
-
-
-    def from_vmix(self,df):
-        self.df = df
-        self.columns_original = self.df.columns.values
-        self.rename_columns()
-       
-
-    def from_obs(self, obs):
-        print("Making metobs from obs")
-        self.df = tools.long_to_wideB(obs)  # pivot table
-        self.columns_original = self.df.columns.values
-        self.rename_columns()
-        # checking to see if there is met data in the file.
-        testcols = ['WD','RH','TEMP','WS']
-        overlap = [x for x in testcols if x in self.df.columns.values]
-        if not overlap:
-           self.df = pd.DataFrame()  
-           print('No Met Data Found') 
-        else:
-           self.df = self.df.dropna(axis=0, how='all', subset=overlap)
-
-
-    def to_csv(self,tdir, csvfile=None):
-        if self.df.empty: return -1
-        if not csvfile: csvfile = ''
-        df = self.df.copy()
-        df.columns = self.columns_original
-        df.to_csv(tdir + "met" + csvfile, header=True, float_format="%g")
-          
- 
-    def rename_sub(self, istr):
-        rstr = istr
-        if 'WD' in istr: rstr = 'WDIR'
-        if 'RH' in istr: rstr = 'RH'
-        if 'T02M' in istr: rstr = 'TEMP'
-        if 'WS' in istr: rstr = 'WS'
-        if 'date' in istr: rstr = 'time'
-        if 'SO2' in istr.upper(): rstr = 'SO2'
-        if 'sid' in istr: rstr = 'siteid'
-        return rstr
-
-    def get_sites(self):
-        if self.df.empty: return []
-        return self.df['siteid'].unique()
-   
-    def rename_columns(self):
-        newc = []
-        for col in self.df.columns.values:
-            if isinstance(col, tuple):
-               if 'obs' not in col[0]:
-                   val = col[0].strip()
-               else:
-                   val = col[1].strip()
-            else:
-               val = col
-            newc.append(self.rename_sub(val))
-        self.df.columns = newc 
-        
-    def nowarning_plothexbin(self, save=True, quiet=True):
-        # get "Adding an axes using the same arguments as previous axes
-        # warnings. This is intended behavior so want to suppress warning.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            self.plothexbin(save, quiet)
-
-    def nowarning_plot_ts(self, save=False, quiet=False):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            self.plot_ts(save, quiet)
-
-    def plot_ts(self, save=False, quiet=False):
-        if self.df.empty: return -1
-        sns.set()
-        slist = self.get_sites()
-        #print('SSSSSSSSS ', slist)
-        for site in slist:
-            fig = plt.figure(self.fignum)
-            fig.set_size_inches(10,5)
-            # re-using these axis produces a warning.
-            ax1 = fig.add_subplot(1,1,1)
-            ax2 = ax1.twinx()
-
-            df = self.df[self.df['siteid'] == site]
-            df = df.set_index('time')
-            so2 = df['SO2']
-            wdir = df['WDIR']
-            ax2.plot(wdir, 'b.', markersize=2)
-            ax1.plot(so2, '-k')
-
-            ax1.set_ylabel('so2 (ppb)')
-            ax2.set_ylabel('Wind direction (degrees)')
-            plt.title(str(site))
-            plt.tight_layout() 
-            if not quiet:
-                plt.show()
-            if save:
-                tag = self.tag
-                if not tag: tag = ''
-                plt.savefig(tag + str(site) + '.met_ts.jpg')
-            plt.close() 
-
-    def plothexbin(self, save=True, quiet=True): 
-        if self.df.empty: return -1
-        slist = self.get_sites()
-        for site in slist:
-            fig = plt.figure(self.fignum)
-            fig.set_size_inches(10,5)
-            # re-using these axis produces a warning.
-            ax1 = fig.add_subplot(1,2,1)
-            ax2 = fig.add_subplot(1,2,2)
-
-            df = self.df[self.df['siteid'] == site]
-            #print('HEXBIN for site ' , site) 
-            #print(df[0:10])
-            #df.columns = self.met_header(df.columns)
-            #print(df.columns.values)
-            #xtest = df[("WD", "Degrees Compass")]
-       
-            xtest = df["WDIR"]
-            ytest = df["WS"]
-            ztest = df["SO2"]
-        
-            if np.isnan(xtest).all():
-                print('No data WDIR')
-                continue
-            if np.isnan(ztest).all():
-                print('No data so2')
-                continue
-    
-            hexbin(xtest, ztest, ax1)  
-            hexbin(ytest, ztest, ax2) 
-            ax1.set_xlabel('Wind Direction ')
-            ax2.set_xlabel('Wind Speed ')
-            ax1.set_ylabel('SO2 (ppb)')
-            plt.title(str(site))
-            plt.tight_layout() 
-            if save:
-                tag = self.tag
-                if not tag: tag = ''
-                plt.savefig(tag + str(site) + '.met_dist.jpg')
-            #self.fignum +=1
-            if not quiet:
-                plt.show()
-            # clearing the axes does not
-            # get rid of warning.
-            plt.cla()
-            plt.clf()
-            plt.close()  
-
-
 class SObs(object):
     """This class for running the SO2 HYSPLIT verification.
     
@@ -378,7 +118,6 @@ class SObs(object):
        save (saves to a csv file)
        check
     """
-
     def __init__(self, dates, area, tdir="./", tag=None):
         """
         area is a tuple or list of four floats
@@ -442,6 +181,94 @@ class SObs(object):
         #    phash[d1] = (sid, self.obs
         #     df = df[df[svar] == siteid]
         #     val = df['obs']
+
+    def generate_ts(self, sidlist=None):
+        """
+        Input
+        list of site ids (optional).
+        If None will loop through all.
+        Returns
+        siteid (int), pandas time series of obs, pandas time series of mdl.
+        """
+ 
+        # get list of siteids.
+        if not sidlist:
+            sra = self.obs["siteid"].unique()
+        else:
+            sratest = self.obs["siteid"].unique()
+            sra = []
+            # test to make sure 
+            for sid in sidlist:
+                if sid in sratest: sra.append(sid) 
+                else: print('WARNING siteid not found ', str(sid), type(sid)) 
+        for sid in sra:
+            ts = get_tseries(self.obs, sid, var="obs", svar="siteid", convert=False)
+            ms = get_tseries(self.obs, sid, var="mdl", svar="siteid")
+            yield sid, ts, ms
+
+    def get_peaks(self, sidlist=None, pval=[0.95,1], plotfigs=True):
+        """
+        for each obs data series creates a CDF of values which are above mdl.
+        Finds values which have prob between pval[0] and pval[1] and returns
+        series of just those values.
+
+        Can be used to identify peaks or valleys.
+        """
+
+        for sid, ts, ms in self.generate_ts(sidlist=sidlist):
+            # get minimum detectable level
+            mdl = np.max(ms.values)
+            # create copy of series
+            tso = ts.copy()
+            # include only values above mdl
+            ts = ts[ts > mdl]
+            # find value in which prob(data < val) == pval 
+            valA = statmain.probof(ts.values, pval[0])
+            valB = statmain.probof(ts.values, pval[1])
+            # data in which values are >= val.
+            tsp = ts[ts >= valA]
+            tsp = tsp[tsp <= valB]
+            # plot peaks as well as CDF's.
+            if plotfigs:
+                fig = plt.figure(1)
+                ax1 = fig.add_subplot(1,1,1)
+                ax1.plot(tso.index.tolist(), tso.values, '-k', linewidth=0.5)
+                ax1.plot(tsp.index.tolist(), tsp.values, 'r.', linewidth=0.5)
+                ax1.plot(ms.index.tolist(), ms, '-b')
+                plt.title(str(sid))
+                fig = plt.figure(2)
+                ax = fig.add_subplot(1,1,1)
+                cx, cy = statmain.cdf(ts.values)
+                statmain.plot_cdf(cx, cy, ax) 
+                cx, cy = statmain.cdf(tso.values)
+                statmain.plot_cdf(cx, cy, ax) 
+                ax.plot(valA, pval[0], 'b.')
+                ax.plot(valB, pval[1], 'b.')
+                plt.show()
+            yield sid, tsp 
+
+    #def show_peaksA(self):
+        # investigated using scipy signal peak finders.
+        # not very satisfactory.
+    #    for sid, ts, ms in self.generate_ts():
+    #        tso = ts.copy()
+    #        mdl = np.max(ms.values)
+    #        print('MDL', mdl)
+    #        zeros = ts <= mdl 
+    #        ts[zeros] = 0
+            
+    #        fts = pd.Series(sigprocess.filter(ts), ts.index.tolist())
+
+    #        peaks = sigprocess.findpeak_cwt(fts)
+    #        peaks = sigprocess.findpeak_simple(tso) 
+    #        tsp = tso.iloc[peaks] 
+            
+    #        plt.plot(tso.index.tolist(), tso.values, '-k', linewidth=0.5)
+            #plt.plot(fts.index.tolist(), fts.values, '--g')
+    #        plt.plot(tsp.index.tolist(), tsp.values, 'r.')
+    #        plt.plot(ms.index.tolist(), ms, '-b')
+    #        plt.title(sid)
+    #        plt.show() 
 
     def plot(self, save=True, quiet=True, maxfig=10 ):
         """plot time series of observations"""
@@ -588,14 +415,14 @@ class SObs(object):
         #if units == "UG/M3":
         #    self.obs = convert_epa_unit(self.obs, obscolumn="obs", unit=units)
 
-    def get_met_data(self):
-        """
-        Returns a MetObs object.
-        """
-        print("Making metobs from obs")
-        meto = MetObs()
-        meto.from_obs(self.dfall)
-        return meto
+    #def get_met_data(self):
+    #    """
+    #    Returns a MetObs object.
+    #    """
+    #    print("Making metobs from obs")
+    #    meto = MetObs()
+    #    meto.from_obs(self.dfall)
+    #    return meto
 
     def bysiteid(self, siteidlist):
         obs = self.obs[self.obs["siteid"].isin(siteidlist)]

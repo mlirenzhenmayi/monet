@@ -44,7 +44,8 @@ def writeover(name, overwrite, query, verbose=False):
              rval = -1   
     return rval
 
-def writelanduse(landusedir, working_directory="./"):
+def writelanduse(landusedir, working_directory="./", overwrite=True,
+                 query=False, silent=False):
     """writes an ASCDATA.CFG file in the outdir. The landusedir must
        be the name of the directory where the landuse files are located.
     Parameters
@@ -56,13 +57,17 @@ def writelanduse(landusedir, working_directory="./"):
     ----------
     None
     """
+    rval = writeover(working_directory + 'ASCDATA.CFG', overwrite, query,
+                         verbose=silent)
     with open(working_directory + "ASCDATA.CFG", "w") as fid:
         fid.write("-90.0  -180.0 \n")
         fid.write("1.0    1.0    \n")
         fid.write("180    360    \n")
         fid.write("2 \n")
         fid.write("0.2 \n")
-        fid.write(landusedir + "/bdyfiles/ \n")
+        fid.write(landusedir +" \n")
+        if  not path.isdir(landusedir) and not silent:
+            print('writelanduse function WARNING: landuse directory does not exist', landusedir)
 
 
 class ConcGrid:

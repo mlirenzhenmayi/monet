@@ -318,8 +318,9 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
     ##determines meteorological files to use.
     met_files = MetFiles(metfmt) 
     runlist = []  #list of RunDescriptor Objects
-    hysplitdir = hdirpath + "/exec/"
-    landusedir = hdirpath + "/bdyfiles/"
+    if hdirpath[-1] != '/': hdirpath += '/'
+    hysplitdir = hdirpath + "exec/"
+    landusedir = hdirpath + "bdyfiles/"
 
     dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks)
     vstr = ''
@@ -336,7 +337,10 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
                     dfdatem = read_datem_file(d1 + fl, colra=cols, header=2) 
                     dfdatem = dfdatem[['lat','lon','sid']]
                     dfdatem = dfdatem.drop_duplicates()
-                    writelanduse(landusedir=landusedir, working_directory=d1)
+                    # do not overwrite, if these files already created
+                    # previously.
+                    writelanduse(landusedir=landusedir, working_directory=d1,
+                                 overwrite=False)
                     for index, row  in dfdatem.iterrows():
                         lat = row['lat']
                         lon = row['lon']
@@ -364,7 +368,7 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
                         #    cg.outfile += "." + suffix
                         if control.num_met > 12: metgrid=True
                         else: metgrid=False 
-                        control.write(metgrid=metgrid, query=True)
+                        control.write(metgrid=metgrid, query=False)
                         run = RunDescriptor(d1, suffix, hysplitdir, "vmixing",
                                              parinit='None')
                         runlist.append(run)
@@ -375,7 +379,7 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
 
 
 def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units="ppb",
-                    tcm=False):
+                    tcm=False, orislist=None):
     """
     read the base control file in tdirpath CONTROL.0
     read the base SETUP.0 file in tdirpath
@@ -426,8 +430,11 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
     met_files = MetFiles(metfmt) 
 
     runlist = []  #list of RunDescriptor Objects
-    hysplitdir = hdirpath + "/exec/"
-    landusedir = hdirpath + "/bdyfiles/"
+    if hdirpath[-1] != '/' : 
+       hdirpath += '/'
+    hysplitdir = hdirpath + "exec/"
+    landusedir = hdirpath + "bdyfiles/"
+    print('LANDUSEDIR', landusedir, hdirpath)
     dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks)
     iii = 0
     # for (dirpath, dirnames, filenames) in walk(tdirpath):
@@ -436,8 +443,14 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
             for fl in filenames:
                 if iii == 0:
                     firstdirpath = dirpath
+                make=False
                 if "EMIT" in fl:
-                    # print(dirpath, dirnames, filenames)
+                    make=True
+                    #oris = fl.replace('EMIT','')
+ 
+                #if orislist not None:
+                #   make = True
+                if make:
                     suffix = fl[4:8]
                     temp = fl.split(".")
                     # print(temp)
@@ -452,7 +465,6 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
                     # if the emittimes file is empty move to the next one.
                     if not et.read_file() : continue
-                    
 
                     # number of locations is number of records
                     # in the emitimes file divided by number of speciess.
@@ -519,6 +531,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     #mfiles = getmetfiles(
                     #    control.date, timechunks, met_type=met_type, mdir=mdir
                     #)
+                    if tcm: timechunks = int(control.run_duration)
                     mfiles = met_files.get_files(control.date, timechunks)
                     for mf in mfiles:
                         if os.path.isfile(mf[0] + mf[1]):

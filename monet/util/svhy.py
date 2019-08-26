@@ -69,11 +69,12 @@ def default_setup(setupname="SETUP.CFG", wdir="./", units="PPB"):
     parinitname = "PARINIT"
     namelist = {}
     # namelist['delt'] =  rhash.delt          #fix time step.
-    namelist["initd"] = "0"  # particle is 0  and puff is 3.
+    namelist["initd"] = "0"     # particle is 0  and puff is 3.
     namelist["maxdim"] = "1"
     namelist["kmix0"] = "250"  # default value is 250. controls minimum mixing depth.
-    namelist["kblt"] = "2"  # Use Kantha Clayson for vertical mixing.
+    namelist["kblt"] = "2"     # Use Kantha Clayson for vertical mixing.
     namelist["kbls"] = "1"
+    namelist["ninit"] = "1"    # set ninit=1 to include pardump file.
 
     if units.lower().strip() == "ppb":
         namelist["ichem"] = "6"  # mass/divided by air density
@@ -181,7 +182,7 @@ def default_control(name, tdirpath, runtime, sdate, cpack=1,
         )
         #particle.add_wetdep(wetdepstr)
         control.add_species(particle)
-    control.add_location(latlon=(46, -105), alt=200, rate=0, area=0)
+    control.add_location(latlon=(lat, lon), alt=200, rate=0, area=0)
     control.write(query=True)
 
 
@@ -226,8 +227,6 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
                 firstdirpath = dirpath
 
             if "EMIT" in fl:
-                # print(dirpath, dirnames, filenames)
-                # print(fl)
                 et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
                 if not et.read_file(): continue
                 # print('NRECS', nrecs)
@@ -395,7 +394,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
         4. Print out a SETUP file with same suffix and
               1. initialized with parinit file from previous time period.
               2. output pardump file with same suffix at end of run.
-              3. set ninit to 1.
+              #3. set ninit to 1.
               4. set delt=5 (TO DO- why?) 
         5. write out landuse file
         6. write script in tdirpath for running HYSPLIT.
@@ -460,26 +459,23 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     else:
                         suffix = temp[0].replace('EMIT','')
                     wdir = dirpath
-
                     # read emitfile and modify number of locations
                     et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
-                    # if the emittimes file is empty move to the next one.
-                    if not et.read_file() : continue
-
-                    # number of locations is number of records
-                    # in the emitimes file divided by number of speciess.
-                    nrecs = et.cycle_list[0].nrecs / len(et.splist)
-                    ht = et.cycle_list[0].recordra[0].height
-                    # print('NRECS', nrecs)
-                    # sys.exit()
-                    sdate = et.cycle_list[0].sdate
-                    ##if sdate not within range given,
-                    ##then skip the rest of the loop.
-                    if sdate < dstart or sdate > dend:
-                        continue
-                    lat = et.cycle_list[0].recordra[0].lat
-                    lon = et.cycle_list[0].recordra[0].lon
-
+                    et_not_empty = et.read_file()
+                    # if the emittimes file not empty then
+                    if et_not_empty: 
+                        # number of locations is number of records
+                        # in the emitimes file divided by number of speciess.
+                        nrecs = et.cycle_list[0].nrecs / len(et.splist)
+                        ht = et.cycle_list[0].recordra[0].height
+                        sdate = et.cycle_list[0].sdate
+                        ##if sdate not within range given,
+                        ##then skip the rest of the loop.
+                        if sdate < dstart or sdate > dend:
+                            continue
+                        lat = et.cycle_list[0].recordra[0].lat
+                        lon = et.cycle_list[0].recordra[0].lon
+                       
                     ##Write a setup file for this emitimes file
                     setupfile = NameList("SETUP.0", working_directory=tdirpath)
                     setupfile.read()
@@ -488,10 +484,10 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     setupfile.add("POUTF", '"PARDUMP.' + suffix + '"')
                     setupfile.add("PINPF", '"PARINIT.' + suffix + '"')
                     if not tcm:
-                        setupfile.add("NINIT", "1")
-                        setupfile.add("EFILE", '"' + fl + '"')
+                         setupfile.add("NINIT", "1")
+                         setupfile.add("EFILE", '"' + fl + '"')
                     else:
-                        setupfile.add("NINIT", "0")
+                         setupfile.add("NINIT", "0")
                     # setupfile.add('DELT', '5')
                     setupfile.rename("SETUP." + suffix, working_directory=wdir + "/")
                     setupfile.write(verbose=False)
@@ -499,9 +495,13 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     ##Write a control file for this emitimes file
                     control = HycsControl(fname="CONTROL.0", working_directory=tdirpath)
                     control.read()
-                    control.date = sdate
+                    # make sure that control start is always start of time
+                    # period.
+                    control.date = dstart
                     # remove species and add new with same
                     # attributes but different names
+                    # even if EMITTIMES file empty there is still
+                    # a header with species information.
                     if et.splist.size > 0:
                        sp = control.species[0]
                        control.remove_species()
@@ -511,19 +511,24 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                            spnew.name = et.sphash[spec]
                            #print(spnew.strpollutant())
                            control.add_species(spnew)  
-
-
-                    ##remove all the locations first and then add
-                    ##locations that correspond to emittimes file.
-                    control.remove_locations()
-                    nlocs = control.nlocs
-                       
-                    while nlocs != nrecs:
-                        if nlocs < nrecs:
-                            control.add_location(latlon=(lat, lon), alt=ht)
-                        if nlocs > nrecs:
-                            control.remove_locations(num=0)
+ 
+                    # if emit-times file not empty
+                    # remove all the locations first and then add
+                    # locations that correspond to emittimes file.
+                    # if it is empty then still create CONTROL file in case
+                    # there is data from PARDUMP file to run.
+                    # keep location from default CONTROL.0 file.
+                    if et_not_empty:
+                        control.remove_locations()
                         nlocs = control.nlocs
+                           
+                        while nlocs != nrecs:
+                            if nlocs < nrecs:
+                                control.add_location(latlon=(lat, lon), alt=ht)
+                            if nlocs > nrecs:
+                                control.remove_locations(num=0)
+                            nlocs = control.nlocs
+
                     control.rename("CONTROL." + suffix, working_directory=wdir)
                     control.remove_metfile(rall=True)
                     ###Add the met files.

@@ -116,12 +116,65 @@ def get_timezone(lat, lon):
     # returns hours. must add this to local time to get utc.
     return (t2 - t1).seconds / 3600.0
 
+class CEMScsv:
+    """
+    csv file with Emissions data. Created from SEmissions object dataframe.
+    """
+    def __init__(self, tdir="./", cname="cems.csv"):
+                 #data=pd.DataFrame()):
+        if '/' != tdir[-1]: tdir += '/'
+        self.tdir = tdir
+        self.cname = cname
+        #self.df = data
+
+    def read_csv(self, name="cems.csv"):
+        cems = pd.read_csv(name, sep=",")
+        return cems
+
+    def make_csv(self, df):
+        print("CREATE CSV FILE ", self.tdir, self.cname)
+        new = []
+        df.fillna(0, inplace=True)
+        for hd in df.columns:
+            try:
+                cstr = hd[0] + " P" + str(hd[4])
+            except:
+                cstr = hd
+            try:
+                cstr += " U" + str(hd[5])
+            except:
+                pass
+            new.append(cstr)
+        df.columns = new
+        df.to_csv(self.tdir + self.cname, float_format="%.1f")
+
+    def generate_cems(self,orislist, spnum='P1'):
+        """
+        return time series of measurements.
+        """
+        cemsfile = self.tdir + self.cname
+        cems = pd.read_csv(cemsfile,sep=",", index_col=[0],parse_dates=True)
+        new=[]   
+        for hd in cems.columns:
+            temp = hd.split(',')
+            temp = temp[0].replace('(','')
+            try:
+                new.append(int(float(temp)))
+            except:
+                new.append(temp)
+        cems.columns = new
+        for col in cems.columns:
+            for oris in orislist:
+                if str(oris) in col and  spnum in col:
+                   yield cems[col]
+
+
 
 class SourceSummary:
 
     def __init__(self, tdir="./", fname="source_summary.csv",
                  data=pd.DataFrame()):
-
+        if tdir[-1] != '/': tdir += '/'
         self.commentchar = "#"
         if not data.empty:
             self.sumdf = self.create(data)
@@ -132,6 +185,61 @@ class SourceSummary:
                 self.sumdf = pd.DataFrame()
         self.tdir = tdir
         self.fname = fname
+
+    def map(self, ax):
+        """plot location of emission sources"""
+        # if self.cems.df.empty:
+        #    self.find()
+        sumdf = self.sumdf
+        plt.sca(ax)
+        oris = sumdf["ORIS"].unique()
+        keep = [
+            "ORIS",
+            "lat",
+            "lon",
+            "Max(lbs)",
+        ]
+        grouplist = [
+            "ORIS",
+            "lat",
+            "lon"]
+
+        sumdf = sumdf[keep]
+        sumdf = sumdf.groupby(grouplist).sum()
+        if isinstance(oris, str):
+            oris = [oris]
+        sumdf = sumdf.reset_index()
+        lathash = df2hash(sumdf, "ORIS", "lat")
+        lonhash = df2hash(sumdf, "ORIS", "lon")
+        tothash = df2hash(sumdf, "ORIS", "Max(lbs)")
+        # fig = plt.figure(self.fignum)
+        for loc in oris:
+            try:
+                lat = lathash[loc]
+            except:
+                loc = None
+            if loc:
+                lat = lathash[loc]
+                lon = lonhash[loc]
+                ms = self.determine_size(tothash[loc])
+                #if loc in self.goodoris:
+                print('pl ' + str(loc) + ' ' + str(tothash[loc]) + ' ' + str(ms))
+                ax.plot(lon, lat, "ko", markersize=ms, linewidth=2, mew=1)
+                plt.text(lon, lat, (str(loc)), fontsize=12, color="red")
+                #else:
+                #    ax.text(lon, lat, str(int(loc)), fontsize=8, color="k")
+
+    def determine_size(self, lbs):
+        # set marker size based on emissions.
+        kg = lbs/2.2
+        if kg  < 10: ms=3
+        elif kg < 50: ms = 5
+        elif kg < 100: ms = 7
+        elif kg < 500: ms = 9
+        elif kg < 1000: ms = 11
+        elif kg < 5000: ms = 13
+        else: ms = 15
+        return ms 
 
     def check_oris(self, threshold):
         """
@@ -254,15 +362,12 @@ class SourceSummary:
             df = pd.read_csv(tdir + name, comment=self.commentchar)
         else:
             df = pd.DataFrame()
-
         # get rid of spaces in column values
         cols = df.columns.values
         newc = []
         for val in cols:
             newc.append(val.strip())
         df.columns = newc
-
-
         return df
 
     def print(self, tdir="./", fname="source_summary.csv"):
@@ -354,7 +459,7 @@ class SEmissions(object):
         alist,
         area=True,
         tdir="./",
-        source_thresh=100,
+        source_thresh=50,
         spnum=False,
         tag=None,
         cemsource="api",
@@ -622,7 +727,13 @@ class SEmissions(object):
         cems = pd.read_csv(name, sep=",")
         return cems
 
-    def make_csv(self, df, cname="cems.csv"):
+    def make_csv(self,df, cname="cems.csv"):
+        if self.tag:
+            cname = str(self.tag) + ".cems.csv"
+        csvfile = CEMScsv(tdir=self.tdir,cname=cname)
+        csvfile.make_csv(df)
+
+    def make_csv_direct(self, df, cname="cems.csv"):
         new = []
         df.fillna(0, inplace=True)
         for hd in df.columns:
@@ -655,8 +766,9 @@ class SEmissions(object):
         # lbs is converted to kg in get_so2_sources
         df = self.get_so2_sources(unit=unit)
         # unit in csv file is kg
+        print("CREATE CSV FILE ")
         self.make_csv(df.copy())
-        print("CREATE EMITIMES in SVCEMS")
+        print("CREATE EMITIMES in SVCEMS ", ' Use day chunks ' +  str(schunks/24))
         # placeholder. Will later add routine to get heat for plume rise
         # calculation.
         dfheat = df.copy() * 0 + heat
@@ -694,10 +806,14 @@ class SEmissions(object):
             #        dftemp, sdf, d1, schunks, tdir, unit=unit, bname="STACKFILE"
             #    )
             d1 = d2 + datetime.timedelta(hours=1)
+            # just a fail-safe loop.
             iii += 1
-            if iii > 48:
+            if iii > 500:
                 print('Hit loop limit in create_emittimes method')
+                print('Exiting program')
+                print(d1, d2, self.d2)
                 done = True
+                sys.exit()
             if d1 > self.d2:
                 done = True
 

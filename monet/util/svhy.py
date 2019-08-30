@@ -226,7 +226,7 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
             if iii == 0:
                 firstdirpath = dirpath
 
-            if "EMIT" in fl:
+            if "EMIT" in fl[0:4]: 
                 et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
                 if not et.read_file(): continue
                 # print('NRECS', nrecs)
@@ -443,8 +443,14 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                 if iii == 0:
                     firstdirpath = dirpath
                 make=False
-                if "EMIT" in fl:
+                if "EMIT" in fl[0:4]: 
                     make=True
+                if 'WARNING' in fl:
+                    make=False
+                if 'MESSAGE' in fl:
+                    make=False
+                if 'VMSDIST' in fl:
+                    make=False
                     #oris = fl.replace('EMIT','')
  
                 #if orislist not None:
@@ -461,6 +467,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     wdir = dirpath
                     # read emitfile and modify number of locations
                     et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
+                    print(dirpath, fl)
                     et_not_empty = et.read_file()
                     # if the emittimes file not empty then
                     if et_not_empty: 
@@ -475,7 +482,6 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                             continue
                         lat = et.cycle_list[0].recordra[0].lat
                         lon = et.cycle_list[0].recordra[0].lon
-                       
                     ##Write a setup file for this emitimes file
                     setupfile = NameList("SETUP.0", working_directory=tdirpath)
                     setupfile.read()
@@ -497,7 +503,8 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     control.read()
                     # make sure that control start is always start of time
                     # period.
-                    control.date = dstart
+                    controldate = dir2date(tdirpath, dirpath)
+                    control.date = controldate
                     # remove species and add new with same
                     # attributes but different names
                     # even if EMITTIMES file empty there is still
@@ -545,7 +552,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                         cg.outfile += "." + suffix
                     if control.num_met > 12: metgrid=True
                     else: metgrid=False 
-                    control.write(metgrid=metgrid)
+                    control.write(metgrid=metgrid, overwrite=True, query=False)
                     writelanduse(landusedir=landusedir, working_directory=wdir + "/")
 
                     with open(wdir + "/rundatem.sh", "w") as fid:
@@ -738,6 +745,7 @@ class RunScript(RunScriptClass):
     def mainstr_generator(self):
         iii = 0
         nice=True
+        nohup=False
         prev_directory = ' '
         for run in self.runlist:
             rstr = ''
@@ -752,7 +760,7 @@ class RunScript(RunScriptClass):
             if run.parinitA != "None":
                 rstr += "cp " + run.parinit_directory + run.parinitA
                 rstr += " " + run.parinitB + "\n"
-            if nice: rstr += 'nice '
+            if nice: rstr += 'nohup '
             rstr += "${MDL}" + run.hysplit_version + " " + run.suffix
             rstr += " & \n"
             prev_directory = run.directory

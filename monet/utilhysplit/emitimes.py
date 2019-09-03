@@ -290,6 +290,7 @@ class EmitCycle(object):
     def __init__(self, sdate=None, duration=None, splist=[1]):
         self.sdate = sdate
         self.duration = duration  # duration of the cycle.
+        # List of EmitLine objects
         self.recordra = []
         # number of records in a cycle.
         self.nrecs = 0

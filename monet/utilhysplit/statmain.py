@@ -27,6 +27,14 @@ find_stats_function
 
 """
 
+def degdiff(cc, mm):
+    # given two degree measurements, find smallest difference.
+    # if moving clockwise gives you the smallest angular difference
+    # then difference is positive. Otherwise negative.
+    wdiff = (np.min([np.abs(cc-mm), 360-np.abs(cc-mm)]))
+    if np.abs(cc-mm) > 360-np.abs(cc-mm):
+       wdiff = -1 * wdiff
+    return wdiff
 
 def stepfunction(xstep, ystep, iii):
     """
@@ -267,9 +275,21 @@ class MatchedData(object):
         temp = temp['diff']
         if ptype=='scatter': 
             ax.plot(temp) 
-            
 
-
+    def autocorr(self, ax, nlist=None):
+        # plots the autocorrelation of both the series.
+        ts1 = self.obsra['obs']
+        ts2 = self.obsra['fc']       
+        alist1 = [] 
+        alist2 = [] 
+        if not nlist: 
+           nlist = np.arange(0,48)
+        for nnn in nlist:
+           alist1.append(ts1.autocorr(lag=nnn)) 
+           alist2.append(ts2.autocorr(lag=nnn))
+        ax.plot(nlist, alist1, 'k.', label='obs')
+        ax.plot(nlist, alist2, 'b.', label='fc')
+        
 
     def plotscatter(self, ax):
         """

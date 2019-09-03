@@ -206,6 +206,20 @@ class SObs(object):
             ms = get_tseries(self.obs, sid, var="mdl", svar="siteid")
             yield sid, ts, ms
 
+    def autocorr(self):
+        """
+        autocorrelation of measurements
+        """
+        for sid, ts, ms in self.generate_ts(sidlist=None):
+            alist = []
+            nlist = np.arange(0,48)
+            for nnn in nlist:
+                alist.append(ts.autocorr(lag=nnn))
+            plt.plot(nlist, alist, 'k.')
+            plt.title(str(sid))
+            plt.savefig(str(sid) + 'obs.autocorr.jpg')
+            plt.show()    
+
     def get_peaks(self, sidlist=None, pval=[0.95,1], plotfigs=True):
         """
         for each obs data series creates a CDF of values which are above mdl.
@@ -214,7 +228,6 @@ class SObs(object):
 
         Can be used to identify peaks or valleys.
         """
-
         for sid, ts, ms in self.generate_ts(sidlist=sidlist):
             # get minimum detectable level
             mdl = np.max(ms.values)
@@ -245,6 +258,8 @@ class SObs(object):
                 ax.plot(valA, pval[0], 'b.')
                 ax.plot(valB, pval[1], 'b.')
                 plt.show()
+            # sid is site number
+            # tsp is a time series of peaks
             yield sid, tsp 
 
     #def show_peaksA(self):

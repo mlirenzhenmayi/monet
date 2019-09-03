@@ -1,6 +1,7 @@
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 import matplotlib.dates as mdates
 import seaborn as sns
+import matplotlib.pyplot as plt
 """
 NAME: plotall.py
 UID: p102
@@ -11,6 +12,31 @@ CTYPE: source code
 
 -----------------------------------------------------------------------------------------------------
 """
+
+def create_map(fignum):
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
+
+    fig = plt.figure(fignum)
+    proj = ccrs.PlateCarree()
+    ax = plt.axes(projection=proj)
+    gl = ax.gridlines(draw_labels=True, linewidth=2, color="gray")
+    gl.ylabels_right = False
+    gl.xlabels_top = False
+    states = cfeature.NaturalEarthFeature(
+        category="cultural",
+        name="admin_1_states_provinces_lines",
+        scale="50m",
+        facecolor="none",
+    )
+    ax.add_feature(states, edgecolor="gray")
+    ax.add_feature(cfeature.BORDERS)
+    ax.add_feature(cfeature.LAKES)
+    ax.add_feature(cfeature.RIVERS)
+    ax.add_feature(cfeature.COASTLINE)
+    return ax
+
+
 def set_date_ticks(ax):
     mloc=mdates.MonthLocator()
     minloc=mdates.WeekdayLocator()

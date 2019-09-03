@@ -26,6 +26,7 @@ MetObs
 
 """
 
+
 def obs2metobs(obsobject):
     """
     input SVobs object.
@@ -41,26 +42,25 @@ def vmixing2metobs(vmix, obs):
     combine into a MetObs object.
     """
     print('--------------')
-    
-    obs = obs[['time','siteid','obs','mdl']]
-    #print(obs.dtypes)
-    #print(vmix.dtypes)
-    obs.columns = ['date','sid','so2','mdl']
-    print(obs['sid'].unique())
-    print(vmix['sid'].unique())
-
-    dfnew = pd.merge(obs,
-                     vmix,
-                     how='left',
-                     left_on=['date','sid'],
-                     right_on=['date','sid']
-                     )
-    dfnew = dfnew.drop_duplicates()
-    print(dfnew[0:10])
     met = MetObs(tag='vmix')
-    met.from_vmix(dfnew)
-    return  met       
-     
+    if not vmix.empty and not obs.empty:
+        obs = obs[['time','siteid','obs','mdl']]
+        #print(obs.dtypes)
+        #print(vmix.dtypes)
+        obs.columns = ['date','sid','so2','mdl']
+        print(obs['sid'].unique())
+        print(vmix['sid'].unique())
+
+        dfnew = pd.merge(obs,
+                         vmix,
+                         how='left',
+                         left_on=['date','sid'],
+                         right_on=['date','sid']
+                         )
+        dfnew = dfnew.drop_duplicates()
+        #print(dfnew[0:10])
+        met.from_vmix(dfnew)
+    return met
 
 def heatmap(x,y, ax, bins=(50,50)):
     heatmap, xedges, yedges = np.histogram2d(x,y, bins=(bins[0],bins[1]))
@@ -73,11 +73,31 @@ def hexbin(x,y,ax,sz=50,mincnt=1, cbar=True):
     cb = ax.hexbin(x,y, gridsize=sz, cmap=cm, mincnt=mincnt)
     if cbar: plt.colorbar(cb)
 
+def myhistA(hhh, ax, bins=None, label=None):
+    # same as myhist except use snsdistplot
+    if not bins:
+        sns.distplot(hhh, label=label)
+    else:
+        sns.distplot(hhh, bins=bins, label=label)
+    plt.legend()
+
+def myhist(hhh, ax, bins=None, label=None, color='b'):
+    # hist works better than sns.distplot.
+    if not bins:
+        sns.distplot(hhh, label=label)
+    else:
+        ax.hist(hhh, density=True, bins=bins, label=label, color=color,
+                alpha=0.5 )
+    plt.legend()
 
 
-def addplants(site, ax, ymax=20, dthresh=150, add_text=True):
-    disthash, dirhash = geometry2hash(site)
+def addplants(site, ax, ymax=20, dthresh=150, add_text=True,
+              geoname='geometry.csv'):
+    # add vertical lines with direction to power plants to the
+    # 2d histogram of so2 concentration vs. wind speed.
+    disthash, dirhash = geometry2hash(site, fname=geoname)
     iii=0
+    tlist = [] # list of tuples, oris, distance, direction
 
     for oris in dirhash.keys():
         try:
@@ -92,8 +112,19 @@ def addplants(site, ax, ymax=20, dthresh=150, add_text=True):
             except:
                 print('FAILED at', oris, site, dirhash[oris])
                 continue
-            yyy = [0,ymax] 
-            print(xxx, oris, site)
+            ty = ymax - iii * ymax/10.0
+            #yyy = [0,ty] 
+            #print(xxx, oris, site)
+            tlist.append((ddd, oris, xxx))
+    # sort according to distance from site.
+    tlist.sort()
+    for val in tlist:
+            oris = val[1]
+            xxx = val[2]
+            dist = val[0]
+            #print(xxx, oris, site)
+            ty = ymax - iii * ymax/10.0
+            yyy = [0,ty] 
             try:
                 ax.plot([xxx,xxx],yyy,'-k')
             except:
@@ -101,13 +132,9 @@ def addplants(site, ax, ymax=20, dthresh=150, add_text=True):
                
             if add_text:
                 tx = xxx+1
-                ty = ymax - iii * ymax/10.0
-                try:
-                    lbl = str(oris) + ' ' + str(int(disthash[oris])) + 'km'
-                except:
-                    print('Label failed at', disthash[oris], site, oris)
-                    lbl='None'
-                ax.text(tx, ty, lbl,fontsize=12, color="blue")
+                #ty = ymax - iii * ymax/10.0
+                lbl = str(oris) + ' ' + str(int(dist)) + 'km'
+                ax.text(tx, ty, lbl,fontsize=10, color="blue")
             iii+=1
 
 def jointplot(x, y, data, fignum=1):
@@ -166,13 +193,13 @@ def metobs2matched(met1, met2):
             print(t1[0:10], type(t1))
             print(t2[0:10], type(t2))
             if not t1.empty and not t2.empty:
-                print('MATCHED')
+                #print('MATCHED')
                 matched = statmain.MatchedData(obs=t1, fc=t2, stn=(sss,ccc)) 
-                print(matched.obsra[0:10])
-                print('-*-*-*-*')
+                #print(matched.obsra[0:10])
+                #print('-*-*-*-*')
                 if not matched.obsra.empty:
                     mdlist.append(matched)
-            print('-*-*-*-*')
+            #print('-*-*-*-*')
     return mdlist 
   
 
@@ -183,12 +210,21 @@ class MetObs(object):
     2. hexbin plot (2d histogram of obs and wind speed/ wind direction)  
     """
 
-    def __init__(self, tag=None):
+    def __init__(self, tag=None, geoname='geometry.csv'):
         self.df = pd.DataFrame()
         self.columns_original = []
         self.fignum = 1
         self.tag = tag
+        self.geoname = geoname
+        
 
+    def set_geoname(self, name):
+        """
+         name of geometry.csv file to use.
+         this is needed to plot direction of power plants
+        """
+        self.geoname = name
+        print('SETTING geoname', self.geoname)
 
     def from_vmix(self,df):
         self.df = df
@@ -266,7 +302,6 @@ class MetObs(object):
         if self.df.empty: return -1
         sns.set()
         slist = self.get_sites()
-        #print('SSSSSSSSS ', slist)
         for site in slist:
             fig = plt.figure(self.fignum)
             fig.set_size_inches(10,5)
@@ -315,6 +350,56 @@ class MetObs(object):
         return True
 
 
+    def conditional(self, save=False, quiet=False):
+        slist = self.get_sites()
+        sz = [10,5]
+        for site in slist:
+            sns.set()
+            sns.set_style('whitegrid')
+            fig = plt.figure(self.fignum)
+            fig.set_size_inches(sz[0],sz[1])
+            ax = fig.add_subplot(1,1,1)
+            df = self.df[self.df['siteid'] == site]
+            v1, x1 =  self.conditional_sub(df, ax, site, pval=[0.99,1],
+                                           color='r')    
+            v2, x2 =  self.conditional_sub(df, ax, site, pval=[0.95,1],    
+                                           color='b')    
+            v3, x3 =  self.conditional_sub(df, ax, site, pval=[0,0.2],    
+                                           color='g')    
+            #self.conditional_sub(df, ax, site, pval=[0.2,0.95])    
+            addplants(site, ax, ymax=0.01, geoname=self.geoname)
+            ax.set_xlabel('Wind Direction (degrees)')
+            ax.set_ylabel('Probability')  
+            plt.title(str(site))
+            plt.tight_layout()
+            plt.savefig(str(site) + 'cpdf.jpg')
+            plt.show() 
+ 
+    def conditional_sub(self,df, ax, site, pval, label=None, color='b'): 
+        var1='SO2'
+        var2='WDIR'
+
+        mdl=2
+        ra = df[var1].tolist()
+        valA = statmain.probof(ra, pval[0]) 
+        valB = statmain.probof(ra, pval[1]) 
+        #print('VALA, VALB', valA, valB)
+        #if valB < 0.2: valB = 0.25
+             
+        tdf = df[df[var1] >= valA]          
+        tdf = tdf[tdf[var1] <= valB]          
+        #print(tdf.columns.values) 
+        tdf = tdf.set_index('time')
+        hhh = tdf[var2]
+        hhh = hhh.fillna(0)
+        if not label: 
+           label = "{0:2.2f}".format(valA)  
+           label += ' to '
+           label += "{0:2.2f}".format(valB)  
+           label += ' ppb'
+        myhist(hhh.values,ax, bins=36, label=label, color=color)
+        return valA, valB
+
     def plothexbin(self, save=True, quiet=True): 
         # 2d histograms of obs and wind speed
         # 2d histogram of obs and wind direction.
@@ -357,15 +442,15 @@ class MetObs(object):
                htest = df['hour']
  
             if np.isnan(xtest).all():
-                print('No data WDIR')
+                print('No data WDIR', site)
                 continue
             if np.isnan(ztest).all():
-                print('No data so2')
+                print('No data so2', site)
                 continue
             cbar=False 
             hexbin(xtest, ztest, ax1, cbar=cbar)  
             ymax = np.max(ztest)
-            addplants(site, ax1, ymax=ymax)
+            addplants(site, ax1, ymax=ymax, geoname=self.geoname)
             hexbin(ytest, ztest, ax2, cbar=cbar) 
             if psqplot:
                hexbin(ptest, ztest, ax3, cbar=cbar)
@@ -383,12 +468,12 @@ class MetObs(object):
                 tag = self.tag
                 if not tag: tag = ''
                 plt.savefig(tag + str(site) + '.met_dist.jpg')
-            #self.fignum +=1
-            if not quiet:
-                plt.show()
+            self.fignum +=1
+            #if not quiet:
+            #    plt.show()
             # clearing the axes does not
             # get rid of warning.
-            plt.cla()
-            plt.clf()
-            plt.close()  
+            #plt.cla()
+            #plt.clf()
+            #plt.close()  
 

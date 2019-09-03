@@ -16,12 +16,9 @@ ABSTRACT: choosing met files for HYSPLIT control file
 
 """
 
-
-
 def getmetfiles(strfmt, sdate, runtime):
     mf = MetFiles(strfmt)
     return mf.get_files(sdate, runtime)
-
 
 
 class MetFiles:
@@ -29,10 +26,10 @@ class MetFiles:
     def __init__(self, strfmt, hours=None, verbose=False):
         self.verbose = verbose
         self.strfmt = strfmt
-        if not hours: 
-            self.mdt = self.find_mdt()
-        else:
-            self.mdt = datetime.timedelta(hours=hours)
+        #if not hours: 
+        #    self.mdt = self.find_mdt()
+        #else:
+        #    self.mdt = datetime.timedelta(hours=hours)
 
     def get_files(self, sdate, runtime):
         """
@@ -42,11 +39,39 @@ class MetFiles:
         nlist = self.make_file_list(sdate, runtime)
         return self.process(nlist)
 
-    def find_mdt(self):
+    def handle_hourA(self, sdate):
+        # returns date with 0 hour.
+        year = sdate.year
+        month = sdate.month
+        day = sdate.day
+        hour = sdate.hour
+        testdate = datetime.datetime(year, month, day, 0)
+        return testdate
+
+    def handle_hourB(self, sdate):
+        testdate = self.handle_hourA(sdate)
+        done=False
+        imax = 100
+        iii = 0
+        while not done:
+              newdate = testdate + self.mdt
+              if newdate < sdate:
+                 testdate = newdate
+              else:
+                 done=True
+              iii+=1
+              if iii > imax: done=True
+        return testdate 
+
+    def find_mdt(self,testdate):
         # finds time spacing between met files by
         # seeing which spacing produces a new file name.
-        testdate = datetime.datetime(2010,1,1)
-        mdtlist = [1,24,24*7,24*31, 24*356]
+        #testdate = datetime.datetime(2010,1,1)
+        if "%H" in self.strfmt:
+            mdtlist = [1,2,3,4,5,6,7,8,9,10,11,12]
+            testdate = self.handle_hourA(testdate)
+        else:
+            mdtlist = [1,24,24*7,24*31, 24*356]
         
         file1 = testdate.strftime(self.strfmt)
         done = False
@@ -55,7 +80,8 @@ class MetFiles:
             dt = datetime.timedelta(hours=mdtlist[iii])
             d2 = testdate   + dt
             file2 = d2.strftime(self.strfmt)
-            if file2 != file1: done=True
+            if file2 != file1 and path.isfile(file2): 
+               done=True
             iii += 1
             if iii >= len(mdtlist): done=True
         return  dt
@@ -76,19 +102,25 @@ class MetFiles:
            temp=temp.replace('week','w5') 
         return temp
 
+
     def make_file_list(self, sdate, runtime):
         nlist = []
         sdate = sdate.replace(tzinfo=None)
+        self.mdt = self.find_mdt(sdate)
+        # handle backwards runs. by switching sdate and edate
         if runtime < 0:
             runtime = abs(runtime)
             end_date = sdate
             sdate = end_date - datetime.timedelta(hours=runtime)
         else:
             end_date = sdate + datetime.timedelta(hours=runtime)
-        edate = sdate
         done = False
+        #self.verbose=True
+        if "%H" in self.strfmt:
+            sdate = self.handle_hourB(sdate)
+        edate = sdate
         if self.verbose:
-            print("GETMET", sdate, edate, end_date, runtime)
+            print("GETMET", sdate, edate, end_date, runtime, self.mdt)
         zzz = 0
         while not done:
             if 'week' in self.strfmt:

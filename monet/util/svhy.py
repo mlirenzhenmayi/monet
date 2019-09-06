@@ -711,20 +711,22 @@ class DatemScript(RunScriptClass):
     def mainstr_generator(self):
         iii = 0
         prev_directory = ' '
-        prev_oris = ' '
+        prev_oris = "None"
         suffixlist = []
         for run in self.runlist:
             dstr=''
             if run.directory != prev_directory:
                dstr += "cd " + run.directory + "\n\n"
+               dstr += "echo " + run.directory + "\n\n"
                #dstr += statmainstr()
                prev_directory = run.directory
+               prev_oris= "None"
             oris = run.get_oris()
-            if oris != prev_oris and iii!=0: 
+            model = 'model_' + oris + '.txt'
+            if oris != prev_oris: 
                 dstr += statmainstr(suffixlist=suffixlist, model=model,
                          pstr=self.pstr)
                 suffixlist = []
-            model = 'model_' + oris + '.txt'
             suffixlist.append(run.suffix)           
             prev_oris = oris
             iii+=1 

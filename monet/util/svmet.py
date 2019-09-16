@@ -12,6 +12,7 @@ from monet.utilhysplit import statmain
 # from arlhysplit.models.datem import mk_datem_pkl
 #from monet.obs.epa_util import convert_epa_unit
 from monet.util import tools
+from monet.util import ptools
 from monet.util.svan1 import geometry2hash
 
 """
@@ -58,7 +59,7 @@ def vmixing2metobs(vmix, obs):
                          right_on=['date','sid']
                          )
         dfnew = dfnew.drop_duplicates()
-        #print(dfnew[0:10])
+        print('vmix2obs---', dfnew[-10:])
         met.from_vmix(dfnew)
     return met
 
@@ -81,18 +82,59 @@ def myhistA(hhh, ax, bins=None, label=None):
         sns.distplot(hhh, bins=bins, label=label)
     plt.legend()
 
-def myhist(hhh, ax, bins=None, label=None, color='b'):
+def myhist(hhh, ax, bins, label=None, color='b'):
     # hist works better than sns.distplot.
-    if not bins:
-        sns.distplot(hhh, label=label)
-    else:
-        ax.hist(hhh, density=True, bins=bins, label=label, color=color,
-                alpha=0.5 )
+    #if not bins:
+    #    sns.distplot(hhh, label=label)
+    #else:
+    nnn, rbins, patches = ax.hist(hhh, density=True, bins=bins, label=label, color=color,
+            alpha=0.5 )
     plt.legend()
+    return nnn, rbins
+
+def get_line_width(eis, neidf ):
+    # The initial EIS locations come from the geometry.csv file which is setup
+    # using under options_obs.csv.
+    # So if the CONFIG.NEI file changes between when that was done and here,
+    # values may not match.
+
+    if neidf.empty:
+       return 1, '-r', 'unknown'
+    df = neidf[neidf['EIS_ID'].str.contains(eis.replace('EIS',''))]  
+    if df.empty:
+       #print(eis, ' empty')
+       return 1, '-c', 'unknown'
+    tp = df.iloc[0]['naics']
+    facility=df.iloc[0]['facility']
+    if tp.strip() == '221112':
+        clr = '-m'
+    elif 'LLC' in tp:
+        clr = '-g'
+    else:
+        clr = '-b'
+    mass = df.iloc[0]['SO2_kgph']
+    if mass < 1: linewidth=1
+    elif mass < 10: linewidth=2
+    elif mass < 100: linewidth=3
+    elif mass < 500: linewidth=4
+    else: linewidth=5
+    return linewidth , clr, facility
+
+def get_height(ymax, dthresh, dist):
+    bbb = np.ceil(dthresh)
+    incr = dthresh / bbb
+    aaa = np.arange(0,bbb+1) * incr 
+    ccc = np.arange(0,bbb+1) * ymax / (bbb+1)
+    ccc = np.flip(ccc)
+    iii=0
+    for val in aaa:
+        if dist < val: break
+        iii +=1
+    return ccc[iii]
 
 
 def addplants(site, ax, ymax=20, dthresh=150, add_text=True,
-              geoname='geometry.csv'):
+              geoname='geometry.csv', neidf=pd.DataFrame()):
     # add vertical lines with direction to power plants to the
     # 2d histogram of so2 concentration vs. wind speed.
     disthash, dirhash = geometry2hash(site, fname=geoname)
@@ -112,30 +154,77 @@ def addplants(site, ax, ymax=20, dthresh=150, add_text=True,
             except:
                 print('FAILED at', oris, site, dirhash[oris])
                 continue
-            ty = ymax - iii * ymax/10.0
-            #yyy = [0,ty] 
-            #print(xxx, oris, site)
             tlist.append((ddd, oris, xxx))
     # sort according to distance from site.
     tlist.sort()
+    nlen = len(tlist)
+    #yra = np.arange(0,nlen,1) * ymax / float(nlen)
+    #yra = np.flip(yra)     
+    textra = []
     for val in tlist:
+            facility = 'unknown'
             oris = val[1]
             xxx = val[2]
             dist = val[0]
+            if 'EIS' in oris:
+                clr= '-b'
+                lbl = str(int(dist)) + 'km'
+                linewidth, clr, facility =get_line_width(oris, neidf)
+                if facility == 'unknown' and dist > 10:
+                   continue
+            else:
+                clr = '-k'
+                lbl = str(oris) + ' ' + str(int(dist)) + 'km'
+                linewidth=5
             #print(xxx, oris, site)
-            ty = ymax - iii * ymax/10.0
+            ty = get_height(ymax, dthresh, dist)  
             yyy = [0,ty] 
+           
             try:
-                ax.plot([xxx,xxx],yyy,'-k')
+                ax.plot([xxx,xxx],yyy,clr, linewidth=linewidth)
             except:
                 print('FAILED at', xxx, oris, site)
-               
             if add_text:
                 tx = xxx+1
-                #ty = ymax - iii * ymax/10.0
-                lbl = str(oris) + ' ' + str(int(dist)) + 'km'
-                ax.text(tx, ty, lbl,fontsize=10, color="blue")
+                textra.append([tx, ty, lbl, facility])
             iii+=1
+    if textra: textra = manage_text(textra, ymax)
+    for  val in textra:     
+         #print(val)
+         ax.text(val[0], val[1], val[2],fontsize=8, color="blue")
+
+
+def manage_text(textra, ymax,  xinc=50):
+    # sort by the x position of the text.
+    yinc = ymax / 10.0
+    prev_xpos = textra[0][0]
+    iii=0
+    newra = []
+    textra.sort()
+    for tx in textra:
+        if iii==0 : 
+           newra. append([tx[0], tx[1], tx[2], tx[3]])
+           prev_xpos = tx[0]
+           prev_ypos = ymax
+        else:
+           xpos = tx[0]
+           ypos = tx[1]
+           label = tx[2]
+           if (xpos - prev_xpos) < xinc:
+              if np.abs((ypos - prev_ypos)) < yinc:    
+                 temp = label.split(' ')
+                 if len(temp) <= 1:
+                     label = ''
+                 #ypos = prev_ypos - yinc 
+                 #if ypos < 0: ypos = ymax
+           #else:
+           #   ypos = ymax
+           newra.append([xpos, ypos, label, tx[3]])
+           prev_xpos = tx[0]
+           prev_ypos = ypos
+        iii+=1
+    return newra
+
 
 def jointplot(x, y, data, fignum=1):
     fig = plt.figure(fignum)
@@ -215,8 +304,15 @@ class MetObs(object):
         self.columns_original = []
         self.fignum = 1
         self.tag = tag
+       
         self.geoname = geoname
-        
+
+        self.cemslist = []  #list of column names representing cems data.
+
+        self.neidf = pd.DataFrame()
+
+    def add_nei_data(self, df):
+        self.neidf = df
 
     def set_geoname(self, name):
         """
@@ -226,12 +322,27 @@ class MetObs(object):
         self.geoname = name
         print('SETTING geoname', self.geoname)
 
+
+    def add_cems(self, cemsdf, verbose=False):
+        """
+        adds the following colummns to the dataframe 
+        """
+        grouplist = ['time']
+        if verbose:
+            print('ADDING CEMS ')
+            print(cemsdf.dtypes)
+            print(self.df.dtypes)
+            print(cemsdf.columns.values)
+            print(self.df.columns.values)
+        self.cemslist.extend(cemsdf.columns.values)
+        self.df = pd.merge(self.df, cemsdf, how='left', left_on=grouplist,
+                           right_on=grouplist) 
+
     def from_vmix(self,df):
         self.df = df
         self.columns_original = self.df.columns.values
         self.rename_columns()
        
-
     def from_obs(self, obs):
         print("Making metobs from obs")
         self.df = tools.long_to_wideB(obs)  # pivot table
@@ -245,7 +356,6 @@ class MetObs(object):
            print('No Met Data Found') 
         else:
            self.df = self.df.dropna(axis=0, how='all', subset=overlap)
-
 
     def to_csv(self,tdir, csvfile=None):
         if self.df.empty: return -1
@@ -308,6 +418,8 @@ class MetObs(object):
             # re-using these axis produces a warning.
             ax1 = fig.add_subplot(1,1,1)
             ax2 = ax1.twinx()
+            #ax3 = fig.add_subplot(2,1,2)
+            ax3 = ax1.twinx()
 
             df = self.df[self.df['siteid'] == site]
             df = df.set_index('time')
@@ -318,6 +430,13 @@ class MetObs(object):
 
             ax1.set_ylabel('so2 (ppb)')
             ax2.set_ylabel('Wind direction (degrees)')
+            if 'time' in self.cemslist:
+                self.cemslist.remove('time')
+            for oris in self.cemslist:
+                print('ORIS', oris, self.cemslist, df.columns.values)
+                cems = df[oris]
+                ax3.plot(cems, '-r.')
+
             plt.title(str(site))
             plt.tight_layout() 
             if not quiet:
@@ -345,7 +464,10 @@ class MetObs(object):
             elif psq=='E': return 5
             elif psq=='F': return 6
             elif psq=='G': return 7
-            else: return 8
+            else:
+                return 8
+        print(self.df['PSQ'])
+        print('---------------------')
         self.df['psqnum'] = self.df.apply(lambda row: process_psq(row['PSQ']), axis=1)
         return True
 
@@ -360,45 +482,129 @@ class MetObs(object):
             fig.set_size_inches(sz[0],sz[1])
             ax = fig.add_subplot(1,1,1)
             df = self.df[self.df['siteid'] == site]
-            v1, x1 =  self.conditional_sub(df, ax, site, pval=[0.99,1],
-                                           color='r')    
-            v2, x2 =  self.conditional_sub(df, ax, site, pval=[0.95,1],    
-                                           color='b')    
-            v3, x3 =  self.conditional_sub(df, ax, site, pval=[0,0.2],    
-                                           color='g')    
-            #self.conditional_sub(df, ax, site, pval=[0.2,0.95])    
-            addplants(site, ax, ymax=0.01, geoname=self.geoname)
+
+
+            v1, x1, nnn1 =  self.conditional_sub(df, ax, site, pval=[0.99,1],
+                                           color='r', limit=True)    
+            # lower limit should not be less than mdl
+            v2, x2, nnn2 =  self.conditional_sub(df, ax, site, pval=[0.95,0.99],    
+                                           color='b', limit=True)    
+           
+            v3, x3, nnn3  =  self.conditional_sub(df, ax, site, pval=[0,0.2],    
+                                           color='g', limit=False)    
+            #if upper limit of green < lower limit of blue
+            # and lower limit of blue is greater than 5
+            # then add a fourth distribution.
+            if x3 < v2 and v2 > 5:
+               v4, x4, nnn4 =  self.conditional_sub(df, ax, site, pval=[0.2,0.95],    
+                                           color='c', limit=True)    
+
+            ymax = 0.90 * np.max([np.max(nnn1), np.max(nnn2), np.max(nnn3)])
+            addplants(site, ax, ymax=ymax, geoname=self.geoname, neidf=self.neidf)
             ax.set_xlabel('Wind Direction (degrees)')
             ax.set_ylabel('Probability')  
+            ptools.set_legend(ax, bw=0.60)
             plt.title(str(site))
-            plt.tight_layout()
+            plt.tight_layout(rect=[0,0,0.75,1])
             plt.savefig(str(site) + 'cpdf.jpg')
             plt.show() 
- 
-    def conditional_sub(self,df, ax, site, pval, label=None, color='b'): 
+
+    def conditionalA(self, distrange=5, roll=12):
+
+        # roll gives how many hours of emission to take into account.
+        # sums the previous roll (default 12)  hours.
+
+        # for each site.
+        # for each ORIS code.
+        # find wdir to that ORIS code from the site.
+        # keep only points within 5 degrees of that wdir.
+        # look at SO2 values when CEMS are high
+        # look at SO2 values when CEMS are low.
+        # plot together.
+        slist = self.get_sites()
+        sz = [10,5]
+        sns.set()
+        sns.set_style('whitegrid')
+        if 'time' in self.cemslist:
+            self.cemslist.remove('time')
+        fignum = 1
+        maxdist = 100
+        for site in slist:
+            fig = plt.figure(fignum)
+            sitedf = self.df[self.df['siteid'] == site]
+            disthash, dirhash = geometry2hash(site, fname=self.geoname)
+            nnn=0
+            for key in disthash.keys():
+                if disthash[key] < maxdist: 
+                  nnn+=1
+            nnn=1
+            sz = [10,5*nnn]
+            print(str(site), str(nnn)) 
+            fig.set_size_inches(sz[0],sz[1])
+            iii = 1
+            for oris in self.cemslist:
+                direction = dirhash[oris]
+                distance  = disthash[oris]
+                if distance > maxdist: continue
+                print('ORIS', oris, direction, distance)
+                df = sitedf.copy()
+                valA = direction + distrange
+                if valA > 360: valA = 360-valA
+                valB = direction - distrange
+                if valB < 0: valB = 360+ valB
+                print('between ', str(valB), str(valA))
+                df = df[df['WDIR']<=valA]
+                df = df[df['WDIR']>=valB]
+                df.dropna(axis=0, inplace=True)
+                print(df)
+                if df.empty: continue 
+                fig = plt.figure(fignum)
+                fig.set_size_inches(sz[0],sz[1])
+                ax = fig.add_subplot(1,1,1)
+                dfroll = df[oris]
+                # want to take into account emission during the previous 12
+                # hours
+                dfroll = dfroll.rolling(roll).sum()
+               
+                
+                hexbin(df['SO2'], dfroll, ax, cbar=True)  
+                iii += 1
+                ax.set_title(str(site) + ' ' + str(oris) ) 
+                #if iii > 2: break
+                plt.show() 
+
+    def conditional_sub(self,df, ax, site, pval, label=None, color='b',
+                       limit=True): 
         var1='SO2'
         var2='WDIR'
-
-        mdl=2
+        mdl=df['mdl'].unique()
         ra = df[var1].tolist()
         valA = statmain.probof(ra, pval[0]) 
         valB = statmain.probof(ra, pval[1]) 
         #print('VALA, VALB', valA, valB)
         #if valB < 0.2: valB = 0.25
-             
+
+        if valA <= mdl[0] and limit: valA = mdl[0] 
+        if valA > valB: 
+           return valA, valB, 0
+
+        print('VAL2', valA, valB, mdl)
         tdf = df[df[var1] >= valA]          
         tdf = tdf[tdf[var1] <= valB]          
         #print(tdf.columns.values) 
         tdf = tdf.set_index('time')
         hhh = tdf[var2]
-        hhh = hhh.fillna(0)
+        # do not use values with NAN
+        hhh = hhh.fillna(-10)
+        #hhh = hhh[hhh != -9]
         if not label: 
            label = "{0:2.2f}".format(valA)  
            label += ' to '
            label += "{0:2.2f}".format(valB)  
            label += ' ppb'
-        myhist(hhh.values,ax, bins=36, label=label, color=color)
-        return valA, valB
+        bins = np.arange(0,365,5)
+        nnn, rbins = myhist(hhh.values,ax, bins=bins, label=label, color=color)
+        return valA, valB, nnn
 
     def plothexbin(self, save=True, quiet=True): 
         # 2d histograms of obs and wind speed
@@ -411,8 +617,8 @@ class MetObs(object):
         psqplot = self.PSQ2NUM()
         if psqplot: 
            nnn=2
-           aaa=2
-           sz=(10,10)
+           aaa=3
+           sz=(10,15)
            self.date2hour()
 
         for site in slist:
@@ -420,12 +626,16 @@ class MetObs(object):
             sns.set_style('whitegrid')
             fig = plt.figure(self.fignum)
             fig.set_size_inches(sz[0],sz[1])
+            fig2 = plt.figure(self.fignum+1)
+            fig2.set_size_inches(sz[0],sz[1])
             # re-using these axis produces a warning.
             ax1 = fig.add_subplot(aaa,nnn,1)
             ax2 = fig.add_subplot(aaa,nnn,2)
             if psqplot:
                 ax3 = fig.add_subplot(aaa,nnn,3)
-                ax4 = fig.add_subplot(nnn,nnn,4)
+                ax4 = fig.add_subplot(aaa,nnn,4)
+                ax5 = fig.add_subplot(aaa,nnn,5)
+                ax6 = fig.add_subplot(aaa,nnn,6)
 
             df = self.df[self.df['siteid'] == site]
             #print('HEXBIN for site ' , site) 
@@ -438,8 +648,17 @@ class MetObs(object):
             ytest = df["WS"]
             ztest = df["SO2"]
             if psqplot:
-               ptest = df['psqnum']       
-               htest = df['hour']
+               # do not include Nans in the distributions.
+               dftemp = df[df['psqnum']<8] 
+               p1test = dftemp['psqnum']       
+               p2test = dftemp['psqnum']       
+               htest = dftemp['hour']
+
+               xtest = dftemp["WDIR"]
+               ytest = dftemp["WS"]
+               ztest = dftemp["SO2"]
+               print(dftemp.columns.values) 
+               pbl = dftemp['MixHgt']
  
             if np.isnan(xtest).all():
                 print('No data WDIR', site)
@@ -453,8 +672,10 @@ class MetObs(object):
             addplants(site, ax1, ymax=ymax, geoname=self.geoname)
             hexbin(ytest, ztest, ax2, cbar=cbar) 
             if psqplot:
-               hexbin(ptest, ztest, ax3, cbar=cbar)
-               hexbin(htest, ptest, ax4, cbar=cbar)
+               hexbin(p2test, ztest, ax3, cbar=cbar)
+               hexbin(htest, p1test, ax4, cbar=cbar)
+               hexbin(ztest, pbl, ax5, cbar=cbar) 
+               hexbin(p2test,pbl,  ax6, cbar=cbar) 
             ax1.set_xlabel('Wind Direction ')
             ax2.set_xlabel('Wind Speed ')
             ax1.set_ylabel('SO2 (ppb)')
@@ -462,6 +683,10 @@ class MetObs(object):
                ax3.set_xlabel('PSQ')
                ax4.set_xlabel('time')
                ax4.set_ylabel('PSQ')
+               ax5.set_ylabel('PBL height ')
+               ax5.set_xlabel('SO2')
+               ax6.set_ylabel('PBL height ')
+               ax6.set_xlabel('Stability')
             ax1.set_title(str(site))
             plt.tight_layout() 
             if save:

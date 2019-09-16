@@ -34,7 +34,7 @@ def create_map(fignum):
     ax.add_feature(cfeature.LAKES)
     ax.add_feature(cfeature.RIVERS)
     ax.add_feature(cfeature.COASTLINE)
-    return ax
+    return fig, ax
 
 
 def set_date_ticks(ax):
@@ -66,11 +66,13 @@ def generate_colors():
         yield clr
 
 
-def set_legend(ax):
+def set_legend(ax, bw=0.8):
     # puts legend outside of plot to the right hand side.
     handles, labels = ax.get_legend_handles_labels()
-    # shrink width of plot by 80%
+    # shrink width of plot by bw%
     box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    ax.legend(handles, labels, loc='center left', bbox_to_anchor=(1, 0.5))
+    ax.set_position([box.x0, box.y0, box.width * bw, box.height], which='both')
+    ax.legend(handles, labels, loc='center left', bbox_to_anchor=(1, 0.5),
+             bbox_transform=ax.transAxes)
+             #bbox_transform=plt.gcf().transFigure)
 

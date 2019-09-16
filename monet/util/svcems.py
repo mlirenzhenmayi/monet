@@ -47,6 +47,37 @@ methods:
 SourceSummary class
 """
 
+
+def determine_color(mass, unit='lbs'):
+    if unit=='lbs':
+        kg = mass/2.2
+    else:
+        kg = mass 
+    if kg  < 0.05: ms = 'g'
+    elif kg  < 1: ms = 'r'
+    elif kg  < 10: ms= 'c'
+    else: ms = 'b'
+    return ms
+
+def determine_size(mass, unit='lbs'):
+    # set marker size based on emissions.
+    if unit=='lbs':
+        kg = mass/2.2
+    else:
+        kg = mass 
+    if kg  < 0.05: ms=0
+    elif kg  < 1: ms=1
+    elif kg  < 10: ms=3
+    elif kg < 50: ms = 5
+    elif kg < 100: ms = 7
+    elif kg < 500: ms = 9
+    elif kg < 1000: ms = 11
+    elif kg < 5000: ms = 13
+    elif kg < 10000: ms = 15
+    else: ms = 17
+    return ms 
+
+
 def remove_strings(df, stype):
     def remove_str(x):
         if isinstance(x, str):
@@ -125,17 +156,65 @@ class CEMScsv:
         if '/' != tdir[-1]: tdir += '/'
         self.tdir = tdir
         self.cname = cname
+        self.cems = pd.DataFrame()
+        self.melted = pd.DataFrame()
+        self.timecol = ('time','time','time')
         #self.df = data
 
-    def read_csv(self, name="cems.csv"):
-        cems = pd.read_csv(name, sep=",")
-        return cems
+    def read_csv(self, cname=None):
+        if not cname: cname = self.cname
+        dtp = {self.timecol: 'datetime64[ns]'}
+        if os.path.isfile(self.tdir + cname):
+            cems = pd.read_csv(cname, sep=",", header=[0,1,2], dtype=dtp
+                              ) 
+            self.cems = cems
+        print('READ CEMS', self.tdir, cname, self.cems[0:10])
+        self.cems[self.timecol] = self.cems[self.timecol].astype('datetime64[ns]')
+        print(self.cems.dtypes)
+        print('READ CEMS', self.cems[0:10])
+        return self.cems
+
+    def melt(self):
+        vals = list(self.cems.columns.values[1:])
+        #print('VALS', vals, type(vals), type(vals[0]))
+       
+        self.melted = pd.melt(self.cems,
+                id_vars=[self.timecol],
+                value_vars = vals)
+        new = ['time','oris','pollnum','unit','SO2']
+        self.melted.columns = new
+        return self.melted
+
+    def get_cems(self):
+        if self.melted.empty and not self.cems.empty:
+           self.melt()
+        if not self.melted.empty:
+            #df = self.melted[self.melted['oris'].isin(orislist)]
+            #if not df.empty:
+            sources = pd.pivot_table(self.melted, index="time", columns='oris', values='SO2',aggfunc=np.sum)
+            sources.reset_index(inplace=True)
+            #else:
+            #    sources = pd.DataFrame()
+        else:
+            sources = pd.DataFrame()
+        return sources 
 
     def make_csv(self, df):
         print("CREATE CSV FILE ", self.tdir, self.cname)
-        new = []
+        new = [self.timecol]
         df.fillna(0, inplace=True)
         for hd in df.columns:
+            val1 = hd[0]
+            # particle type
+            try:
+                val2 = " P" + str(hd[4])
+            except:
+                val2 = ' Pall'
+            # unit
+            try:
+                val3 = " U" + str(hd[5])
+            except:
+                val2 = ' Uall'
             try:
                 cstr = hd[0] + " P" + str(hd[4])
             except:
@@ -144,9 +223,12 @@ class CEMScsv:
                 cstr += " U" + str(hd[5])
             except:
                 pass
-            new.append(cstr)
-        df.columns = new
-        df.to_csv(self.tdir + self.cname, float_format="%.1f")
+            #new.append(cstr)
+            new.append((val1,val2,val3))
+        #df.columns = new
+        df.reset_index(inplace=True)
+        df.columns=pd.MultiIndex.from_tuples(new)
+        df.to_csv(self.tdir + self.cname, float_format="%.1f", index=False)
 
     def generate_cems(self,orislist, spnum='P1'):
         """
@@ -221,25 +303,13 @@ class SourceSummary:
             if loc:
                 lat = lathash[loc]
                 lon = lonhash[loc]
-                ms = self.determine_size(tothash[loc])
+                ms = determine_size(tothash[loc])
                 #if loc in self.goodoris:
                 print('pl ' + str(loc) + ' ' + str(tothash[loc]) + ' ' + str(ms))
                 ax.plot(lon, lat, "ko", markersize=ms, linewidth=2, mew=1)
                 plt.text(lon, lat, (str(loc)), fontsize=12, color="red")
                 #else:
                 #    ax.text(lon, lat, str(int(loc)), fontsize=8, color="k")
-
-    def determine_size(self, lbs):
-        # set marker size based on emissions.
-        kg = lbs/2.2
-        if kg  < 10: ms=3
-        elif kg < 50: ms = 5
-        elif kg < 100: ms = 7
-        elif kg < 500: ms = 9
-        elif kg < 1000: ms = 11
-        elif kg < 5000: ms = 13
-        else: ms = 15
-        return ms 
 
     def check_oris(self, threshold):
         """

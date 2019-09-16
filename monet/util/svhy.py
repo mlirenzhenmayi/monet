@@ -42,6 +42,8 @@ class RunDescriptor:  main purpose currently is to produce a string for the
 
 create_runlist:  returns a runlist. Similar to create_controls but does not
 write CONTROL and SETUP files.
+
+Currently runtime duration is set in the default CONTROL file only.
 """
 
 
@@ -157,7 +159,7 @@ def default_control(name, tdirpath, runtime, sdate, cpack=1,
 
     cgrid = ConcGrid(
         "junkname",
-        levels=[20, 50, 100, 150, 175, 225, 300],
+        levels=[50, 100, 200, 300, 400],
         centerlat=lat,
         centerlon=lon,
         latdiff=latdiff,
@@ -221,7 +223,6 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
 
     iii = 0
     for (dirpath, dirnames, filenames) in walk(tdirpath):
-        #print(dirpath, dirnames, filenames)
         for fl in filenames:
             if iii == 0:
                 firstdirpath = dirpath
@@ -229,9 +230,6 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
             if "EMIT" in fl[0:4]: 
                 et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
                 if not et.read_file(): continue
-                # print('NRECS', nrecs)
-                # sys.exit()
-                #sdate = et.cycle_list[0].sdate
                 try: 
                     sdate = dir2date(tdirpath, dirpath)
                 except:
@@ -253,7 +251,8 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
                     parinitA = "PARDUMP." + suffix
                     parinitB = "PARINIT." + suffix
                     parinit = (pdir, parinitA, parinitB)
-                run = RunDescriptor(wdir, suffix, hysplitdir, "hycs_std", parinit)
+                run = RunDescriptor(wdir, suffix, hysplitdir, "hycs_std",
+                                    parinit)
                 wr = "a"
                 if iii == 0:
                     wr = "w"
@@ -293,12 +292,18 @@ def read_vmix(tdirpath, sdate, edate, timechunks, sid=None, verbose=False):
     for dirpath in dtree:
         for (d1, dirnames, filenames) in walk(dirpath):
              for fl in filenames:
+                 test=True
                  if 'STABILITY' in fl:
                      if not sid or str(sid) in fl:
                          temp = fl.split('.')
                          xsid = temp[1]
-                         xsid = int(xsid.replace('V',''))
-                         vmix.add_data(fl, vdir=dirpath, sid=xsid,
+                         try:
+                             xsid = int(xsid.replace('V',''))
+                         except:
+                             print('XSID NOT VALID', fl, xsid, d1)
+                             test=False
+                         if test:
+                             vmix.add_data(fl, vdir=dirpath, sid=xsid,
                                        verbose=verbose)
     return vmix.df
 
@@ -374,6 +379,107 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
                         #vstr += 'cd ' + dirnames + '\n'
                         #vstr += '$MDL/vmixing -p' + suffix + '-a2'
                         #vstr += '\n' 
+    return runlist
+
+def nei_source_generator(df):
+    #ns = NeiSummary(tdir, fname)
+    #df = ns.load()
+    order = ['EIS_ID', 'latitude',
+             'longitude','SO2_kgph','height']
+    #print(df.columns.values) 
+    if 'height' not in df.columns.values:
+        df['height'] = 50 
+
+    for index, row in df.iterrows():
+        shash = {}
+        for val in order:
+            shash[val] = row[val]
+        yield shash
+
+# create control files for other sources. Not CEMS.
+def nei_controls(tdirpath, hdirpath, sourcedf, sdate, edate, timechunks, metfmt,
+                 units='ppb', tcm=False):
+    # sourcedf contains info on
+    # stackheight
+    # emission rate
+    # heat input 
+    from os import walk
+    from monet.util.svdir import dirtree
+    from monet.util.svdir import date2dir
+    from monet.util.svdir import dir2date
+    control = HycsControl(fname="CONTROL.0", working_directory=tdirpath)
+    control.read()
+
+    dstart = sdate
+    dend = edate
+    ##determines meteorological files to use.
+    met_files = MetFiles(metfmt) 
+    runlist = []  #list of RunDescriptor Objects
+    if hdirpath[-1] != '/' : 
+       hdirpath += '/'
+    hysplitdir = hdirpath + "exec/"
+    landusedir = hdirpath + "bdyfiles/"
+    print('LANDUSEDIR', landusedir, hdirpath)
+    dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks)
+    iii = 0
+    for dirpath in dtree:
+        for src in nei_source_generator(sourcedf):
+            print(src)
+            suffix = 'EIS' + src['EIS_ID'].strip()
+
+            setupfile = NameList("SETUP.0", working_directory=tdirpath)
+            setupfile.read()
+            setupfile.rename("SETUP." + suffix, working_directory=dirpath + "/")
+            setupfile.add("NDUMP", str(timechunks))
+            setupfile.add("NCYCL", str(timechunks))
+            setupfile.add("POUTF", '"PARDUMP.' + suffix + '"')
+            setupfile.add("PINPF", '"PARINIT.' + suffix + '"')
+            setupfile.write(verbose=False)
+
+            release_rate = src['SO2_kgph']
+            ##Write a control file
+            control = HycsControl(fname="CONTROL.0", working_directory=tdirpath)
+            control.read()
+            # make sure that control start is always start of time
+            # period.
+            controldate = dir2date(tdirpath, dirpath)
+            control.date = controldate
+
+            control.rename("CONTROL." + suffix, working_directory=dirpath)
+               
+            # edit locations        
+            control.remove_locations()
+            control.add_location(line=False, 
+                                latlon=(src['latitude'],src['longitude']),
+                                alt = src['height'],
+                                rate = 0
+                                 )
+            # set emission rate and duration in the pollutant definition.
+            for sp in control.species:
+                sp.rate = release_rate
+                sp.duration=int(control.run_duration)
+            ###Add the met files.
+            control.remove_metfile(rall=True)
+            if tcm: timechunks = int(control.run_duration)
+            mfiles = met_files.get_files(control.date, timechunks)
+            for mf in mfiles:
+                if os.path.isfile(mf[0] + mf[1]):
+                    control.add_metfile(mf[0], mf[1])
+            for cg in control.concgrids:
+                cg.outfile += "." + suffix
+            if control.num_met > 12: metgrid=True
+            else: metgrid=False 
+            control.write(metgrid=metgrid, overwrite=True, query=False)
+            writelanduse(landusedir=landusedir, working_directory=dirpath + "/")
+            sdate = dir2date(tdirpath, dirpath)
+            pdate = sdate - datetime.timedelta(hours=timechunks)
+            pdir = date2dir(tdirpath, pdate, dhour=timechunks)
+            parinitA = "PARDUMP." + suffix
+            parinitB = "PARINIT." + suffix
+            parinit = (pdir, parinitA, parinitB)
+            run = RunDescriptor(dirpath, suffix, hysplitdir, "hycs_std",
+                                 parinit, {'emrate':src['SO2_kgph']})
+            runlist.append(run)
     return runlist
 
 
@@ -581,7 +687,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
     return runlist
 
 
-def unit_mult(units="ug/m3"):
+def unit_mult(units="ug/m3", emult=None):
     rstr = ""
     #rstr = "#emission in kg (mult by 1e9)" + "\n"
     if units.lower().strip() == "ppb":
@@ -606,14 +712,18 @@ def statmainstr(suffixlist=None, model=None, pstr=None):
     mergestr =  "$MDL/conmerge -imergefile -o" + csum + "\n"
     datem = "datem.txt"
     if not pstr: pstr= ''
+
     # all cdump files in the directory are merged 
     if not suffixlist:
        cdumpstr = 'ls cdump.* > mergefile \n' 
+       model = 'model_all.txt'
+
     # only certain cdump files in the directory are merged 
     elif len(suffixlist)> 1:
        cdumpstr = 'rm -f mergefile \n'
        for suffix in suffixlist:
            cdumpstr += 'ls cdump.' + suffix + ' >> mergefile \n'
+
     # datem run on only one cdump file in the directory.
     else:
        csum = 'cdump.' + suffixlist[0]
@@ -621,7 +731,7 @@ def statmainstr(suffixlist=None, model=None, pstr=None):
        mergestr = ''        
        if not model: model = 'model.' + suffixlist[0] + '.txt'  
 
-    if not model: model = 'model.txt'
+    #if not model: model = 'model.txt'
 
     suffix = model.replace('.txt','')
     suffix = suffix.replace('model','')
@@ -648,6 +758,7 @@ class RunScriptClass:
         #self.runlist = sorted(runlist)
         self.runlist = runlist
         self.main()
+        self.maxprocess = 30
 
     def make_hstr(self):
         return ""
@@ -670,8 +781,12 @@ class RunScriptClass:
             dstr = ''
             if run.directory != prev_directory:
                dstr += "cd " + run.directory + "\n\n"
+               dstr += "echo " + run.directory + "\n\n"
             dstr += self.mstr(run)
             prev_directory = run.directory
+            if iii> 30: 
+               dstr += 'wait \n'
+               iii=0
             iii += 1
             yield dstr
        
@@ -708,27 +823,54 @@ class DatemScript(RunScriptClass):
     def make_hstr(self):
         return unit_mult(self.unit)
 
+
+    def get_list(self, runlist):
+        orislist = []
+        for run in self.runlist:
+            orislist.append(run.get_oris())
+        return list(set(orislist))
+
     def mainstr_generator(self):
         iii = 0
-        prev_directory = ' '
-        prev_oris = "None"
+        prev_directory = 'None'
         suffixlist = []
+        # going thru each run.
         for run in self.runlist:
             dstr=''
+
+            # looking forward to next oris and next directory.
+            if iii+1 < len(self.runlist):
+                next_oris = self.runlist[iii+1].oris
+                next_dir = self.runlist[iii+1].directory
+            else:
+                next_oris = 'None'
+                next_dir = 'None'
+
+            # checking if we are in a new directory.
             if run.directory != prev_directory:
+               # if in new directory the cd and echo command.
                dstr += "cd " + run.directory + "\n\n"
                dstr += "echo " + run.directory + "\n\n"
-               #dstr += statmainstr()
+               # now make this directory the prev directory.
                prev_directory = run.directory
-               prev_oris= "None"
+
+            # get the oris, or just the suffix of the run.
             oris = run.get_oris()
+
+            # this is the name for the dataA.txt file (statmain output)
             model = 'model_' + oris + '.txt'
-            if oris != prev_oris: 
+
+            # add to list of suffixes that belong to this oris
+            suffixlist.append(run.suffix)           
+
+            # if the next oris is different or we will be in a new directory.
+            # then generate a string.           
+            if oris != next_oris or run.directory != next_dir: 
                 dstr += statmainstr(suffixlist=suffixlist, model=model,
                          pstr=self.pstr)
+                # reset the suffixlist.
                 suffixlist = []
-            suffixlist.append(run.suffix)           
-            prev_oris = oris
+
             iii+=1 
             yield dstr
 
@@ -746,12 +888,14 @@ class RunScript(RunScriptClass):
 
     def mainstr_generator(self):
         iii = 0
+        jjj = 0
         nice=True
         nohup=False
         prev_directory = ' '
         for run in self.runlist:
             rstr = ''
             if run.directory != prev_directory:
+                jjj=0
                 if iii != 0:
                     rstr += "wait" + "\n\n"
                     rstr += 'echo "Finished ' + prev_directory + '"  >> ' 
@@ -765,8 +909,12 @@ class RunScript(RunScriptClass):
             if nice: rstr += 'nohup '
             rstr += "${MDL}" + run.hysplit_version + " " + run.suffix
             rstr += " & \n"
+            if jjj> 30:
+               rstr += 'wait \n'
+               jjj=0
             prev_directory = run.directory
             iii += 1
+            jjj += 1
             yield rstr
         ##add line to copy PARDUMP file from one directory to PARINIT file
 
@@ -778,6 +926,7 @@ class RunDescriptor(object):
         hysplitdir,
         hysplit_version="hycs_std",
         parinit=(None, None, None),
+        ehash=None
     ):
         self.hysplitdir = hysplitdir  # directory where HYSPLIT executable is.
         self.hysplit_version = hysplit_version  # name of hysplit executable to
@@ -789,14 +938,21 @@ class RunDescriptor(object):
             parinit[0]
         )  # parinit file associated with the run.
         # should be full path.
+        self.oris = self.get_oris()
+        if not ehash: self.ehash = {}
+        else: self.ehash = ehash
 
     def __lt__(self, other):
         """
         lt and eq so runlist can be sorted according to
-        directory and then to suffix.
+        directory and then to oris and then to suffix.
         """
+        # if the directories are equal then sort by suffixes.
         if self.directory == other.directory:
-           t1 = self.suffix < other.suffix
+           if self.oris == other.oris:
+               t1 = self.suffix < other.suffix
+           else:
+               t1 = self.oris < other.oris
         else:
            t1 = self.directory < other.directory
         return t1

@@ -13,6 +13,7 @@ Classes
 ConfigFile(NameList)
 """
 
+
 class ConfigFile(NameList):
     def __init__(self, fname, working_directory="./"):
         self.lorder = None
@@ -30,6 +31,10 @@ class ConfigFile(NameList):
         self.hdir = "./"
         self.tdir = "./"
         self.quiet = 0
+
+        # attributes for NEI data
+        self.neiconfig = None  #file which gives info on other source
+        self.ndir = '/n-home/alicec/'
 
         # attributes for CEMS data
         self.cems = True
@@ -57,6 +62,8 @@ class ConfigFile(NameList):
         # attributes for met data
         self.vmix = 0 
         self.ish = 0
+        # directory for vmixing output
+        self.vdir = None
 
         if os.path.isfile(fname):
             self.read(case_sensitive=False)
@@ -74,7 +81,6 @@ class ConfigFile(NameList):
         self.logfile= None
         self.fignum= None
         
-
 
 
     def _load_descrip(self):
@@ -98,6 +104,11 @@ class ConfigFile(NameList):
         hstr = "top level directory path for outputs"
         self.descrip["outdir"] = hstr
         lorder.append("outdir")
+
+        hstr = "top level directory path for vmixing outputs"
+        self.descrip["vmixdir"] = hstr
+        lorder.append("vmixdir")
+
 
         hstr = "string. run tag for naming output files such as bash scripts."
         self.descrip["tag"] = hstr
@@ -210,10 +221,16 @@ class ConfigFile(NameList):
         lorder.append("RESULTS")
 
         hstr = "0 or 1 \n"
-        hstr += sp10 + 'if 1 create scripts to run c2datem\n'
-        hstr += sp10 + 'subdirectories'
+        hstr += sp10 + 'if 1 create bash scripts to run c2datem\n'
         self.descrip['scripts'] = hstr
         lorder.append('scripts')
+  
+        hstr = "str. name of file with information on other sources \n"
+        hstr += sp10 + 'if options.run true then will create CONTROL files for\n'
+        hstr += sp10 + ' these sources based on CONTROL.0 and info in the file.\n'
+        self.descrip['neiconfig'] = hstr
+        lorder.append('scripts')
+
 
         self.lorder = lorder
 
@@ -251,6 +268,8 @@ class ConfigFile(NameList):
         ## should be all lower case here.
         ## namelist is not case sensitive and
         ## all keys are converted to lower case.
+        self.neiconfig = self.test('neiconfig', self.neiconfig)
+        self.ndir = self.test('neidir', self.ndir)
 
         self.bounds = self.test("area", self.bounds)
         self.drange = self.test("drange", self.drange)
@@ -266,6 +285,8 @@ class ConfigFile(NameList):
         self.orislist = self.process_oris()
         self.hdir = self.test("hysplitdir", self.hdir)
         self.tdir = self.test("outdir", self.tdir)
+        self.vdir = self.test("vmixdir", self.vdir)
+        if not self.vdir: self.vdir = self.tdir
 
         self.quiet = self.test("quiet", self.quiet)
         self.quiet = int(self.quiet)
@@ -277,11 +298,19 @@ class ConfigFile(NameList):
         self.chunks = int(self.chunks)
 
         self.write_scripts = self.test("scripts", self.write_scripts)
+        try:
+            self.write_scripts = int(self.write_scripts)
+        except:
+            self.write_scripts = self.str2bool(self.write_scripts) 
+
         self.metfmt = self.test("metfile", self.metfmt)
 
         self.vmix = self.test('vmix', self.vmix)
-        self.vmix = int(self.vmix)
-  
+        try:
+            self.vmix = int(self.vmix)
+        except: 
+            self.vmix = self.str2bool(self.vmix) 
+ 
         self.ish = self.test('ish', self.ish)
         self.ish = int(self.ish)
         # booleans

@@ -52,7 +52,7 @@ def options_cems_main(options, d1, d2, area, source_chunks, logfile):
         if not options.obs:
             print("map fig number  " + str(rfignum))
             mapfig = plt.figure(rfignum)
-            axmap = create_map(rfignum)
+            figmap, axmap = create_map(rfignum)
             ef.map(axmap)
             plt.savefig(options.tdir + "map.jpg")
             if options.quiet < 2:

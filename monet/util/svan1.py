@@ -15,10 +15,11 @@ import sys
 
 from monet.util.svcems import SourceSummary
 from monet.util.svcems import df2hash
-from monet.util.svcems import CEMScsv
+#from monet.util.svcems import CEMScsv
 from monet.util.svobs import SObs
 import monet.util.svobs as svo
 from monet.util.svobs import get_tseries
+from monet.util.nei import NeiSummary
 
 """
 Functions and classes in this module investiage the relationship
@@ -70,15 +71,18 @@ def make_gpd(df, latstr, lonstr):
 
 class CemsObs(object):
 
-    def __init__(self, obsfile, cemsfile, source_sum_file):
+    def __init__(self, obsfile, cemsfile, source_sum_file, neiconfig=None):
         """
         source_sum_file is the name of the  source_summary file.
         obsfile is the csv file.
+        neiconfig is name of file with info about other sources.
         """
         # inputs
         self.obsfile = obsfile
         self.sourcesum = source_sum_file
         self.cemsfile = cemsfile
+
+        self.neiconfig = neiconfig
 
         # outputs
         self.sumdf = gpd.GeoDataFrame() #created by make_sumdf
@@ -158,8 +162,23 @@ class CemsObs(object):
         sourcesum = sourcesum[['ORIS','Name','Total(tons)','lat','lon']]
         sgpd = make_gpd(sourcesum, 'lat', 'lon')
         orishash = df2hash(sgpd, 'ORIS','geometry')
+        if self.neiconfig:
+           neisum = NeiSummary(fname=self.neiconfig)
+           neisum.load()
+           ngpd = make_gpd(neisum.df, 'latitude', 'longitude')
+           #eishash = df2hash(ngpd, 'EIS_ID', 'geometry')
 
-        
+           #orishash.update(eishash)
+           newcol = []
+           for col in ngpd.columns.values:
+               if col=='EIS_ID': newcol.append('ORIS')
+               elif col == 'facility': newcol.append('Name')
+               else: newcol.append(col) 
+           ngpd.columns = newcol
+           ngpd['ORIS'] = ngpd.apply(lambda row: 
+                                     'EIS' + str(row['ORIS']).strip(), axis=1) 
+           sgpd = pd.concat([sgpd, ngpd], sort=True)
+           orishash = df2hash(sgpd, 'ORIS','geometry')
         # read the obs file.
         self.get_obs()
 
@@ -174,12 +193,15 @@ class CemsObs(object):
             #location of site
             pnt = siteidhash[site]
             # find distance  to site from all power plants
-            cname = str(int(site)) + 'dist' 
+            try:
+                cname = str(int(site)) + 'dist' 
+            except:
+                cname = str(site) + 'dist' 
             sgpd[cname] = sgpd.apply(
                                lambda row: distance(row['geometry'], pnt),
                                axis=1)
             # find direction to site from all power plants
-            lname = str(int(site)) + 'direction'
+            lname = cname.replace('dist','direction')
             sgpd[lname] = sgpd.apply(
                                lambda row: bearing(row['geometry'], pnt),
                                axis=1)
@@ -188,20 +210,21 @@ class CemsObs(object):
         for oris in orishash.keys():
             # location of power plant.
             pnt = orishash[oris]
-
             # find distance to power plant from all sites
-            cname = str(int(oris)) + 'dist' 
+            try:
+                cname = str(int(oris)) + 'dist' 
+            except:
+                cname = str(oris) + 'dist' 
             osum[cname] = osum.apply(
                                lambda row: distance(row['geometry'], pnt),
                                axis=1)
 
             # find direction to power plant from all sites
-            lname = str(int(oris)) + 'direction'
+            lname = cname.replace('dist','direction')
             osum[lname] = osum.apply(
                                lambda row: bearing(row['geometry'], pnt),
                                axis=1)
      
-        #print('  ----------------------------------------')
         #print(osum[osum[cname]<500])
         # geopandas dataframe with siteid, site location as POINT, distance and
         # direction to each power plant.

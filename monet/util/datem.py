@@ -116,9 +116,11 @@ def writedatem_sh(
     return outfile_list
 
 
+
 def frame2datem(
     dfile,
     df,
+    fillval=-999,
     header_str="Header",
     writeover=True,
     cnames=["date", "duration", "lat", "lon", "obs", "vals", "sid", "altitude"],
@@ -132,14 +134,23 @@ def frame2datem(
        obs - value of observation, float
        vals - modeled value, float
        sid  - station id, int or string
-       altitude - float """
+       altitude - float 
+       extra columns can be written.
+
+    """
+    dlen = len(cnames)
+    blen = 8
     iii = 0
+    df = df.fillna(fillval)
     if writeover:
         with open(dfile, "w") as fid:
             fid.write(header_str + " (obs then model) " + "\n")
             fid.write(
-                "year mn dy shr dur(hhmm) LAT LON  ug/m2 ug/m2 site_id  height \n"
+                "year mn dy shr dur(hhmm) LAT LON  ug/m2 ug/m2 site_id  height "
             )
+            for iii in np.arange(blen,blen+(dlen-blen)):
+                fid.write(cnames[iii] +  '  ')
+            fid.write('\n')
     with open(dfile, "a") as fid:
         for index, row in df.iterrows():
             fid.write(row[cnames[0]].strftime("%Y %m %d %H%M") + " ")
@@ -154,7 +165,17 @@ def frame2datem(
                 fid.write("%12s  " % (row[cnames[6]]))
             else:
                 print("WARNING frame2datem function: not printing station id")
-            fid.write("%7.2f \n" % (row[cnames[7]]))
+            fid.write("%7.2f " % (row[cnames[7]]))
+            for iii in np.arange(blen,blen+(dlen-blen)):
+                if isinstance(row[cnames[iii]], int):
+                    fid.write("%12i" % (row[cnames[iii]]))
+                elif isinstance(row[cnames[iii]], float):
+                    fid.write("%12.2f" % (row[cnames[iii]]))
+                elif isinstance(row[cnames[6]], str):
+                    fid.write("%12s  " % (row[cnames[iii]]))
+
+
+            fid.write('\n')
             # fid.write(str(row[cnames[7]]) + '\n')
 
 

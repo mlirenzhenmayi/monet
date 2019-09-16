@@ -148,8 +148,9 @@ if options.defaults:
 if options.results:
     with open(logfile, 'a') as fid:
      fid.write('Running  results\n')
-    from monet.util.svresults2 import SVresults
+    from monet.util.svresults3 import SVresults
     from monet.util.svcems import SourceSummary
+    from monet.util.svcems import CEMScsv
     sss = SourceSummary(fname= options.tag + '.source_summary.csv')
     df = sss.load()
     orislist = sss.check_oris(10)
@@ -157,11 +158,15 @@ if options.results:
     print('ORIS LIST', orislist)
     #sys.exit()
     svr = SVresults(options.tdir, orislist=orislist, daterange=[d1, d2])
-    datemfile = options.tag + "DATEM.txt"
-    print("writing datem ", datemfile)
-    svr.writedatem(datemfile)
-    svr.fill_hash()
-    print("PLOTTING")
+    flist = svr.find_files()
+    svr.create_df(flist)
+    
+
+    #datemfile = options.tag + "DATEM.txt"
+    #print("writing datem ", datemfile)
+    ##svr.writedatem(datemfile)
+    #svr.fill_hash()
+    #print("PLOTTING")
     svr.plotall()
 
 ##------------------------------------------------------##
@@ -169,7 +174,6 @@ if options.results:
 ##------------------------------------------------------##
 #vmet is a MetObs object.
 #vmetdf is the dataframe associated with that.
-
 if options.vmix==1:
     # reads files created from vmixing program in each subdirectory.
     # creates MetObs object with matched so2 observations and vmixing data time
@@ -179,10 +183,22 @@ if options.vmix==1:
     # tag + .vmixing.csv
     # PLOTS CREATED
     # histograms of wind direction conditional on concentration measurement.
-    # 2d histgrams of wind direction and (currently commented out)
+    # 2d histgrams of wind direction 
     vmet = options_vmix.options_vmix_main(options, d1, d2, area, source_chunks,
                                       logfile)
 
+    #sys.exit()
+    #   # this adds met data to the datem file for Nick.
+    #   dothis=False 
+    #   if dothis:
+    #       from monet.util.svresults2 import SVresults
+    #       svr = SVresults(options.tdir, orislist=orislist, daterange=[d1, d2])
+    #       svr.readc2datem()
+    #       svr.add_metobs(vmet.df, orislist=orislist)
+    #       datemfile = options.tag + "DATEM.txt"
+    #       print("writing datem ", datemfile)
+    #       svr.writedatem_enhanced(dfile=datemfile)
+       
 ##------------------------------------------------------##
 ##------------------------------------------------------##
 if options.cems:
@@ -194,7 +210,17 @@ if options.cems:
    from monet.util import options_cems 
    ef, rfignum = options_cems.options_cems_main(options, d1, d2, area, 
                                                  source_chunks, logfile)
-   
+   #from monet.util.svcems import CEMScsv
+   #cems = CEMScsv()
+   #dftest = cems.read_csv(options.tag + '.cems.csv')
+   #print('CEMS CSV FILE TEST')
+   #print(dftest[0:10])
+   #print('__________________________________')
+   #cems.melt()
+   #print('__________________________________')
+   #print(dftest.columns.values)
+   #sdf = cems.get_cems('6095')
+   #print(sdf[0:20])
 ##------------------------------------------------------##
 ##------------------------------------------------------##
 if options.obs:
@@ -216,6 +242,11 @@ if options.obs:
 
 ##------------------------------------------------------##
 ##------------------------------------------------------##
+# FILES created
+# CONTROL and SETUP and ASCDATA.CFG files in each subdirectory.
+# CONTROL files for vmixing. 
+# bash script to run HYSPLIT
+# bash script to run vmixing
 
 runlist = []
 if options.create_runs:
@@ -223,8 +254,29 @@ if options.create_runs:
     from monet.util.svhy import create_vmix_controls
     from monet.util.svhy import RunScript
     from monet.util.svhy import VmixScript
+    from monet.util.svhy import DatemScript
     with open(logfile, 'a') as fid:
          fid.write('creating CONTROL files\n')
+
+    if options.neiconfig:
+       from monet.util import nei
+       from monet.util.svhy import nei_controls
+       ns = nei.NeiSummary()
+       print('WRITING EIS CONTROLS')
+       neidf = ns.load(fname = options.tdir + '/neifiles/' + options.neiconfig) 
+       nei_runlist = nei_controls(options.tdir, options.hdir, neidf, d1, d2, source_chunks, options.metfmt,
+                    units = options.cunits, tcm=tcmrun)
+       if not nei_runlist:
+          print('NO CONTROL files for NEI sources ')
+          #sys.exit()
+       else:
+          print('Making script for NEI sources ')
+          print(len(nei_runlist))
+          rs = RunScript(options.tag + "_nei.sh", nei_runlist, options.tdir)
+          print('Making DATEM script for NEI sources ')
+          rs = DatemScript(
+          options.tag + "_nei_datem.sh", nei_runlist, options.tdir, options.cunits, poll=1
+          )
 
     print('Creating CONTROL files')
     runlist = create_controls(
@@ -242,6 +294,7 @@ if options.create_runs:
         print('Check if EMITIMES files have been created')
     else:
         rs = RunScript(options.tag + ".sh", runlist, options.tdir)
+
     print('Creating CONTROL files for vmixing')
     runlist = create_vmix_controls(
         options.tdir,
@@ -255,19 +308,25 @@ if options.create_runs:
         print('No vmixing CONTROL files created. Check if datem.txt files exist')
     else:
         rs = VmixScript(options.tag + '.vmix.sh', runlist, options.tdir)
+        print('creating vmixing CONTROL files created.')
 
 ##------------------------------------------------------##
 ##------------------------------------------------------##
+# FILES created
+# bash scripts to run c2datem on the results.
 
 if options.write_scripts:
+    from monet.util.svhy import VmixScript
     from monet.util.svhy import DatemScript
+    from monet.util.svhy import RunScript
     with open(logfile, 'a') as fid:
          fid.write('writing scripts\n')
-
+    print('writing vmix script')
     #if not runlist:
     from monet.util.svhy import create_runlist
     runlist = create_runlist(options.tdir, options.hdir, d1, d2, source_chunks)
-
+    rs = VmixScript(options.tag + '.vmix.sh', runlist, options.tdir)
+    rs = RunScript(options.tag + ".sh", runlist, options.tdir)
     rs = DatemScript(
         "p1datem_" + options.tag + ".sh", runlist, options.tdir, options.cunits, poll=1
     )

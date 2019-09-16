@@ -124,7 +124,6 @@ class VmixingData:
     def readfile(self,  fname, vdir='./', century=2000, verbose=False):
         """Reads file and returns True if the file exists.
            returns False if file is not found"""
-
         df = pd.DataFrame()
         if path.isfile(vdir + fname):
             if verbose: print('Adding', vdir + fname)
@@ -133,7 +132,12 @@ class VmixingData:
                  head1 = fid.readline()
                  head2 = fid.readline()
                  head3 = fid.readline()
-                 lat, lon, met = self.get_location(head1)
+                 try:
+                     lat, lon, met = self.get_location(head1)
+                 except:
+                     print('problem with vmixing file ', fname, vdir)
+                     return df
+                     #sys.exit()
                  cols, units = self.parse_header(head2,head3)
                  for line in fid.readlines():
                      # get the date for the line

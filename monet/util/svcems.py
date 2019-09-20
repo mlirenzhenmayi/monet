@@ -168,10 +168,10 @@ class CEMScsv:
             cems = pd.read_csv(cname, sep=",", header=[0,1,2], dtype=dtp
                               ) 
             self.cems = cems
-        print('READ CEMS', self.tdir, cname, self.cems[0:10])
+        #print('READ CEMS', self.tdir, cname, self.cems[0:10])
         self.cems[self.timecol] = self.cems[self.timecol].astype('datetime64[ns]')
-        print(self.cems.dtypes)
-        print('READ CEMS', self.cems[0:10])
+        #print(self.cems.dtypes)
+        #print('READ CEMS', self.cems[0:10])
         return self.cems
 
     def melt(self):
@@ -470,9 +470,9 @@ class SourceSummary:
             rstr += "{0:>12.11s}".format(str(row["Name"]))
             rstr += ","
             rstr += " "
-            rstr += "{:10.2f}".format(row["lat"])
+            rstr += "{:10.4f}".format(row["lat"])
             rstr += ","
-            rstr += "{:10.2f}".format(row["lon"])
+            rstr += "{:10.4f}".format(row["lon"])
             rstr += ","
             rstr += "{:10.1f}".format(row["Stack height (m)"])
             rstr += ","

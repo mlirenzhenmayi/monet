@@ -32,20 +32,11 @@ Creates plots of obs and model forecast.
 
 """
 
-class svData:
-
-    def __init__(self):
-        self.sid = None
-        self.oris = None
-        self.pnum = None
-        self.d1 = None
-        self.d2 = None
-        self.md = None  # matched data.
 
             
 
 
-class SVresults:
+class DatemOutput:
 
     """
     ATTRIBUTES:
@@ -88,7 +79,6 @@ class SVresults:
         #self.chash = {}  #dict. key is oris code. value is a color.
         #self.set_colors()
  
-
     def dirpath2date(self, dirpath):
         temp = dirpath.split('/')
         year = None
@@ -155,11 +145,12 @@ class SVresults:
                 else:  test3 = poll in fl
         
                 if test1 and test2 and test3: 
-                    print('found', fl)
+                    #print('found', fl)
                     dataA_files.append(dirpath + '/' + fl)
-                    print(dirpath + '/' + fl)
+                    #print(dirpath + '/' + fl)
         return dataA_files 
 
+    # instead of this will add this dataframe to metobs.
     def add_metobs(self, metobsdf, orislist=None):
         # merge in the met data based on time and site id.
         print('metdf**', metobsdf.columns.values)
@@ -270,6 +261,7 @@ class SVresults:
     def create_df(self, filelist):
         df = pd.DataFrame()
         nnn = 0
+        print('HERE', df[0:10])
         mcols = ['sid', 'date', 'lat','lon','obs', 'source', 'pollnum', 'stype']
         for fname  in filelist:
             temp = fname.split('/')
@@ -290,22 +282,58 @@ class SVresults:
             tempdf['source'] = dname
             tempdf['pollnum'] = pollnum
             tempdf['stype'] = stype
+            dropra = ['day', 'hour', 'month', 'year']
+            for dr in dropra:
+                if dr in tempdf.columns.values:
+                   tempdf.drop(dr, axis=1, inplace=True)
             if nnn==0:
                df = tempdf
             else:
                df = pd.concat([df, tempdf], sort=True)
             df = df.groupby(mcols).sum().reset_index()
             nnn+=1
+        #df = df.set_index(mcols)
         self.df = df
-        print(self.df[0:10])
+        #print(self.df[0:10])
+        #print(self.df.sum(level='
+
+        df2 = self.get_pivot()
+        print(df2[0:10])
         #sys.exit()
         return df 
 
-    def group(self, sourcelist=None, pollnumlist=None, stypelist=None):
+    def get_pivot(self, vals='model',  pollagg=True):
+        # time is now the index
+        # a separate column is generated for each model at each sid at each
+        # source.
+        #if pollagg:
+        #   mcols = ['sid', 'date', 'lat','lon','obs','source','stype']
+
+        if vals not in ['model', 'obs']:
+           vals = 'model'
+
+        df = pd.pivot_table(self.df, values=vals,
+                            index = ['date'],
+                            columns = ['source','sid','pollnum','stype'],
+                            aggfunc=np.sum)
+        df = df.reset_index()
+        newcols = []
+        for val in df.columns.values: 
+            if 'date' in val: newcols.append('time')
+            elif 'sid' in val: newcols.append('siteid')
+            else: newcols.append(val)
+        df.columns = newcols
+        #print('COLUMN VALUE', df.columns.values)
+        #print(df[0:10])
+        return df
+
+    def group(self, sid=None, sourcelist=None, pollnumlist=None, stypelist=None):
         mcols = ['sid', 'date', 'lat','lon','obs']
         tempdf = self.df.copy()
-
+        print('GROUP A', tempdf[0:5])
         # keep only sources in the sourcelist
+        if sid:
+            tempdf = tempdf[tempdf['sid'].isin([sid])]
         if sourcelist:
             tempdf = tempdf[tempdf['source'].isin(sourcelist)]
         # keep only sources types in the list
@@ -315,9 +343,24 @@ class SVresults:
         if pollnumlist:
             tempdf = tempdf[tempdf['pollnum'].isin(pollnumlist)]
         tempdf = tempdf.groupby(mcols).sum().reset_index()
-        print('TEMP', tempdf[0:30])
+        print('GROUP B', sourcelist, tempdf[0:5])
         return tempdf
 
+    def pivot_sub(self, sid=None, vals='model', sourcelist=None, pollnumlist=None, stypelist=None):
+        if vals not in ['model', 'obs']:
+           vals = 'model'
+        tempdf = self.df.copy()
+        #if sid: tempdf = tempdf['sid'] = sid
+        if sourcelist:
+            tempdf = tempdf[tempdf['source'].isin(sourcelist)]
+        if stypelist:
+            tempdf = tempdf[tempdf['stype'].isin(stypelist)]
+        if pollnumlist:
+            tempdf = tempdf[tempdf['pollnum'].isin(pollnumlist)]
+        df = pd.pivot_table(tempdf, values=vals,
+                            index = ['date'],
+                            columns = 'sid', aggfunc=np.sum)
+        return df 
 
     def sourcelist(self):
         df = self.df.copy()
@@ -355,6 +398,8 @@ class SVresults:
         print('Plotting all in svresults3')
         sns.set()
 
+        # elist list of EIS sources
+        # slist list of ORIS sources
         elist, slist = self.sourcelist()
         print(elist)
         print(slist)
@@ -362,6 +407,7 @@ class SVresults:
         chash2 = self.colorhash(elist)
         print(elist)
         print(slist)
+        # for each site.
         for sid in self.get_sidlist():
             figa = plt.figure(1)
             ax1a = figa.add_subplot(1,1,1)
@@ -376,29 +422,41 @@ class SVresults:
             iii=0
             iii2=0
             self.plot_loop(ax1a, chash1, slist, sid)
-            self.plot_loop(ax1b, chash2, elist, sid)
+            self.plot_loop(ax1b, chash2, elist, sid, legend=True)
             self.plot_loop(ax1c, chash2, [slist, elist], sid, clrs=['g', 'b'],
                            lbls = ['ORIS', 'NEI'])           
   
             plt.show()
 
-
     def plot_loop(self, ax, chash, slist, sid, 
                   clrs=None,
-                  lbls=None):
+                  lbls=None,
+                  legend=True):
             iii=0 
             for oris in slist:
                 if not isinstance(oris, list): 
-                    df = self.group(sourcelist=[oris])
+                    #df = self.pivot_sub(sid, sourcelist=[oris])
+                    #df2 = self.pivot_sub(vals='obs', sourcelist=[oris])
+                    df = self.group(sid, sourcelist=[oris])
                 else:
-                    df = self.group(sourcelist=oris)
-                dftemp = df[df["sid"] == sid]
-                dftemp.set_index('date', inplace=True)
+                    #df = self.pivot_sub(sid, sourcelist=oris)
+                    #df2 = self.pivot_sub(vals='obs', sourcelist=oris)
+                    df = self.group(sid, sourcelist=oris)
+                #dftemp = df[df["sid"] == sid]
+                print('GROUPED', df[0:10])
+                #model = df[sid]
+                #obs = df2[sid]
+                df.set_index('date', inplace=True)
+                model = df['model']
+                #obs = df['obs'].fillna(0, inplace=True)
+                obs = df['obs']
+                #dftemp.set_index('date', inplace=True)
                 #dftemp = self.massage_df(dftemp)
-                obs = dftemp["obs"]
-                model = dftemp["model"]
+                #obs = dftemp["obs"]
+                #model = df["model"]
+                #obs = df2["obs"]
                 if iii==0: 
-                    ax.plot(obs.index.tolist(), obs.values, '-k')
+                    ax.plot(obs.index.tolist(), obs.values, '-k.')
                     #ax2.plot(obs.index.tolist(), obs.values, '-k',label='Obs')
                 if model.values.any(): 
                     if clrs: clr = clrs[iii]
@@ -414,9 +472,8 @@ class SVresults:
                                      label=label)
                 iii+=1
                 set_date_ticks(ax)
-                set_legend(ax, bw=0.95)
+                if legend: set_legend(ax, bw=0.95)
                 ax.set_title(str(sid))
-
 
     def massage_df(self, df):
             dftemp = df.copy()

@@ -6,7 +6,7 @@ import os
 from os import path, chdir
 from subprocess import call
 import pandas as pd
-
+import sys
 # from arlhysplit.process import is_process_running
 # from arlhysplit.process import ProcessList
 from monet.utilhysplit.hcontrol import HycsControl
@@ -238,8 +238,8 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
                     continue
                 suffix = fl[4:8]
                 temp = fl.split(".")
-                #if temp[1] != "txt":
-                #    suffix += "." + temp[1]
+                if temp[1] != "txt":
+                    suffix += "." + temp[1]
                 temp = fl.replace('EMIT','')
                 suffix = temp.replace('.txt','')
                 wdir = dirpath
@@ -396,6 +396,33 @@ def nei_source_generator(df):
             shash[val] = row[val]
         yield shash
 
+
+def create_nei_runlist(tdirpath, hdirpath, sourcedf, sdate, edate, timechunks, 
+                 units='ppb', tcm=False):
+    from os import walk
+    from monet.util.svdir import dirtree
+    from monet.util.svdir import date2dir
+    from monet.util.svdir import dir2date
+    #dstart = sdate
+    #dend = edate
+    hysplitdir = hdirpath + "exec/"
+    runlist = []
+    dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks)
+    for dirpath in dtree:
+        for src in nei_source_generator(sourcedf):
+            suffix = 'EIS' + src['EIS_ID'].strip()
+            sdate = dir2date(tdirpath, dirpath)
+            pdate = sdate - datetime.timedelta(hours=timechunks)
+            pdir = date2dir(tdirpath, pdate, dhour=timechunks)
+            parinitA = "PARDUMP." + suffix
+            parinitB = "PARINIT." + suffix
+            parinit = (pdir, parinitA, parinitB)
+            run = RunDescriptor(dirpath, suffix, hysplitdir, "hycs_std",
+                                 parinit, {'emrate':src['SO2_kgph']})
+            runlist.append(run)
+    return runlist
+
+
 # create control files for other sources. Not CEMS.
 def nei_controls(tdirpath, hdirpath, sourcedf, sdate, edate, timechunks, metfmt,
                  units='ppb', tcm=False):
@@ -424,7 +451,6 @@ def nei_controls(tdirpath, hdirpath, sourcedf, sdate, edate, timechunks, metfmt,
     iii = 0
     for dirpath in dtree:
         for src in nei_source_generator(sourcedf):
-            print(src)
             suffix = 'EIS' + src['EIS_ID'].strip()
 
             setupfile = NameList("SETUP.0", working_directory=tdirpath)
@@ -752,14 +778,16 @@ def statmainstr(suffixlist=None, model=None, pstr=None):
 
 class RunScriptClass:
 
-    def __init__(self, name, runlist, tdirpath):
+    def __init__(self, name, runlist, tdirpath, check=False):
         self.scriptname = name 
         self.tdirpath = tdirpath
         #self.runlist = sorted(runlist)
         self.runlist = runlist
+        self.runlist.sort()
         self.main()
         self.maxprocess = 30
-
+        #sys.exit()
+ 
     def make_hstr(self):
         return ""
 
@@ -859,15 +887,17 @@ class DatemScript(RunScriptClass):
 
             # this is the name for the dataA.txt file (statmain output)
             model = 'model_' + oris + '.txt'
-
+            print(run)
             # add to list of suffixes that belong to this oris
             suffixlist.append(run.suffix)           
-
+            print('LIST ', suffixlist)
             # if the next oris is different or we will be in a new directory.
             # then generate a string.           
             if oris != next_oris or run.directory != next_dir: 
+                
                 dstr += statmainstr(suffixlist=suffixlist, model=model,
                          pstr=self.pstr)
+                print('DSTR', dstr)
                 # reset the suffixlist.
                 suffixlist = []
 
@@ -882,7 +912,7 @@ class RunScript(RunScriptClass):
     2. run HYSPLIT
     """
 
-    def __init__(self, name, runlist, tdirpath):
+    def __init__(self, name, runlist, tdirpath, check=True):
         self.logfile = 'runlogfile.txt'
         super().__init__(name, runlist, tdirpath)
 
@@ -892,7 +922,9 @@ class RunScript(RunScriptClass):
         nice=True
         nohup=False
         prev_directory = ' '
+        check=True
         for run in self.runlist:
+            norstr = False
             rstr = ''
             if run.directory != prev_directory:
                 jjj=0
@@ -903,9 +935,17 @@ class RunScript(RunScriptClass):
                     rstr += "\n\n"
                     rstr += "#-----------------------------------------\n"
                 rstr += "cd " + run.directory + "\n\n"
+            shortstr =  rstr
             if run.parinitA != "None":
                 rstr += "cp " + run.parinit_directory + run.parinitA
                 rstr += " " + run.parinitB + "\n"
+            if check:
+               if os.path.isfile(run.directory + '/cdump.' + run.suffix):
+                   norstr = True 
+                   print('cdump exists ', run.directory, run.suffix)
+               else:
+                   print('cdump does not exist ', run.directory, run.suffix)
+            
             if nice: rstr += 'nohup '
             rstr += "${MDL}" + run.hysplit_version + " " + run.suffix
             rstr += " & \n"
@@ -915,6 +955,7 @@ class RunScript(RunScriptClass):
             prev_directory = run.directory
             iii += 1
             jjj += 1
+            if norstr: rstr = shortstr
             yield rstr
         ##add line to copy PARDUMP file from one directory to PARINIT file
 
@@ -942,6 +983,16 @@ class RunDescriptor(object):
         if not ehash: self.ehash = {}
         else: self.ehash = ehash
 
+    def __str__(self):
+        rstr = ''
+        rstr += self.directory
+        rstr += ' '
+        rstr += self.oris
+        rstr += ' '
+        rstr += self.suffix
+        return rstr
+
+
     def __lt__(self, other):
         """
         lt and eq so runlist can be sorted according to
@@ -949,10 +1000,13 @@ class RunDescriptor(object):
         """
         # if the directories are equal then sort by suffixes.
         if self.directory == other.directory:
+           # if the if the oris's are equal then sort by suffix.
            if self.oris == other.oris:
                t1 = self.suffix < other.suffix
+           # if oris not equal then sort by oris.
            else:
                t1 = self.oris < other.oris
+        # if directories not equal then sort by directories
         else:
            t1 = self.directory < other.directory
         return t1
@@ -960,7 +1014,8 @@ class RunDescriptor(object):
     def __eq__(self, other):
         t1 = self.directory == other.directory
         t2 = self.suffix == other.suffix
-        return t1 and t2
+        t3 = self.oris == other.oris
+        return t1 and t2 and t3
 
     def get_oris(self):
         oris = self.suffix.split('_')[0]

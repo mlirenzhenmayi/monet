@@ -82,13 +82,17 @@ def myhistA(hhh, ax, bins=None, label=None):
         sns.distplot(hhh, bins=bins, label=label)
     plt.legend()
 
-def myhist(hhh, ax, bins, label=None, color='b'):
+def myhist(hhh, ax, bins, label=None, color='b', step=False, density=True):
     # hist works better than sns.distplot.
     #if not bins:
     #    sns.distplot(hhh, label=label)
     #else:
-    nnn, rbins, patches = ax.hist(hhh, density=True, bins=bins, label=label, color=color,
-            alpha=0.5 )
+    if not step:
+        nnn, rbins, patches = ax.hist(hhh, density=True, bins=bins, label=label, color=color,
+                alpha=0.5 )
+    else:
+        nnn, rbins, patches = ax.hist(hhh, density=True, bins=bins, label=label, color=color,
+                histtype='step')
     plt.legend()
     return nnn, rbins
 
@@ -107,11 +111,11 @@ def get_line_width(eis, neidf ):
     tp = df.iloc[0]['naics']
     facility=df.iloc[0]['facility']
     if tp.strip() == '221112':
-        clr = '-m'
+        clr = 'm'
     elif 'LLC' in tp:
-        clr = '-g'
+        clr = 'g'
     else:
-        clr = '-b'
+        clr = 'b'
     mass = df.iloc[0]['SO2_kgph']
     if mass < 1: linewidth=1
     elif mass < 10: linewidth=2
@@ -132,66 +136,95 @@ def get_height(ymax, dthresh, dist):
         iii +=1
     return ccc[iii]
 
-
-def addplants(site, ax, ymax=20, dthresh=150, add_text=True,
-              geoname='geometry.csv', neidf=pd.DataFrame()):
-    # add vertical lines with direction to power plants to the
-    # 2d histogram of so2 concentration vs. wind speed.
+def addplants_subA(site, geoname, dthresh):
+    # returns list of tuples
+    # (distance, oris(or EIS), direction)
     disthash, dirhash = geometry2hash(site, fname=geoname)
     iii=0
     tlist = [] # list of tuples, oris, distance, direction
-
+    orislist = []
     for oris in dirhash.keys():
         try:
-            ddd = float(disthash[oris])
+            distance = float(disthash[oris])
         except:
             print('FAILED at', oris, site, disthash[oris])
             continue
 
-        if ddd < dthresh:
+        if distance < dthresh:
             try:
-                xxx = float(dirhash[oris])
+                direction = float(dirhash[oris])
             except:
                 print('FAILED at', oris, site, dirhash[oris])
                 continue
-            tlist.append((ddd, oris, xxx))
+            tlist.append((distance, oris, direction))
     # sort according to distance from site.
     tlist.sort()
     nlen = len(tlist)
-    #yra = np.arange(0,nlen,1) * ymax / float(nlen)
-    #yra = np.flip(yra)     
+    return tlist, nlen
+
+def addplants_subB(tlist, ymax, neidf, dthresh):
+    iii=0
     textra = []
+    orislist = []
     for val in tlist:
             facility = 'unknown'
             oris = val[1]
             xxx = val[2]
             dist = val[0]
             if 'EIS' in oris:
-                clr= '-b'
+                clr= 'b'
                 lbl = str(int(dist)) + 'km'
                 linewidth, clr, facility =get_line_width(oris, neidf)
                 if facility == 'unknown' and dist > 10:
                    continue
             else:
-                clr = '-k'
+                clr = 'k'
                 lbl = str(oris) + ' ' + str(int(dist)) + 'km'
                 linewidth=5
+                orislist.append([str(oris), str(int(dist))])
             #print(xxx, oris, site)
             ty = get_height(ymax, dthresh, dist)  
             yyy = [0,ty] 
            
-            try:
-                ax.plot([xxx,xxx],yyy,clr, linewidth=linewidth)
-            except:
-                print('FAILED at', xxx, oris, site)
-            if add_text:
-                tx = xxx+1
-                textra.append([tx, ty, lbl, facility])
+            #try:
+            #    ax.plot([xxx,xxx],yyy,clr, linewidth=linewidth)
+            #except:
+            #    print('FAILED at', xxx, oris, site)
+            textra.append([xxx, ty, lbl, facility, linewidth, clr])
             iii+=1
     if textra: textra = manage_text(textra, ymax)
+    return orislist, textra 
+
+def addplants(site, ax, ymax=20, dthresh=150, add_text=True,
+              geoname='geometry.csv', neidf=pd.DataFrame()):
+    # add vertical lines with direction to power plants to the
+    # 2d histogram of so2 concentration vs. wind speed.
+    add_text=True 
+    # tlist is list of tuples with information on each source.
+    tlist, nlen = addplants_subA(site, geoname, dthresh)
+    orislist, textra = addplants_subB(tlist, ymax, neidf, dthresh)
     for  val in textra:     
          #print(val)
-         ax.text(val[0], val[1], val[2],fontsize=8, color="blue")
+         ax.plot([val[0], val[0]], [0,val[1]], linewidth=val[4], color=val[5])
+         if add_text:
+             ax.text(val[0]+1, val[1], val[2],fontsize=8, color="blue")
+    return orislist
+
+def addplants_horizontal(site, ax, xr, dthresh=150, add_text=True,
+              geoname='geometry.csv', neidf=pd.DataFrame()):
+    # add horizontal lines with direction to power plants to the
+    # time series.
+    tlist, nlen = addplants_subA(site, geoname, dthresh)
+    orislist, textra = addplants_subB(tlist, ymax, neidf)
+    for  val in textra:   
+         # height is the wind direction.
+         pnt1 = [xr[0], val[0]]
+         pnt2 = [xr[1], val[0]] 
+         # still use linewidth to indicate source strength 
+         ax.plot(pnt1, pnt2,  linewidth=val[4], alpha=0.5)
+         if add_text:
+             ax.text(xr[0], val[0]+1, val[2],fontsize=8, color="blue")
+    return orislist
 
 
 def manage_text(textra, ymax,  xinc=50):
@@ -203,7 +236,7 @@ def manage_text(textra, ymax,  xinc=50):
     textra.sort()
     for tx in textra:
         if iii==0 : 
-           newra. append([tx[0], tx[1], tx[2], tx[3]])
+           newra. append([tx[0], tx[1], tx[2], tx[3], tx[4], tx[5]])
            prev_xpos = tx[0]
            prev_ypos = ymax
         else:
@@ -219,7 +252,7 @@ def manage_text(textra, ymax,  xinc=50):
                  #if ypos < 0: ypos = ymax
            #else:
            #   ypos = ymax
-           newra.append([xpos, ypos, label, tx[3]])
+           newra.append([xpos, ypos, label, tx[3], tx[4], tx[5]])
            prev_xpos = tx[0]
            prev_ypos = ypos
         iii+=1
@@ -308,8 +341,19 @@ class MetObs(object):
         self.geoname = geoname
 
         self.cemslist = []  #list of column names representing cems data.
+        self.model_list = [] #list of columnnames representing model data
 
         self.neidf = pd.DataFrame()
+        self.empty = self.isempty()
+
+    def isempty(self):
+        if self.df.empty: 
+           self.empty=True
+           return True
+        else: 
+           self.empty=False
+           return False
+
 
     def add_nei_data(self, df):
         self.neidf = df
@@ -322,28 +366,100 @@ class MetObs(object):
         self.geoname = name
         print('SETTING geoname', self.geoname)
 
+    def add_model(self, mdf, verbose=True):
+        # RIGHT NOW - must add model after creating from vmixing data.
+        # or from_vmix will overwrite the self.df
+        # add model output to the main dataframe.
+        # use the 
+     
+        # instead of merging the model data to the dataframe.
+        # might be best to simply add the model object.
+        # and produce time series from it as needed to be merged.
 
-    def add_cems(self, cemsdf, verbose=False):
+        self.model_list = list(mdf.columns.values)
+        print(self.model_list)
+        if 'time' in self.model_list: self.model_list.remove('time')
+        if 'siteid' in self.model_list: self.model_list.remove('siteid')
+        self.model_columns = mdf.columns.values
+
+        if self.df.empty:
+           self.df = mdf
+        else:
+            metobscol = ['time']
+            modelcol = ['time'] 
+            newdf = pd.merge(self.df,
+                             mdf,
+                             how='left',
+                             left_on = metobscol,
+                             right_on =modelcol 
+                             )
+            self.df = newdf
+            print(newdf[0:10])
+            print(self.df.columns.values)
+            print(self.model_list)
+        self.isempty()
+        return  self.df
+
+
+    def add_model_object(self, model):
+        self.model = model
+
+    def conditional_model(self):
+        original_df = self.df.copy()
+        mdf = self.model.group() 
+        mdf = mdf.drop(['lat', 'lon', 'obs'], axis=1) 
+        metobscol = ['time', 'siteid']
+        modelcol = ['date', 'sid'] 
+        newdf = pd.merge(self.df,
+                         mdf,
+                         how='left',
+                         left_on = metobscol,
+                         right_on =modelcol 
+                         )
+        newdf = newdf.fillna(0)
+        print('NEWDF', newdf.columns.values)
+        print(newdf[0:10])
+        self.df = newdf
+        self.conditional(varlist=['SO2', 'model']) 
+        
+          
+
+    def add_cems(self, cemsdf, verbose=True):
         """
         adds the following colummns to the dataframe 
         """
+       
         grouplist = ['time']
         if verbose:
             print('ADDING CEMS ')
             print(cemsdf.dtypes)
             print(self.df.dtypes)
-            print(cemsdf.columns.values)
-            print(self.df.columns.values)
-        self.cemslist.extend(cemsdf.columns.values)
-        self.df = pd.merge(self.df, cemsdf, how='left', left_on=grouplist,
-                           right_on=grouplist) 
+            print(list(cemsdf.columns.values))
+            #print(self.df.columns.values)
+        #self.cemslist.extend(cemsdf.columns.values)
+        self.cemslist = list(cemsdf.columns.values)
+        if verbose: print('CEMSLIST', self.cemslist)
+        if 'time' in self.cemslist:
+           self.cemslist.remove('time')
+
+        if self.df.empty:
+           self.df = cemsdf
+        else:
+           self.df = pd.merge(self.df, cemsdf, how='left', left_on=grouplist,
+                               right_on=grouplist) 
+        if verbose: print('CEMSLIST', self.cemslist)
+        self.isempty()
 
     def from_vmix(self,df):
+        # Currenlty this overwrites anything that used to be in self.df
         self.df = df
         self.columns_original = self.df.columns.values
         self.rename_columns()
-       
+        self.isempty()      
+ 
     def from_obs(self, obs):
+        # Currenlty this overwrites anything that used to be in self.df
+        # only keep rows (sites) which have Met data.
         print("Making metobs from obs")
         self.df = tools.long_to_wideB(obs)  # pivot table
         self.columns_original = self.df.columns.values
@@ -356,6 +472,7 @@ class MetObs(object):
            print('No Met Data Found') 
         else:
            self.df = self.df.dropna(axis=0, how='all', subset=overlap)
+        self.isempty()      
 
     def to_csv(self,tdir, csvfile=None):
         if self.df.empty: return -1
@@ -408,6 +525,7 @@ class MetObs(object):
             warnings.simplefilter("ignore")
             self.plot_ts(save, quiet)
 
+
     def plot_ts(self, save=False, quiet=False):
         if self.df.empty: return -1
         sns.set()
@@ -427,15 +545,19 @@ class MetObs(object):
             wdir = df['WDIR']
             ax2.plot(wdir, 'b.', markersize=2)
             ax1.plot(so2, '-k')
-
+            for model in self.model_list:
+                if model[1] == site:
+                    print('PLOTTING', model)
+                    mso2 = df[model]
+                    ax1.plot(mso2, 'm.')
+            # ax2 is for wind direction.
+            #orislist = addplants(site, ax2, ymax=np.max(nnn1), geoname=self.geoname, neidf=self.neidf)
             ax1.set_ylabel('so2 (ppb)')
             ax2.set_ylabel('Wind direction (degrees)')
-            if 'time' in self.cemslist:
-                self.cemslist.remove('time')
-            for oris in self.cemslist:
-                print('ORIS', oris, self.cemslist, df.columns.values)
-                cems = df[oris]
-                ax3.plot(cems, '-r.')
+            #for oris in self.cemslist:
+            #    print('ORIS', oris, self.cemslist, df.columns.values)
+            #    cems = df[oris]
+            #    ax3.plot(cems, '-r.')
 
             plt.title(str(site))
             plt.tight_layout() 
@@ -469,10 +591,18 @@ class MetObs(object):
         print(self.df['PSQ'])
         print('---------------------')
         self.df['psqnum'] = self.df.apply(lambda row: process_psq(row['PSQ']), axis=1)
+        self.isempty()      
         return True
 
 
-    def conditional(self, save=False, quiet=False):
+    def conditionalB(self, save=False, quiet=True):
+        # looks at probability of wind direction for top 5% of SO2 values for
+        # all measurements
+        # when CEMS above a threshold
+        # when CEMS below a threshold.
+
+        # Looking to see if power plant being on or off makes a big difference.
+        # 
         slist = self.get_sites()
         sz = [10,5]
         for site in slist:
@@ -482,32 +612,106 @@ class MetObs(object):
             fig.set_size_inches(sz[0],sz[1])
             ax = fig.add_subplot(1,1,1)
             df = self.df[self.df['siteid'] == site]
-
-
             v1, x1, nnn1 =  self.conditional_sub(df, ax, site, pval=[0.99,1],
                                            color='r', limit=True)    
-            # lower limit should not be less than mdl
-            v2, x2, nnn2 =  self.conditional_sub(df, ax, site, pval=[0.95,0.99],    
-                                           color='b', limit=True)    
-           
-            v3, x3, nnn3  =  self.conditional_sub(df, ax, site, pval=[0,0.2],    
-                                           color='g', limit=False)    
-            #if upper limit of green < lower limit of blue
-            # and lower limit of blue is greater than 5
-            # then add a fourth distribution.
-            if x3 < v2 and v2 > 5:
-               v4, x4, nnn4 =  self.conditional_sub(df, ax, site, pval=[0.2,0.95],    
-                                           color='c', limit=True)    
+            orislist = addplants(site, ax, ymax=np.max(nnn1), geoname=self.geoname, neidf=self.neidf)
+            plt.close()
+            for oris in orislist:
+                sns.set()
+                sns.set_style('whitegrid')
+                fig = plt.figure(self.fignum)
+                fig.set_size_inches(sz[0],sz[1])
+                ax = fig.add_subplot(1,1,1)
+                df = self.df[self.df['siteid'] == site]
+                v1, x1, nnn1 =  self.conditional_sub(df, ax, site, pval=[0.99,1],
+                                               color='r', limit=True,
+                                               density=False)    
+                orislist = addplants(site, ax, ymax=np.max(nnn1), geoname=self.geoname, neidf=self.neidf)
 
-            ymax = 0.90 * np.max([np.max(nnn1), np.max(nnn2), np.max(nnn3)])
-            addplants(site, ax, ymax=ymax, geoname=self.geoname, neidf=self.neidf)
-            ax.set_xlabel('Wind Direction (degrees)')
-            ax.set_ylabel('Probability')  
-            ptools.set_legend(ax, bw=0.60)
-            plt.title(str(site))
-            plt.tight_layout(rect=[0,0,0.75,1])
-            plt.savefig(str(site) + 'cpdf.jpg')
+                print('Adding step for ', oris)
+                self.add_more(oris, df, site, ax)
+                ax.set_xlabel('Wind Direction (degrees)')
+                ax.set_ylabel('Probability')  
+                ptools.set_legend(ax, bw=0.60)
+                plt.title(str(site) + ' ORIS: ' + str(oris[0]))
+                plt.tight_layout(rect=[0,0,0.75,1])
+                plt.savefig(str(site) + 'cpdf.jpg')
+                plt.show() 
+    
+
+
+    def conditional(self, save=False, quiet=False, varlist=['SO2', 'model']):
+        slist = self.get_sites()
+        sz = [10,5]
+        for site in slist:
+            for var1 in varlist:
+                sns.set()
+                sns.set_style('whitegrid')
+                fig = plt.figure(self.fignum)
+                fig.set_size_inches(sz[0],sz[1])
+                ax = fig.add_subplot(1,1,1)
+                df = self.df[self.df['siteid'] == site]
+
+
+                v1, x1, nnn1 =  self.conditional_sub(df, ax, site, pval=[0.99,1],
+                                               color='r', limit=True, var1=var1)    
+                # lower limit should not be less than mdl
+                v2, x2, nnn2 =  self.conditional_sub(df, ax, site, pval=[0.95,0.99],    
+                                               color='b', limit=True, var1=var1)    
+               
+                v3, x3, nnn3  =  self.conditional_sub(df, ax, site, pval=[0,0.2],    
+                                               color='g', limit=False, var1=var1)    
+                #if upper limit of green < lower limit of blue
+                # and lower limit of blue is greater than 5
+                # then add a fourth distribution.
+                #if x3 < v2 and v2 > 5:
+                #   v4, x4, nnn4 =  self.conditional_sub(df, ax, site, pval=[0.2,0.95],    
+                #                               color='c', limit=True)    
+                ymax = 0.90 * np.max([np.max(nnn1), np.max(nnn2), np.max(nnn3)])
+                orislist = addplants(site, ax, ymax=ymax, geoname=self.geoname, neidf=self.neidf)
+                #for oris in [orislist[0]]:
+                #    print('Adding step for ', oris)
+                #    self.add_more(oris, df, site, ax)
+
+                ax.set_xlabel('Wind Direction (degrees)')
+                ax.set_ylabel('Probability')  
+                ptools.set_legend(ax, bw=0.60)
+                plt.title(str(site) + str(var1))
+                plt.tight_layout(rect=[0,0,0.75,1])
+                plt.savefig(str(site) + 'cpdf.jpg')
+                self.fignum +=1
             plt.show() 
+
+
+    def add_more(self, orisinfo, indf, site, ax):
+        df = indf.copy()
+        oris  = orisinfo[0]
+        distance = orisinfo[1]
+        roll=12
+        thresh = 50 * roll
+        print('dfroll--------')
+        # want to take into account emission during the previous 12
+        # hours
+        df['roll'] = df[oris].rolling(roll).sum()
+        #df = dfroll.copy()
+        #print('df--------')
+        #print(df[0:36])
+        # only take values where cems is above threshold.
+        #df = df[df[oris] >= thresh]
+        df2 = df[df['roll'] >= thresh]
+        print('ON size', df2.size)
+        v1, x1, nnn1 =  self.conditional_sub(df2, ax, site, pval=[0.95,1],
+                                             color='r', limit=True, step=True,
+                                             density=False)    
+        # only take values where cems is below threshold.
+        #df = indf.copy()
+        df2 = df[df['roll'] < thresh]
+        print('off size', df2.size)
+        #df = dfroll.copy()
+        #df = df[df[oris] < thresh]
+        v1, x1, nnn1 =  self.conditional_sub(df2, ax, site, pval=[0.95,1],
+                                             color='k', limit=True, step=True)    
+
 
     def conditionalA(self, distrange=5, roll=12):
 
@@ -564,7 +768,7 @@ class MetObs(object):
                 dfroll = df[oris]
                 # want to take into account emission during the previous 12
                 # hours
-                dfroll = dfroll.rolling(roll).sum()
+                #dfroll = dfroll.rolling(roll).sum()
                
                 
                 hexbin(df['SO2'], dfroll, ax, cbar=True)  
@@ -574,8 +778,8 @@ class MetObs(object):
                 plt.show() 
 
     def conditional_sub(self,df, ax, site, pval, label=None, color='b',
-                       limit=True): 
-        var1='SO2'
+                       var1='SO2', limit=True, step=False, density=True): 
+        #var1='SO2'
         var2='WDIR'
         mdl=df['mdl'].unique()
         ra = df[var1].tolist()
@@ -583,17 +787,22 @@ class MetObs(object):
         valB = statmain.probof(ra, pval[1]) 
         #print('VALA, VALB', valA, valB)
         #if valB < 0.2: valB = 0.25
-
-        if valA <= mdl[0] and limit: valA = mdl[0] 
+        #print('MDL', mdl)
+        try:
+             if mdl:
+                if valA <= mdl[0] and limit: valA = mdl[0] 
+        except:
+             print('MDL not valid', mdl)
+        
         if valA > valB: 
            return valA, valB, 0
 
-        print('VAL2', valA, valB, mdl)
         tdf = df[df[var1] >= valA]          
         tdf = tdf[tdf[var1] <= valB]          
         #print(tdf.columns.values) 
         tdf = tdf.set_index('time')
         hhh = tdf[var2]
+        #print('SIZE', tdf.size)
         # do not use values with NAN
         hhh = hhh.fillna(-10)
         #hhh = hhh[hhh != -9]
@@ -603,7 +812,8 @@ class MetObs(object):
            label += "{0:2.2f}".format(valB)  
            label += ' ppb'
         bins = np.arange(0,365,5)
-        nnn, rbins = myhist(hhh.values,ax, bins=bins, label=label, color=color)
+        nnn, rbins = myhist(hhh.values,ax, bins=bins, label=label, color=color,
+                            step=step, density=density)
         return valA, valB, nnn
 
     def plothexbin(self, save=True, quiet=True): 

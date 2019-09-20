@@ -78,10 +78,51 @@ class NeiSummary:
            with open(fname, "w") as fid:
                 rstr = self.commentchar + 'Area ' + str.join(',',list(map(str, self.area)))
                 rstr += '\n'
-                rstr += str.join(', ',self.order)
+                rstr += str.join(',',self.order)
                 rstr += '\n'
                 fid.write(rstr)
                 fid.write(self.create_string(self.df))
+
+    def remove_cems(self, cemsdf, check=True):
+        cols = ['lat','lon','ORIS','Name']
+        cemsdf = cemsdf[cols]
+        cemsdf = cemsdf.drop_duplicates()
+        cols_left = ['latitude', 'longitude']
+        cols_right  = ['lat','lon']
+        dftemp = pd.merge(self.df, cemsdf, how='left',
+                          left_on = cols_left,
+                          right_on = cols_right)        
+        dftemp.fillna('NOMATCH', inplace=True)
+        print('FOLLOWING FACILITIES MATCH CEMS FACILITIES')
+        print(dftemp[dftemp['Name'] != 'NOMATCH'])
+        dftemp = dftemp[dftemp['Name'] == 'NOMATCH']
+        dftemp.drop(cols, axis=1, inplace=True)
+        self.df = dftemp
+        if check:
+               
+           dft = dftemp[dftemp['naics'].str.contains('221112')]
+           for index, row in dft.iterrows():
+               print('Checking non-matched sources with naics 221112\n')
+               print('Press y to remove source \n')
+               print('Press n to keep source \n')
+               print('Press c to continue keeping all sources. \n')
+               print(row)
+               remove = input("Remove this source ? ")
+               if 'y' in remove.lower():
+                   self.df = self.df[self.df['EIS_ID'] != row['EIS_ID']]
+               if 'c' in remove.lower():
+                   return self.df
+           dft = dftemp[dftemp['naics'].str.contains('LLC')]
+           for index, row in dft.iterrows():
+               print(row)
+               remove = input("Remove this source ? ")
+               if 'y' in remove.lower():
+                   self.df = self.df[self.df['EIS_ID'] != row['EIS_ID']]
+
+        #print(self.df[0:10])
+        return  self.df
+        #dftemp.dropna(inplace=True)
+        #print(dftemp)
 
     def create_string(self, df):
         rstr = ""
@@ -92,6 +133,8 @@ class NeiSummary:
                     iii = val[0]
                     rstr += ft.format(row[iii])
                     rstr += ', '
+                # remove last comma
+                rstr = rstr[:-1]
                 rstr += '\n'
         return rstr
     

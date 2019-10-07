@@ -71,7 +71,7 @@ def date2dir(topdirpath, sdate, dhour=1, chkdir=False):
         callstr = 'mkdir -p ' +   finaldir
         call(callstr, shell=True)      
     for val in get_vlist(sdate, dhour):
-        finaldir  += val[1] + str(val[0]).zfill(val[2]) + '/'
+        finaldir = path.join(finaldir, val[1] + str(val[0]).zfill(val[2]) + '/')
     if not path.isdir(finaldir) and chkdir:
         callstr = 'mkdir -p ' +   finaldir
         call(callstr, shell=True)      
@@ -101,7 +101,9 @@ def dirtree(topdirpath,  sdate, edate,
     while not done:
         finaldir = topdirpath
         for val in get_vlist(sdate, dhour):
-            finaldir  += val[1] + str(val[0]).zfill(val[2]) + '/'
+            #finaldir  += val[1] + str(val[0]).zfill(val[2]) + '/'
+            f2 = val[1] + str(val[0]).zfill(val[2]) + '/'
+            finaldir= path.join(finaldir,  f2)
             if not path.isdir(finaldir) and chkdir:
                 callstr = 'mkdir -p ' +   finaldir
                 call(callstr, shell=True)      

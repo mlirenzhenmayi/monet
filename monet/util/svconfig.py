@@ -199,6 +199,8 @@ class ConfigFile(NameList):
         hstr += sp10 + "/TopLevelDirectory/gdas1/gdas1.%b%y.week\n"
         hstr += sp10 + 'use the word "week" to indicate when files are by week\n'
         hstr += sp10 + "week will be replaced by w1, w2, w3... as appropriate.\n"
+        hstr += sp10 + "If ENS is in the input string then \n"
+        hstr += sp10 + "will create separate directories for SREF runs \n"
         self.descrip["metfile"] = hstr
         lorder.append("metfile")
 

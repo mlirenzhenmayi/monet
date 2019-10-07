@@ -229,7 +229,7 @@ def create_runlist(tdirpath, hdirpath, sdate, edate, timechunks):
 
             if "EMIT" in fl[0:4]: 
                 et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
-                if not et.read_file(): continue
+                #if not et.read_file(): continue
                 try: 
                     sdate = dir2date(tdirpath, dirpath)
                 except:
@@ -307,7 +307,8 @@ def read_vmix(tdirpath, sdate, edate, timechunks, sid=None, verbose=False):
                                        verbose=verbose)
     return vmix.df
 
-def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
+def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks,
+                         metfmt,write=True):
     """
     read the base control file in tdirpath CONTROL.0
     """
@@ -343,7 +344,8 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
                     dfdatem = dfdatem.drop_duplicates()
                     # do not overwrite, if these files already created
                     # previously.
-                    writelanduse(landusedir=landusedir, working_directory=d1,
+                    if write:
+                        writelanduse(landusedir=landusedir, working_directory=d1,
                                  overwrite=False)
                     for index, row  in dfdatem.iterrows():
                         lat = row['lat']
@@ -351,6 +353,13 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
                         pid = int(row['sid'])
                         #print('PID', str(pid))
                         suffix = 'V' + str(pid)
+                        run = RunDescriptor(d1, suffix, hysplitdir, "vmixing",
+                                             parinit='None')
+                        runlist.append(run)
+                      
+                        # skip the rest of the loop if only want to create
+                        # list of run descriptors.
+                        if not write: continue
                         control = HycsControl(fname='CONTROL.V',
                                   working_directory=d1, rtype='vmixing')
                         #control.read()
@@ -364,6 +373,7 @@ def create_vmix_controls(tdirpath,hdirpath,sdate,edate,timechunks, metfmt):
                         control.remove_metfile(rall=True)
                         ###Add the met files.
                         control.add_duration(timechunks-1)
+     
                         mfiles = met_files.get_files(control.date, timechunks)
                         for mf in mfiles:
                             if os.path.isfile(mf[0] + mf[1]):
@@ -418,7 +428,7 @@ def create_nei_runlist(tdirpath, hdirpath, sourcedf, sdate, edate, timechunks,
             parinitB = "PARINIT." + suffix
             parinit = (pdir, parinitA, parinitB)
             run = RunDescriptor(dirpath, suffix, hysplitdir, "hycs_std",
-                                 parinit, {'emrate':src['SO2_kgph']})
+                                 parinit)
             runlist.append(run)
     return runlist
 
@@ -504,13 +514,13 @@ def nei_controls(tdirpath, hdirpath, sourcedf, sdate, edate, timechunks, metfmt,
             parinitB = "PARINIT." + suffix
             parinit = (pdir, parinitA, parinitB)
             run = RunDescriptor(dirpath, suffix, hysplitdir, "hycs_std",
-                                 parinit, {'emrate':src['SO2_kgph']})
+                                 parinit)
             runlist.append(run)
     return runlist
 
 
 def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units="ppb",
-                    tcm=False, orislist=None):
+                    tcm=False, orislist=None, moffset=0):
     """
     read the base control file in tdirpath CONTROL.0
     read the base SETUP.0 file in tdirpath
@@ -676,7 +686,14 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     #    control.date, timechunks, met_type=met_type, mdir=mdir
                     #)
                     if tcm: timechunks = int(control.run_duration)
-                    mfiles = met_files.get_files(control.date, timechunks)
+                    # ability to have met files cover longer time period.
+                    mdate = control.date - datetime.timedelta(hours=moffset)
+                    metchunks = timechunks + moffset
+                    #mfiles = met_files.get_files(control.date, timechunks)
+                    mfiles = met_files.get_files(mdate, metchunks)
+                    print(mfiles)
+                    print(mdate, metchunks)
+                    print(control.date, timechunks)
                     for mf in mfiles:
                         if os.path.isfile(mf[0] + mf[1]):
                             control.add_metfile(mf[0], mf[1])
@@ -778,7 +795,9 @@ def statmainstr(suffixlist=None, model=None, pstr=None):
 
 class RunScriptClass:
 
-    def __init__(self, name, runlist, tdirpath, check=False):
+    def __init__(self, name, runlist, tdirpath, check=False,
+                 shell="#!/bin/bash\n"):
+        self.shell = shell
         self.scriptname = name 
         self.tdirpath = tdirpath
         #self.runlist = sorted(runlist)
@@ -789,7 +808,7 @@ class RunScriptClass:
         #sys.exit()
  
     def make_hstr(self):
-        return ""
+        return self.shell
 
     def main(self):
         rstr = self.make_hstr()
@@ -849,7 +868,9 @@ class DatemScript(RunScriptClass):
         super().__init__(name, runlist, tdirpath)
 
     def make_hstr(self):
-        return unit_mult(self.unit)
+        rstr = self.shell
+        rstr += unit_mult(self.unit)
+        return rstr
 
 
     def get_list(self, runlist):
@@ -887,17 +908,14 @@ class DatemScript(RunScriptClass):
 
             # this is the name for the dataA.txt file (statmain output)
             model = 'model_' + oris + '.txt'
-            print(run)
             # add to list of suffixes that belong to this oris
             suffixlist.append(run.suffix)           
-            print('LIST ', suffixlist)
             # if the next oris is different or we will be in a new directory.
             # then generate a string.           
             if oris != next_oris or run.directory != next_dir: 
                 
                 dstr += statmainstr(suffixlist=suffixlist, model=model,
                          pstr=self.pstr)
-                print('DSTR', dstr)
                 # reset the suffixlist.
                 suffixlist = []
 
@@ -913,6 +931,10 @@ class RunScript(RunScriptClass):
     """
 
     def __init__(self, name, runlist, tdirpath, check=True):
+        """
+        if check True then will only write command to run HYSPLIT if the
+        cdump file does not already exist.
+        """
         self.logfile = 'runlogfile.txt'
         super().__init__(name, runlist, tdirpath)
 
@@ -944,8 +966,8 @@ class RunScript(RunScriptClass):
                    norstr = True 
                    print('cdump exists ', run.directory, run.suffix)
                else:
-                   print('cdump does not exist ', run.directory, run.suffix)
-            
+                   #print('cdump does not exist ', run.directory, run.suffix)
+                   pass 
             if nice: rstr += 'nohup '
             rstr += "${MDL}" + run.hysplit_version + " " + run.suffix
             rstr += " & \n"
@@ -960,14 +982,16 @@ class RunScript(RunScriptClass):
         ##add line to copy PARDUMP file from one directory to PARINIT file
 
 class RunDescriptor(object):
+    """
+    class for keeping track of HYSPLIT runs.
+    """
     def __init__(
         self,
-        directory,
-        suffix,
-        hysplitdir,
-        hysplit_version="hycs_std",
-        parinit=(None, None, None),
-        ehash=None
+        directory,  # directory of hysplit run
+        suffix,     # suffix of CONTROL and SETUP files
+        hysplitdir, # directory for hysplit executable.
+        hysplit_version="hycs_std",  # name of hysplit executable
+        parinit=(None, None, None)  
     ):
         self.hysplitdir = hysplitdir  # directory where HYSPLIT executable is.
         self.hysplit_version = hysplit_version  # name of hysplit executable to
@@ -980,8 +1004,6 @@ class RunDescriptor(object):
         )  # parinit file associated with the run.
         # should be full path.
         self.oris = self.get_oris()
-        if not ehash: self.ehash = {}
-        else: self.ehash = ehash
 
     def __str__(self):
         rstr = ''

@@ -37,6 +37,18 @@ def create_map(fignum):
     return fig, ax
 
 
+
+def set_date_ticksB(ax):
+    mloc=mdates.MonthLocator()
+    #minloc=mdates.WeekdayLocator()
+    #minloc=mdates.WeekdayLocator(byweekday=MO, interval=1)
+    minloc=mdates.DayLocator(bymonthday=[1,5,10,15,20,25,30])
+    ax.xaxis.set_major_locator(mloc)
+    ax.xaxis.set_minor_locator(minloc)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d/%y'))
+    start, end = ax.get_ylim()
+
+
 def set_date_ticks(ax):
     mloc=mdates.MonthLocator()
     minloc=mdates.WeekdayLocator()
@@ -75,4 +87,10 @@ def set_legend(ax, bw=0.8):
     ax.legend(handles, labels, loc='center left', bbox_to_anchor=(1, 0.5),
              bbox_transform=ax.transAxes)
              #bbox_transform=plt.gcf().transFigure)
+
+def make_patch_spines_invisible(ax):
+    ax.set_frame_on(True)
+    ax.patch.set_visible(False)
+    for sp in ax.spines.values():
+        sp.set_visible(False)
 

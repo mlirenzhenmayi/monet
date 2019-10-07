@@ -8,6 +8,7 @@ from monet.util import options_process
 from monet.util import options_vmix
 from monet.util import options_obs  
 from monet.util import svconfig
+from monet.util.svmet import MetObs
 import sys
 import pandas as pd
 import numpy as np
@@ -87,6 +88,7 @@ parser.add_option(
 
 (opts, args) = parser.parse_args()
 
+options = svconfig.ConfigFile(opts.configfile)
 if opts.print_help:
     print("-------------------------------------------------------------")
     print("Configuration file options (key words are not case sensitive)")
@@ -94,7 +96,7 @@ if opts.print_help:
     print(options.print_help(order=options.lorder))
     sys.exit()
 
-options = svconfig.ConfigFile(opts.configfile)
+#options = svconfig.ConfigFile(opts.configfile)
 # options.fileread is a boolean attribute of ConfigFile class.
 if not options.fileread:
     print("configuration file " + opts.configfile + " not found.\ngoodbye")
@@ -105,7 +107,6 @@ if not options.fileread:
 # Process some of the options to create new parameters.
 ##------------------------------------------------------##
 ##------------------------------------------------------##
-
 
 svp = options_process.main(options)
 # TO DO - may pass svp rather than individual attributes to functions.
@@ -119,6 +120,9 @@ tcmrun = svp.tcmrun
 run_duration = svp.run_duration
 rfignum = 1
 
+# create an instance of the MetObs class.
+vmet = MetObs()
+
 ##------------------------------------------------------##
 # Run a test
 ##------------------------------------------------------##
@@ -126,13 +130,13 @@ rfignum = 1
 runtest=False
 if runtest:
    options_obs.test(options, d1, d2, area, source_chunks,
-                    run_duration, logfile, rfignum)  
+                    run_duration, logfile, rfignum, svp.ensemble)  
    sys.exit()
 
 ##------------------------------------------------------##
 # Create default CONTROL.0 and SETUP.0 files
 ##------------------------------------------------------##
-if options.defaults:
+if options.defaults and not svp.ensemble:
     with open(logfile, 'a') as fid:
         fid.write('Running  defaults\n')
     from monet.util.svhy import default_setup
@@ -141,65 +145,13 @@ if options.defaults:
     # if units='ppb' then ichem=6 is set to output mixing ratios.
     default_setup("SETUP.0", options.tdir, units=options.cunits)
     default_control("CONTROL.0", options.tdir, run_duration, d1, area=area)
+# if ensemble then copy CONTROL.0 and SETUP.0 to ensemble directories
+if options.defaults and svp.ensemble:
+    from monet.util.svens import ensemble_defaults
+    ensemble_defaults(options.tdir)
 
 ##------------------------------------------------------##
-# Plots of results
-##------------------------------------------------------##
-if options.results:
-    with open(logfile, 'a') as fid:
-     fid.write('Running  results\n')
-    from monet.util.svresults3 import SVresults
-    from monet.util.svcems import SourceSummary
-    from monet.util.svcems import CEMScsv
-    sss = SourceSummary(fname= options.tag + '.source_summary.csv')
-    df = sss.load()
-    orislist = sss.check_oris(10)
-    #orislist = options.orislist
-    print('ORIS LIST', orislist)
-    #sys.exit()
-    svr = SVresults(options.tdir, orislist=orislist, daterange=[d1, d2])
-    flist = svr.find_files()
-    svr.create_df(flist)
-    
-
-    #datemfile = options.tag + "DATEM.txt"
-    #print("writing datem ", datemfile)
-    ##svr.writedatem(datemfile)
-    #svr.fill_hash()
-    #print("PLOTTING")
-    svr.plotall()
-
-##------------------------------------------------------##
-# Vmixing
-##------------------------------------------------------##
-#vmet is a MetObs object.
-#vmetdf is the dataframe associated with that.
-if options.vmix==1:
-    # reads files created from vmixing program in each subdirectory.
-    # creates MetObs object with matched so2 observations and vmixing data time
-    # series.
- 
-    # FILES CREATED
-    # tag + .vmixing.csv
-    # PLOTS CREATED
-    # histograms of wind direction conditional on concentration measurement.
-    # 2d histgrams of wind direction 
-    vmet = options_vmix.options_vmix_main(options, d1, d2, area, source_chunks,
-                                      logfile)
-
-    #sys.exit()
-    #   # this adds met data to the datem file for Nick.
-    #   dothis=False 
-    #   if dothis:
-    #       from monet.util.svresults2 import SVresults
-    #       svr = SVresults(options.tdir, orislist=orislist, daterange=[d1, d2])
-    #       svr.readc2datem()
-    #       svr.add_metobs(vmet.df, orislist=orislist)
-    #       datemfile = options.tag + "DATEM.txt"
-    #       print("writing datem ", datemfile)
-    #       svr.writedatem_enhanced(dfile=datemfile)
-       
-##------------------------------------------------------##
+## Get the CEMS data.
 ##------------------------------------------------------##
 if options.cems:
    # OUTPUTS
@@ -209,19 +161,10 @@ if options.cems:
    # source_summary.csv
    from monet.util import options_cems 
    ef, rfignum = options_cems.options_cems_main(options, d1, d2, area, 
-                                                 source_chunks, logfile)
-   #from monet.util.svcems import CEMScsv
-   #cems = CEMScsv()
-   #dftest = cems.read_csv(options.tag + '.cems.csv')
-   #print('CEMS CSV FILE TEST')
-   #print(dftest[0:10])
-   #print('__________________________________')
-   #cems.melt()
-   #print('__________________________________')
-   #print(dftest.columns.values)
-   #sdf = cems.get_cems('6095')
-   #print(sdf[0:20])
+                                                 source_chunks, logfile,
+                                                svp.ensemble)
 ##------------------------------------------------------##
+## Get observational data
 ##------------------------------------------------------##
 if options.obs:
     #OUTPUTS
@@ -235,26 +178,31 @@ if options.obs:
     # map with obs, cems, ish 
     # 2d distributions of so2 conc and wdir for sites with met data.
     meto, obs = options_obs.options_obs_main(options, d1, d2, area, source_chunks, run_duration,
-                     logfile, rfignum) 
-
-    if options.vmix==1:
-       options_vmix.options_vmix_met(options, vmet, meto, logfile)
+                     logfile, rfignum, svp.ensemble) 
 
 ##------------------------------------------------------##
+# Create CONTROL and SETUP files in subdirectories.
 ##------------------------------------------------------##
 # FILES created
 # CONTROL and SETUP and ASCDATA.CFG files in each subdirectory.
 # CONTROL files for vmixing. 
 # bash script to run HYSPLIT
 # bash script to run vmixing
-
-runlist = []
 if options.create_runs:
+   tcmrun=False
+   from monet.util.options_run import options_run_main
+   options_run_main(options, d1, d2, source_chunks, tcmrun)
+
+
+oldrunlist = False
+runlist = []
+if oldrunlist:
     from monet.util.svhy import create_controls
     from monet.util.svhy import create_vmix_controls
     from monet.util.svhy import RunScript
     from monet.util.svhy import VmixScript
     from monet.util.svhy import DatemScript
+    from monet.util.svcems import SourceSummary
     with open(logfile, 'a') as fid:
          fid.write('creating CONTROL files\n')
 
@@ -263,20 +211,25 @@ if options.create_runs:
        from monet.util.svhy import nei_controls
        ns = nei.NeiSummary()
        print('WRITING EIS CONTROLS')
+       sss = SourceSummary(fname = options.tag + '.source_summary.csv')
+       
        neidf = ns.load(fname = options.tdir + '/neifiles/' + options.neiconfig) 
+       ns.remove_cems(sss.sumdf)
+       ns.print(fname = options.tdir + '/neifiles/CONFIG.NEWNEI')
+       neidf = ns.df
        nei_runlist = nei_controls(options.tdir, options.hdir, neidf, d1, d2, source_chunks, options.metfmt,
                     units = options.cunits, tcm=tcmrun)
-       if not nei_runlist:
-          print('NO CONTROL files for NEI sources ')
-          #sys.exit()
-       else:
-          print('Making script for NEI sources ')
-          print(len(nei_runlist))
-          rs = RunScript(options.tag + "_nei.sh", nei_runlist, options.tdir)
-          print('Making DATEM script for NEI sources ')
-          rs = DatemScript(
-          options.tag + "_nei_datem.sh", nei_runlist, options.tdir, options.cunits, poll=1
-          )
+       #if not nei_runlist:
+       #   print('NO CONTROL files for NEI sources ')
+       #   #sys.exit()
+       #else:
+       #   print('Making script for NEI sources ')
+       #   print(len(nei_runlist))
+       #   rs = RunScript(options.tag + "_nei.sh", nei_runlist, options.tdir)
+       #   print('Making DATEM script for NEI sources ')
+       #   rs = DatemScript(
+       #   options.tag + "_nei_datem.sh", nei_runlist, options.tdir, options.cunits, poll=1
+       #   )
 
     print('Creating CONTROL files')
     runlist = create_controls(
@@ -292,9 +245,10 @@ if options.create_runs:
     if not runlist: 
         print('No  CONTROL files created') 
         print('Check if EMITIMES files have been created')
-    else:
-        rs = RunScript(options.tag + ".sh", runlist, options.tdir)
-
+    #else:
+    #    print('Creating batch script for HYSPLIT runs')
+    #    rs = RunScript(options.tag + ".sh", runlist, options.tdir)
+    #sys.exit()
     print('Creating CONTROL files for vmixing')
     runlist = create_vmix_controls(
         options.tdir,
@@ -306,9 +260,9 @@ if options.create_runs:
     )
     if not runlist: 
         print('No vmixing CONTROL files created. Check if datem.txt files exist')
-    else:
-        rs = VmixScript(options.tag + '.vmix.sh', runlist, options.tdir)
-        print('creating vmixing CONTROL files created.')
+    #else:
+    #    rs = VmixScript(options.tag + '.vmix.sh', runlist, options.tdir)
+    #    print('creating vmixing CONTROL files created.')
 
 ##------------------------------------------------------##
 ##------------------------------------------------------##
@@ -337,6 +291,77 @@ if options.write_scripts:
         "p3datem_" + options.tag + ".sh", runlist, options.tdir, options.cunits, poll=3
     )
 
+##------------------------------------------------------##
+# Vmixing
+##------------------------------------------------------##
+#vmet is a MetObs object.
+#vmetdf is the dataframe associated with that.
+if options.vmix==1:
+    # reads files created from vmixing program in each subdirectory.
+    # creates MetObs object with matched so2 observations and vmixing data time
+    # series.
+ 
+    # FILES CREATED
+    # tag + .vmixing.csv
+    # PLOTS CREATED
+    # histograms of wind direction conditional on concentration measurement.
+    # 2d histgrams of wind direction 
+    vmet = options_vmix.options_vmix_main(options, d1, d2, area, source_chunks,
+                                      logfile)
+    # if the meto object was created with obs then can compare obserbed met to
+    # vmixing met.
+    if options.obs: 
+        options_vmix.options_vmix_met(options, vmet, meto, logfile)
+
+    #sys.exit()
+    #   # this adds met data to the datem file for Nick.
+    #   dothis=False 
+    #   if dothis:
+    #       from monet.util.svresults2 import SVresults
+    #       svr = SVresults(options.tdir, orislist=orislist, daterange=[d1, d2])
+    #       svr.readc2datem()
+    #       svr.add_metobs(vmet.df, orislist=orislist)
+    #       datemfile = options.tag + "DATEM.txt"
+    #       print("writing datem ", datemfile)
+    #       svr.writedatem_enhanced(dfile=datemfile)
+       
+##------------------------------------------------------##
+##------------------------------------------------------##
+# Plots of results
+##------------------------------------------------------##
+if options.results:
+    from monet.util import options_model
+    from monet.util import nei
+    if not options.vmix==1: 
+        vmet = options_vmix.get_vmet(options, d1, d2, area, source_chunks,
+                                      logfile)
+        vmet.set_geoname(options.tag + '.geometry.csv')
+        if options.neiconfig:
+          ns = nei.NeiSummary()
+          ns.load(options.tdir + 'neifiles/' + options.neiconfig)
+          vmet.add_nei_data(ns.df)
+
+    options_model.options_model_main(options, d1, d2, vmet, logfile)
+
+
+    #sss = SourceSummary(fname= options.tag + '.source_summary.csv')
+    #df = sss.load()
+    #orislist = sss.check_oris(10)
+    #orislist = options.orislist
+    #print('ORIS LIST', orislist)
+    #sys.exit()
+    #svr = DatemOutput(options.tdir, orislist=orislist, daterange=[d1, d2])
+    #flist = svr.find_files()
+    #svr.create_df(flist)
+    #pdf = svr.get_pivot() 
+   
+
+    #datemfile = options.tag + "DATEM.txt"
+    #print("writing datem ", datemfile)
+    ##svr.writedatem(datemfile)
+    #svr.fill_hash()
+    #print("PLOTTING")
+    #svr.plotall()
 
 ##------------------------------------------------------##
 # TO DO should tie numpar to the emissions amount during that time period

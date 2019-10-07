@@ -103,7 +103,7 @@ def get_line_width(eis, neidf ):
     # values may not match.
 
     if neidf.empty:
-       return 1, '-r', 'unknown'
+       return 1, 'r', 'unknown'
     df = neidf[neidf['EIS_ID'].str.contains(eis.replace('EIS',''))]  
     if df.empty:
        #print(eis, ' empty')
@@ -125,6 +125,7 @@ def get_line_width(eis, neidf ):
     return linewidth , clr, facility
 
 def get_height(ymax, dthresh, dist):
+    if ymax== -99: return 1
     bbb = np.ceil(dthresh)
     incr = dthresh / bbb
     aaa = np.arange(0,bbb+1) * incr 
@@ -175,8 +176,8 @@ def addplants_subB(tlist, ymax, neidf, dthresh):
                 clr= 'b'
                 lbl = str(int(dist)) + 'km'
                 linewidth, clr, facility =get_line_width(oris, neidf)
-                if facility == 'unknown' and dist > 10:
-                   continue
+                #if facility == 'unknown' and dist > 10:
+                #   continue
             else:
                 clr = 'k'
                 lbl = str(oris) + ' ' + str(int(dist)) + 'km'
@@ -214,18 +215,36 @@ def addplants_horizontal(site, ax, xr, dthresh=150, add_text=True,
               geoname='geometry.csv', neidf=pd.DataFrame()):
     # add horizontal lines with direction to power plants to the
     # time series.
+    # xr should be daterange.
     tlist, nlen = addplants_subA(site, geoname, dthresh)
-    orislist, textra = addplants_subB(tlist, ymax, neidf)
+    # -99 means that the height of the line will just be returned as 1. val[1]
+    orislist, textra = addplants_subB(tlist, -99, neidf, dthresh)
+    iii=0
     for  val in textra:   
+         print('adding plant lines', val)
          # height is the wind direction.
-         pnt1 = [xr[0], val[0]]
-         pnt2 = [xr[1], val[0]] 
+         pnt1 = [xr[0], xr[1]]
+         pnt2 = [val[0], val[0]] 
+         print('PNT1', pnt1)
+         print('PNT2', pnt2)
+         dt = (xr[1] - xr[0]) / 10.0
+         if iii==0: xtext = xr[0]-dt
          # still use linewidth to indicate source strength 
-         ax.plot(pnt1, pnt2,  linewidth=val[4], alpha=0.5)
+         try:
+             ax.plot(pnt1, pnt2,  linewidth=val[4], alpha=0.5, color=val[5])
+         except:
+             return orislist
          if add_text:
-             ax.text(xr[0], val[0]+1, val[2],fontsize=8, color="blue")
+             ax.text(xtext, val[0]+1, val[2],fontsize=8, color="blue")
+             xtext += dt
+             if xtext > xr[1]: xtext = xr[0]
+             print('XTEXT', xtext, dt)
+         iii+=1
     return orislist
 
+def color_wdir(wdir, 
+              geoname='geometry.csv', neidf=pd.DataFrame()):
+    return -1
 
 def manage_text(textra, ymax,  xinc=50):
     # sort by the x position of the text.
@@ -292,10 +311,10 @@ def metobs2matched(met1, met2):
         m1temp = met1[met1['siteid'] == sss]     
         m2temp = met2[met2['siteid'] == sss]     
 
-        m1temp.sort_values(by=['time'], axis=0, inplace=True)
-        m2temp.sort_values(by=['time'], axis=0, inplace=True)
-        m1temp['dup'] = m1temp.duplicated(subset=['time'], keep=False)
-        m2temp['dup'] = m2temp.duplicated(subset=['time'], keep=False)
+        m1temp = m1temp.sort_values(by=['time'], axis=0, inplace=False)
+        m2temp = m2temp.sort_values(by=['time'], axis=0, inplace=False)
+        #m1temp['dup'] = m1temp.duplicated(subset=['time'], keep=False)
+        #m2temp['dup'] = m2temp.duplicated(subset=['time'], keep=False)
 
 
         m1temp.set_index('time', inplace=True)
@@ -333,6 +352,41 @@ class MetObs(object):
     """
 
     def __init__(self, tag=None, geoname='geometry.csv'):
+        """
+        The dataframe is structured in the following way.
+       
+        COLUMNS
+          'time'
+          'siteid'
+          'wdir'
+          'ws'
+          'SO2'  gives observations of SO2.
+
+        'time' and 'siteid' could be turned into row indices.
+   
+        Currently the meteorological data can either come from observations or
+        from the vmixing output but not both. This should be changed so we can
+        get all the data into one frame.
+ 
+        Model data may be added with the add_model_all method. 
+        This will add extra columns which have a hierarchical index 
+        (source, pollnum, stype).
+        e.g. (8042, 1, ORIS)
+        e.g. (11529,1, EIS)
+        source is either the ORIS code or EIS_ID (from nei dataset)
+        pollnum gives the species number (usually 1 so far).
+        stype indicates whether the source is from CEMS with known hourly
+        emissions or if emissions were estimated from the NEI data.
+
+        CEMS data may be added.  However, CEMS data is not specific to a siteid.
+        Therefore the cems data must be repeated if it is merged into the main
+        dataframe.
+
+        self.geoname gives a geometry.csv file associated with the data. This
+        file provides important information on the distance and direction
+        between measurement sites and sources.
+
+        """
         self.df = pd.DataFrame()
         self.columns_original = []
         self.fignum = 1
@@ -345,6 +399,8 @@ class MetObs(object):
 
         self.neidf = pd.DataFrame()
         self.empty = self.isempty()
+        #self.model = pd.DataFrame()
+        self.model =  {}  #dictionary of DataFrames
 
     def isempty(self):
         if self.df.empty: 
@@ -366,18 +422,21 @@ class MetObs(object):
         self.geoname = name
         print('SETTING geoname', self.geoname)
 
-    def add_model(self, mdf, verbose=True):
+    def add_model_all(self, mdf, verbose=True):
+        # This adds the model data to the dataframe.
+        # 
+
         # RIGHT NOW - must add model after creating from vmixing data.
         # or from_vmix will overwrite the self.df
         # add model output to the main dataframe.
         # use the 
-     
+ 
         # instead of merging the model data to the dataframe.
         # might be best to simply add the model object.
         # and produce time series from it as needed to be merged.
 
         self.model_list = list(mdf.columns.values)
-        print(self.model_list)
+        print('adding model list', self.model_list)
         if 'time' in self.model_list: self.model_list.remove('time')
         if 'siteid' in self.model_list: self.model_list.remove('siteid')
         self.model_columns = mdf.columns.values
@@ -385,8 +444,8 @@ class MetObs(object):
         if self.df.empty:
            self.df = mdf
         else:
-            metobscol = ['time']
-            modelcol = ['time'] 
+            metobscol = ['time', 'siteid']
+            modelcol = ['date', 'sid'] 
             newdf = pd.merge(self.df,
                              mdf,
                              how='left',
@@ -401,8 +460,11 @@ class MetObs(object):
         return  self.df
 
 
-    def add_model_object(self, model):
-        self.model = model
+    def add_model_object(self,name, model):
+        self.model[name] = model
+
+    #def add_model(self):
+       
 
     def conditional_model(self):
         original_df = self.df.copy()
@@ -424,7 +486,7 @@ class MetObs(object):
         
           
 
-    def add_cems(self, cemsdf, verbose=True):
+    def add_cems(self, cemsdf, verbose=False):
         """
         adds the following colummns to the dataframe 
         """
@@ -438,15 +500,17 @@ class MetObs(object):
             #print(self.df.columns.values)
         #self.cemslist.extend(cemsdf.columns.values)
         self.cemslist = list(cemsdf.columns.values)
-        if verbose: print('CEMSLIST', self.cemslist)
         if 'time' in self.cemslist:
            self.cemslist.remove('time')
 
         if self.df.empty:
            self.df = cemsdf
         else:
-           self.df = pd.merge(self.df, cemsdf, how='left', left_on=grouplist,
-                               right_on=grouplist) 
+           self.df = pd.merge(self.df, 
+                              cemsdf, 
+                              how='left', 
+                              left_on=grouplist,
+                              right_on=grouplist) 
         if verbose: print('CEMSLIST', self.cemslist)
         self.isempty()
 
@@ -471,6 +535,8 @@ class MetObs(object):
            self.df = pd.DataFrame()  
            print('No Met Data Found') 
         else:
+           # drop rows which have all NANs in the columns which give
+           # metdata (WD, RH, TEMP, WS)
            self.df = self.df.dropna(axis=0, how='all', subset=overlap)
         self.isempty()      
 
@@ -481,6 +547,8 @@ class MetObs(object):
         for val in ['psqnum', 'hour']:
             if val in df.columns.values:
                 df = df.drop([val], axis=1)
+        print(self.columns_original)
+        print(df.columns.values)
         df.columns = self.columns_original
         df.to_csv(tdir + "met" + csvfile, header=True, float_format="%g")
           
@@ -526,18 +594,30 @@ class MetObs(object):
             self.plot_ts(save, quiet)
 
 
-    def plot_ts(self, save=False, quiet=False):
+    def add_model_ts(self, sid, tp='ORIS', model_list=None ):
+        if not model_list:
+           model_list = self.model.keys()
+        for mmm in model_list:
+            model = self.model[mmm]
+            elist, slist = model.sourcelist()
+            model_ts = model.group(sid, stypelist=[tp])
+            model_ts.set_index('date', inplace=True)
+            yield mmm, model_ts['model']
+
+
+    def plot_ts(self, save=True, quiet=False):
         if self.df.empty: return -1
         sns.set()
+        sns.set_style('whitegrid')
         slist = self.get_sites()
         for site in slist:
             fig = plt.figure(self.fignum)
-            fig.set_size_inches(10,5)
+            fig.set_size_inches(15,5)
             # re-using these axis produces a warning.
             ax1 = fig.add_subplot(1,1,1)
             ax2 = ax1.twinx()
             #ax3 = fig.add_subplot(2,1,2)
-            ax3 = ax1.twinx()
+            #ax3 = ax1.twinx()
 
             df = self.df[self.df['siteid'] == site]
             df = df.set_index('time')
@@ -545,13 +625,23 @@ class MetObs(object):
             wdir = df['WDIR']
             ax2.plot(wdir, 'b.', markersize=2)
             ax1.plot(so2, '-k')
-            for model in self.model_list:
-                if model[1] == site:
-                    print('PLOTTING', model)
-                    mso2 = df[model]
-                    ax1.plot(mso2, 'm.')
+            #print('MODEL LIST', self.model_list)
+            iii=0
+            clrs = ['-m.', '-r.','-c.','-b.','-y'] 
+            for name, oris_ts in self.add_model_ts(site, tp='ORIS'):
+                ax1.plot(oris_ts, clrs[iii], label=name)  
+                iii+=1
+            for name, eis_ts in self.add_model_ts(site, tp='NEI'):
+                ax1.plot(eis_ts, '-g.', label=name)  
+            #for model in self.model_list:
+                #if model[1] == site:
+           #         print('PLOTTING', model)
+           #         mso2 = df[model]
+           #         ax1.plot(mso2, 'm.')
             # ax2 is for wind direction.
-            #orislist = addplants(site, ax2, ymax=np.max(nnn1), geoname=self.geoname, neidf=self.neidf)
+            dlist = oris_ts.index.tolist()
+            #daterange = (dlist[0], dlist[-1])
+            #orislist = addplants_horizontal(site, ax2, daterange, geoname=self.geoname, neidf=self.neidf)
             ax1.set_ylabel('so2 (ppb)')
             ax2.set_ylabel('Wind direction (degrees)')
             #for oris in self.cemslist:
@@ -559,15 +649,27 @@ class MetObs(object):
             #    cems = df[oris]
             #    ax3.plot(cems, '-r.')
 
+            #ax2.spines["right"].set_position(("axes", 1.1))
+            #ptools.make_patch_spines_invisible(ax2)
+            #ax2.spines["right"].set_visible(True)
+            ax2.grid(False, which='both')
+            ptools.set_date_ticksB(ax1)
+            ax1.grid(True, which='both')
             plt.title(str(site))
+            fig.autofmt_xdate()
+            ax = plt.gca()
+            handles, labels = ax.get_legend_handles_labels()
+            ax.legend(handles, labels)
             plt.tight_layout() 
-            if not quiet:
-                plt.show()
             if save:
                 tag = self.tag
                 if not tag: tag = ''
                 plt.savefig(tag + str(site) + '.met_ts.jpg')
+            if not quiet:
+                plt.show()
             plt.close() 
+
+
 
     def date2hour(self):
         def process_date(dt):
@@ -640,7 +742,7 @@ class MetObs(object):
     
 
 
-    def conditional(self, save=False, quiet=False, varlist=['SO2', 'model']):
+    def conditional(self, save=False, quiet=False, varlist=['SO2']):
         slist = self.get_sites()
         sz = [10,5]
         for site in slist:
@@ -677,7 +779,7 @@ class MetObs(object):
                 ax.set_ylabel('Probability')  
                 ptools.set_legend(ax, bw=0.60)
                 plt.title(str(site) + str(var1))
-                plt.tight_layout(rect=[0,0,0.75,1])
+                #plt.tight_layout(rect=[0,0,0.75,1])
                 plt.savefig(str(site) + 'cpdf.jpg')
                 self.fignum +=1
             plt.show() 
@@ -780,6 +882,7 @@ class MetObs(object):
     def conditional_sub(self,df, ax, site, pval, label=None, color='b',
                        var1='SO2', limit=True, step=False, density=True): 
         #var1='SO2'
+        df = df.fillna(0)
         var2='WDIR'
         mdl=df['mdl'].unique()
         ra = df[var1].tolist()
@@ -796,6 +899,7 @@ class MetObs(object):
         
         if valA > valB: 
            return valA, valB, 0
+
 
         tdf = df[df[var1] >= valA]          
         tdf = tdf[tdf[var1] <= valB]          

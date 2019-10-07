@@ -12,6 +12,14 @@ class SVparams:
         self.datem_chunks = 5
         self.tcmrun = False
         self.run_duration = None
+        self.ensembe = False
+
+    def check_ensemble(self, metfmt):
+        if 'ENS' in metfmt:
+            self.ensemble=True
+        else:
+            self.ensemble=False
+    
 
     def make_d1d2(self, drange):
         temp = drange.split(":")
@@ -73,6 +81,7 @@ def main(options):
     svp.make_area(options.bounds)
     svp.add_logfile(options.tag)
     svp.make_source_chunks(options.chunks)
+    svp.check_ensemble(options.metfmt)
     return svp
 
 

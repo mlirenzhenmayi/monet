@@ -836,9 +836,9 @@ class SEmissions(object):
         # lbs is converted to kg in get_so2_sources
         df = self.get_so2_sources(unit=unit)
         # unit in csv file is kg
-        print("CREATE CSV FILE ")
-        self.make_csv(df.copy())
-        print("CREATE EMITIMES in SVCEMS ", ' Use day chunks ' +  str(schunks/24))
+        #print("CREATE CSV FILE ")
+        #self.make_csv(df.copy())
+        print("CREATE EMITIMES in SVCEMS ", tdir, ' Use day chunks ' +  str(schunks/24))
         # placeholder. Will later add routine to get heat for plume rise
         # calculation.
         dfheat = df.copy() * 0 + heat

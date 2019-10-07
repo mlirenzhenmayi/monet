@@ -12,6 +12,7 @@ from monet.util.ptools import create_map
 from monet.util.svcems import SourceSummary
 from monet.util.nei import NeiData
 from monet.util.nei import NeiSummary
+from monet.util import svens
 
 """
 FUNCTIONS
@@ -47,12 +48,17 @@ def make_geometry(options, obsfile, logfile):
     # output geometry.csv file with distances and directons from power plants to aqs sites.
     sumfile = options.tag + ".source_summary.csv"
     cemsfile = options.tag + ".cems.csv"
-    neifile = options.tdir + 'neifiles/' + options.neiconfig
+    if options.neiconfig: 
+       neifile = options.tdir + 'neifiles/' + options.neiconfig
+       if not os.path.isfile(neifile):
+           neifile=None 
+    else:
+       neifile=None 
     t1 = os.path.isfile(obsfile)
     t2 = os.path.isfile(sumfile)
     t3 = os.path.isfile(cemsfile)
-    t4 = os.path.isfile(neifile)
-    if not t4: neifile=None 
+    #t4 = os.path.isfile(neifile)
+    #if not t4: neifile=None 
     if t1 and t2 and t3:
         from monet.util.svan1 import CemsObs
         from monet.util.svan1 import gpd2csv
@@ -69,7 +75,7 @@ def make_geometry(options, obsfile, logfile):
              fid.write('cemsfile ' + cemsfile + str(t3))
 
 def options_obs_main(options, d1, d2, area, source_chunks, 
-                     run_duration, logfile, rfignum):
+                     run_duration, logfile, rfignum, svensemble):
     #INPUTS 
     # options
     # source_chunks
@@ -94,13 +100,23 @@ def options_obs_main(options, d1, d2, area, source_chunks,
     # create the SObs object to get AQS data.    
     obs = create_obs(options, d1, d2, area, rfignum)
 
+
+    # exerperiment with fitting an AR or ARMA model to obs data.
+    # then generate artificial time series for reference forecast.
+    #obs.try_ar()
+
     # make the geometry.csv file 
     with open(logfile, 'a') as fid:
         fid.write('Creating geometry.csv file\n')
     make_geometry(options, obs.csvfile, logfile)
 
     # create the datem files in each subdirectory.
-    obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir)
+    if svensemble:
+        # if ensemble runs create dfiles in each subdirectory.
+        svens. create_ens_dfile(obs, d1, source_chunks, run_duration,
+                                options.tdir)
+    else:
+        obs.obs2datem(d1, ochunks=(source_chunks, run_duration), tdir=options.tdir)
 
     # create a MetObs object which specifically has the met data from the obs.
     meto = create_metobs(obs, options)
@@ -119,6 +135,7 @@ def options_obs_main(options, d1, d2, area, source_chunks,
     plt.show()
 
     # PLOT time series of observations
+    print('Plotting obs time series')
     obs.plot(save=True, quiet=options.quiet)
     return meto, obs
 
@@ -137,10 +154,11 @@ def make_map(options, obs, d1, d2, area):
     # put the obs data on the map
     obs.map(axmap)
     print("map fig number  " + str(fignum))
-    # put the cems data on the map.
-    cemsum = SourceSummary(options.tdir, options.tag + ".source_summary.csv")
-    #if not cemsum.sumdf.empty:
-    cemsum.map(axmap)
+    # put the cems data on the map if the source_summary file exists..
+    if os.path.isfile(options.tdir + options.tag + ".source_summary.csv"):
+        cemsum = SourceSummary(options.tdir, options.tag + ".source_summary.csv")
+        #if not cemsum.sumdf.empty:
+        cemsum.map(axmap)
     # put the ISH sites on the map. 
     if options.ish > 0:
         #with open(logfile, 'a') as fid:

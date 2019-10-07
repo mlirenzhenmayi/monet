@@ -103,6 +103,8 @@ class VmixingData:
         return -1
 
     def get_location(self, head1):
+        # vmixing doesn't always print a space between lat and lon
+        head1 = head1.replace('-', ' -')
         temp1 = head1.split()
         lat = float(temp1[0])
         lon = float(temp1[1])
@@ -136,6 +138,7 @@ class VmixingData:
                      lat, lon, met = self.get_location(head1)
                  except:
                      print('problem with vmixing file ', fname, vdir)
+                     print('header ', head1)
                      return df
                      #sys.exit()
                  cols, units = self.parse_header(head2,head3)

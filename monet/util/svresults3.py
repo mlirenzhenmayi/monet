@@ -76,6 +76,7 @@ class DatemOutput:
         ## internal use
         self.plist = ['p1','p2','p3']
         self.plist = [None]
+        
         #self.chash = {}  #dict. key is oris code. value is a color.
         #self.set_colors()
  
@@ -122,7 +123,7 @@ class DatemOutput:
                   rval = False
         return rval
 
-    def find_files(self, filetag=None, poll='p1'): 
+    def find_files(self, filetag=None, poll='p1', verbose=True): 
         """ oris should be oris number or None
             poll should indicate species (p1, p2, p3) or be None.
 
@@ -133,8 +134,9 @@ class DatemOutput:
         """
         dataA_files = []
         for (dirpath, dirnames, filenames) in os.walk(self.tdirpath):
+            print('CHECKING ', dirpath)
             if not self.datetest(dirpath): continue 
-
+            print('Keep going')
             for fl in filenames:
                 test1 = 'dataA' in fl
 
@@ -147,7 +149,7 @@ class DatemOutput:
                 if test1 and test2 and test3: 
                     #print('found', fl)
                     dataA_files.append(dirpath + '/' + fl)
-                    #print(dirpath + '/' + fl)
+                    print('found', dirpath + '/' + fl)
         return dataA_files 
 
     # instead of this will add this dataframe to metobs.
@@ -261,7 +263,6 @@ class DatemOutput:
     def create_df(self, filelist):
         df = pd.DataFrame()
         nnn = 0
-        print('HERE', df[0:10])
         mcols = ['sid', 'date', 'lat','lon','obs', 'source', 'pollnum', 'stype']
         for fname  in filelist:
             temp = fname.split('/')
@@ -278,6 +279,7 @@ class DatemOutput:
             if 'EIS' in fname: stype = 'NEI'
             else: stype = 'ORIS'
             tempdf = read_dataA(fname)
+            if  tempdf.empty: continue
             tempdf.drop(['Num'], inplace=True, axis=1)
             tempdf['source'] = dname
             tempdf['pollnum'] = pollnum
@@ -290,6 +292,7 @@ class DatemOutput:
                df = tempdf
             else:
                df = pd.concat([df, tempdf], sort=True)
+            #print('CREATE DF', df.columns.values)
             df = df.groupby(mcols).sum().reset_index()
             nnn+=1
         #df = df.set_index(mcols)
@@ -297,8 +300,12 @@ class DatemOutput:
         #print(self.df[0:10])
         #print(self.df.sum(level='
 
+        print('get_pivot input', self.df[0:10])
+        plt.plot(self.df['model'])
+        plt.show()
         df2 = self.get_pivot()
         print(df2[0:10])
+        print('---------------------------')
         #sys.exit()
         return df 
 
@@ -313,16 +320,16 @@ class DatemOutput:
            vals = 'model'
 
         df = pd.pivot_table(self.df, values=vals,
-                            index = ['date'],
-                            columns = ['source','sid','pollnum','stype'],
+                            index = ['date', 'sid'],
+                            columns = ['source','pollnum','stype'],
                             aggfunc=np.sum)
         df = df.reset_index()
-        newcols = []
-        for val in df.columns.values: 
-            if 'date' in val: newcols.append('time')
-            elif 'sid' in val: newcols.append('siteid')
-            else: newcols.append(val)
-        df.columns = newcols
+        #newcols = []
+        #for val in df.columns.values: 
+        #    if 'date' in val: newcols.append('time')
+        #    elif 'sid' in val: newcols.append('siteid')
+        #    else: newcols.append(val)
+        #df.columns = newcols
         #print('COLUMN VALUE', df.columns.values)
         #print(df[0:10])
         return df

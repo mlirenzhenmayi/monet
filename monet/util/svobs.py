@@ -97,12 +97,12 @@ def generate_obs(siteidlist, obsfile):
         yield ts
 
 def get_tseries(df, siteid, var="obs", svar="siteid", convert=False):
-    qqq = df["siteid"].unique()
+    #qqq = df["siteid"].unique()
     df = df[df[svar] == siteid]
     df.set_index("time", inplace=True)
     mult = 1
-    if convert:
-        mult = 1 / 2.6178
+    #if convert:
+    #    mult = 1 / 2.6178
     series = df[var] * mult
     return series
 
@@ -490,6 +490,16 @@ class SObs(object):
     def get_map_info(self):
         ohash = obs_util.get_lhash(self.obs, "siteid")
         return ohash
+
+    #def try_ar(self):
+    #    from monet.util.armodels import ARtest
+    #    for sid, ts, ms in self.generate_ts():
+    #        nnn= int(len(ts)/2.0)
+    #        ts1 = ts[0:nnn]
+    #        ts2 = ts[nnn:]
+    #        print('SITE', sid)
+    #        ar = ARtest(ts1, ts2)
+             
 
     def map(self, ax):
         """

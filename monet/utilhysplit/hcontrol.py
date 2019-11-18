@@ -23,6 +23,7 @@ FUNCTIONS
    writelanduse - writes ASCDATA.CFG file.
 """
 
+
 def writeover(name, overwrite, query, verbose=False):
     """
     checks if file already exits.
@@ -40,26 +41,29 @@ def writeover(name, overwrite, query, verbose=False):
     """
     rval = 1
     if path.isfile(name):
-          print('file already exists ' +  name)
-          fexists = True
-          if query:
-            istr= " Press y to overwrite file \n"
-            istr+= " Press any other key to continue without overwriting "
+        print("file already exists " + name)
+        if query:
+            istr = " Press y to overwrite file \n"
+            istr += " Press any other key to continue without overwriting "
             answer = input(istr)
-            if answer.strip().lower() != 'y':
-               overwrite=False 
+            if answer.strip().lower() != "y":
+                overwrite = False
             else:
-               overwrite=True
-          if overwrite:
-             if verbose: print('overwriting existing file')
-             rval = 1
-          else:
-             if verbose: print('Continuing without overwriting file')
-             rval = -1   
+                overwrite = True
+        if overwrite:
+            if verbose:
+                print("overwriting existing file")
+            rval = 1
+        else:
+            if verbose:
+                print("Continuing without overwriting file")
+            rval = -1
     return rval
 
-def writelanduse(landusedir, working_directory="./", overwrite=True,
-                 query=False, silent=False):
+
+def writelanduse(
+    landusedir, working_directory="./", overwrite=True, query=False, silent=False
+):
     """writes an ASCDATA.CFG file in the outdir. The landusedir must
        be the name of the directory where the landuse files are located.
     Parameters
@@ -71,17 +75,21 @@ def writelanduse(landusedir, working_directory="./", overwrite=True,
     ----------
     None
     """
-    rval = writeover(working_directory + 'ASCDATA.CFG', overwrite, query,
-                         verbose=silent)
-    with open(path.join(working_directory,"ASCDATA.CFG"), "w") as fid:
+    writeover(
+        working_directory + "ASCDATA.CFG", overwrite, query, verbose=silent
+    )
+    with open(path.join(working_directory, "ASCDATA.CFG"), "w") as fid:
         fid.write("-90.0  -180.0 \n")
         fid.write("1.0    1.0    \n")
         fid.write("180    360    \n")
         fid.write("2 \n")
         fid.write("0.2 \n")
-        fid.write(landusedir +" \n")
-        if  not path.isdir(landusedir) and not silent:
-            print('writelanduse function WARNING: landuse directory does not exist', landusedir)
+        fid.write(landusedir + " \n")
+        if not path.isdir(landusedir) and not silent:
+            print(
+                "writelanduse function WARNING: landuse directory does not exist",
+                landusedir,
+            )
 
 
 class ConcGrid:
@@ -91,7 +99,7 @@ class ConcGrid:
     -------
     __init__
     get_nlev
-    set_annotate
+    set_annnotate
     describe
     __str__
     typestrg
@@ -112,7 +120,7 @@ class ConcGrid:
     sample_stop
     sampletype
     interval
-    annotate : boolean
+    annnotate : boolean
     """
 
     def __init__(
@@ -132,7 +140,7 @@ class ConcGrid:
             sample_stop="00 00 00 00 00",
             sampletype=0,
             interval=(-1, -1),
-        ):
+    ):
 
         # self.name, self.levels, self.centerlat, self.centerlon,
         # self.latdiff, self.londiff, self.latspan, self.lonspan,
@@ -172,7 +180,7 @@ class ConcGrid:
         self.sampletype = sampletype
         self.interval = interval
         self.get_nlev()
-        self.annotate = False
+        self.annnotate = False
 
     def copy(self):
         return ConcGrid(
@@ -193,11 +201,11 @@ class ConcGrid:
             self.interval,
         )
 
-    def set_annotate(self, on=True):
+    def set_annnotate(self, on=True):
         """
         write
         """
-        self.annotate = on
+        self.annnotate = on
 
     def get_nlev(self):
         """
@@ -209,12 +217,17 @@ class ConcGrid:
     def __str__(self):
         """string method will output ten lines suitable for inserting into a
         HYSPLIT control file"""
-        pnotes = self.annotate
+        pnotes = self.annnotate
         note = ""
         if pnotes:
             note = "  #Concentration Grid Center (latitude longitude)"
-        returnstr = "{:.4f}".format(self.centerlat) + " " + \
-            "{:.4f}".format(self.centerlon) + note + "\n"
+        returnstr = (
+            "{:.4f}".format(self.centerlat)
+            + " "
+            + "{:.4f}".format(self.centerlon)
+            + note
+            + "\n"
+        )
         if pnotes:
             note = "  #Concentration grid spacing (degrees latitude longitude)"
         returnstr += str(self.latdiff) + " " + str(self.londiff) + note + "\n"
@@ -272,8 +285,9 @@ class ConcGrid:
             + str(self.londiff)
             + "\n"
         )
-        returnstr += ("Span (deg Lat, Lon: " +
-                      str(self.latspan) + " " + str(self.lonspan) + "\n")
+        returnstr += (
+            "Span (deg Lat, Lon: " + str(self.latspan) + " " + str(self.lonspan) + "\n"
+        )
         returnstr += "Output grid directory: " + self.outdir + "\n"
         returnstr += "Output grid file name: " + self.outfile + "\n"
         returnstr += "Num of vertical levels: " + str(self.nlev) + "\n"
@@ -281,10 +295,8 @@ class ConcGrid:
         for lev in self.levels:
             returnstr += str(lev) + " "
         returnstr += "\n"
-        returnstr += "Sampling start (yy mm dd hh min) : " + \
-            self.sample_start + "\n"
-        returnstr += "Sampling stop (yy mm dd hh min) : " + \
-            self.sample_stop + "\n"
+        returnstr += "Sampling start (yy mm dd hh min) : " + self.sample_start + "\n"
+        returnstr += "Sampling stop (yy mm dd hh min) : " + self.sample_stop + "\n"
         # returnstr +=  self.typstr() + ' ' + str(self.sampletype) + ' '
         returnstr += (
             "Interval (hh min) "
@@ -298,8 +310,7 @@ class ConcGrid:
     def typestr(self):
         """returns a string describing what kind of sampling interval is used"""
         print(self.interval[0], self.interval[1])
-        tmstr = str(self.interval[0]).zfill(2) + \
-            ":" + str(self.interval[1]).zfill(2)
+        tmstr = str(self.interval[0]).zfill(2) + ":" + str(self.interval[1]).zfill(2)
         if self.sampletype == 0:
             returnstr = "Average over  " + tmstr + " with output every " + tmstr
         elif self.sampletype == 1:
@@ -421,19 +432,19 @@ class Species:
         return Species.total
 
     def __init__(
-            self,
-            name,
-            psize=0,
-            rate="1",
-            duration=-1,
-            density=2.5,
-            shape=1,
-            date="00 00 00 00 00",
-            wetdepstr="0.0 0.0 0.0",
-            vel="0.0 0.0 0.0 0.0 0.0",
-            decay="0.0",
-            resuspension="0.0",
-        ):
+        self,
+        name,
+        psize=0,
+        rate="1",
+        duration=-1,
+        density=2.5,
+        shape=1,
+        date="00 00 00 00 00",
+        wetdepstr="0.0 0.0 0.0",
+        vel="0.0 0.0 0.0 0.0 0.0",
+        decay="0.0",
+        resuspension="0.0",
+    ):
 
         self.name = name
         self.rate = rate
@@ -477,12 +488,12 @@ class Species:
         """
         try:
             self.rate = float(lines[0])
-        except BaseException:
+        except ValueError:
             print("warning: rate is not a float", lines[0])
             return False
         try:
             self.duration = float(lines[1])
-        except BaseException:
+        except ValueError:
             print("warning: duration is not a float", lines[1])
             return False
         if lines[2].strip()[0:2] == "00":
@@ -494,7 +505,7 @@ class Species:
                     lines[2].strip(), "%y %m %d %H %M"
                 )
                 self.datestr = self.date.strftime("%y %M %D %H")
-            except BaseException:
+            except ValueError:
                 print("warning: date not valid", lines[2])
                 self.date = lines[2].strip()
                 self.datestr = lines[2].strip()
@@ -516,15 +527,15 @@ class Species:
         temp = lines[0].strip().split()
         try:
             self.psize = float(temp[0])
-        except BaseException:
+        except ValueError:
             print("warning: diameter not a float ", temp[0])
         try:
             self.density = float(temp[1])
-        except BaseException:
+        except ValueError:
             print("warning: density not a float ", temp[1])
         try:
             self.shape = float(temp[2])
-        except BaseException:
+        except ValueError:
             print("warning: shape not a float ", temp[2])
         # To do - read these in as floats
         self.vel = lines[1].strip()
@@ -534,21 +545,21 @@ class Species:
         self.resuspension = lines[4].strip()
         return -1
 
-    def strpollutant(self, annotate=False):
+    def strpollutant(self, annnotate=False):
         """Prints out three lines which define a species/pollutant in HYSPLIT
         control file"""
         note = ""
         spc = " " * 20
-        if annotate:
+        if annnotate:
             note = spc + "#Species identifier"
         returnval = self.name + note + "\n"
-        if annotate:
+        if annnotate:
             note = spc + "#Rate of emission"
         returnval += str(self.rate) + note + "\n"
-        if annotate:
+        if annnotate:
             note = spc + "#Duration of emission"
         returnval += "%0.2f" % self.duration + note + "\n"
-        if annotate:
+        if annnotate:
             note = spc + "#Start date of emission"
         returnval += self.datestr + note + "\n"
         return returnval
@@ -560,20 +571,19 @@ class Species:
         self.wetdepstr = wstr
         # self.wetdep = 1
 
-    def strdep(self, annotate=True):
+    def strdep(self, annnotate=True):
         """Prints out five lines which define deposition
         and gravitational settling for species/pollutant
         in HYSPLIT control file"""
         note = ""
         spc = " " * 20
-        if annotate:
+        if annnotate:
             if self.shape < 0:
                 shapstr = "Ganser Formulation"
             if self.shape >= 0:
                 shapstr = "Stokes Formulation"
             shapstr = ""
-            note = spc + \
-                "#Particle diameter(um)   Density (g/cc),  Shape " + shapstr
+            note = spc + "#Particle diameter(um)   Density (g/cc),  Shape " + shapstr
         returnval = (
             "%05.1f" % self.psize
             + " "
@@ -583,10 +593,10 @@ class Species:
             + note
             + "\n"
         )
-        if annotate:
+        if annnotate:
             note = spc + "#Dry Deposition for gas or using resistance method "
         returnval += self.vel + note + "\n"
-        if annotate:
+        if annnotate:
             note = spc + "#Wet deposition parameters"
         # if self.wetdep == 1:
         if self.wetdepstr == "":
@@ -596,11 +606,11 @@ class Species:
             returnval += self.wetdepstr + note + "\n"
         # else:
         #    returnval += "0.0 0.0 0.0" + note + "\n"
-        if annotate:
+        if annnotate:
             note = spc + "#radioactive decay parameters"
         # line for radioactive decay half life
         returnval += str(self.decay) + note + "\n"
-        if annotate:
+        if annnotate:
             note = spc + "#resuspension from deposit"
         returnval += self.resuspension + note + "\n"  # line for resuspension factor
 
@@ -621,14 +631,14 @@ class NameList:
             working_directory += "/"
         self.wdir = working_directory
 
-    def print_help(self, order=None, sep=':'):
+    def print_help(self, order=None, sep=":"):
         rstr = ""
         if not order:
             order = self.descrip.keys()
         for key in order:
             rstr += key.ljust(10) + sep
             rstr += self.descrip[key]
-            rstr += '\n'
+            rstr += "\n"
         return rstr
 
     def add_n(self, nlist):
@@ -655,34 +665,31 @@ class NameList:
         """creates dictionary with description of namelist parameters
         """
         self.descrip["ichem"] = (
-            "Chemistry conversion modules.\n" +
-            "0:none, 1:matrix , 2:convert, 3:dust"
+            "Chemistry conversion modules.\n" + "0:none, 1:matrix , 2:convert, 3:dust"
         )
         self.descrip["qcycle"] = "Cycling of emission hours"
         self.descrip["delt"] = (
-            "integration time step\n" +
-            " (0=autoset, >0= constant ,<0=minimum)"
+            "integration time step\n" + " (0=autoset, >0= constant ,<0=minimum)"
         )
         self.descrip["kmixd"] = (
-            "Mixed layer obtained from \n" +
-            " 0:input, 1:temperature, 2: TKE",
+            "Mixed layer obtained from \n" + " 0:input, 1:temperature, 2: TKE",
         )
         self.descrip["kmix0"] = "mixing depth. 250 minimum"
         self.descrip["kzmis"] = (
-            "Vertical mixing profile." +
-            " 0:No adjustments." +
-            " 1: vertical diffusivity in PBL single" +
-            " average value"
+            "Vertical mixing profile."
+            + " 0:No adjustments."
+            + " 1: vertical diffusivity in PBL single"
+            + " average value"
         )
         self.descrip["kbls"] = (
-            "Stability computed by" "(1) Heat and momentum fluxes," +
-            " 2: Wind and temperature profiles" 
+            "Stability computed by"
+            "(1) Heat and momentum fluxes," + " 2: Wind and temperature profiles"
         )
         self.descrip["kblt"] = (
-            "Flag to set vertical turbulence computational" +
-            "method. 1:Beljaars/Holtslag" +
-            "(2):Kanthar/Clayson " +
-            " 3:TKE field 4:Velocity Variances"
+            "Flag to set vertical turbulence computational"
+            + "method. 1:Beljaars/Holtslag"
+            + "(2):Kanthar/Clayson "
+            + " 3:TKE field 4:Velocity Variances"
         )
         self.descrip["initd"] = "defines particle or puff mode"
 
@@ -726,20 +733,18 @@ class NameList:
                     key = key.lower()
                 self.nlist[key] = temp[1].strip(",")
 
-    def write(self, order=None, gem=False, verbose=False, overwrite=True,
-              query=False):
-        """ if gem=True then will write &GENPARM at beginning of file rather than &SETUP"""
+    def write(self, order=None, gem=False, verbose=False, overwrite=True, query=False):
+        """ if gem=True then will write &GENPARM at beginnning of file rather than &SETUP"""
 
-        rval = writeover(self.wdir + self.fname, overwrite, query,
-                         verbose=verbose)
-        if rval==-1:
-           return rval
+        rval = writeover(self.wdir + self.fname, overwrite, query, verbose=verbose)
+        if rval == -1:
+            return rval
 
         if order is None:
             order = []
         if verbose:
             print("WRITING SETUP FILE", self.wdir + self.fname)
-        with open(path.join(self.wdir,self.fname), "w") as fid:
+        with open(path.join(self.wdir, self.fname), "w") as fid:
             if gem:
                 fid.write("&GEMPARM \n")
             else:
@@ -750,16 +755,17 @@ class NameList:
                 kstr = True
                 try:
                     fid.write(key.lower() + "=" + self.nlist[key] + ",\n")
-                except BaseException:
-                    print("WARNING: " + str(key) + " " +
-                          str(self.nlist[key]) + " not str")
+                except ValueError:
+                    print(
+                        "WARNING: " + str(key) + " " + str(self.nlist[key]) + " not str"
+                    )
                     kstr = False
                 if not kstr:
                     fid.write(str(key) + "=" + str(self.nlist[key]) + ",\n")
             fid.write("/ \n")
+        return rval
 
-
-class ControlLoc(object):
+class ControlLoc:
     """Release location in HYSPLIT CONTROL file"""
 
     total = 0
@@ -769,8 +775,7 @@ class ControlLoc(object):
         """number of ControlLoc objects"""
         return ControlLoc.total
 
-    def __init__(self, line=False, latlon=(-1, -1),
-                 alt=10.0, rate=False, area=False):
+    def __init__(self, line=False, latlon=(-1, -1), alt=10.0, rate=False, area=False):
         """ Can either input a string (line from HYSPLIT CONTROL file) or can enter
             latlon = tuple (default(-1,-1))
             altitude= real (default (10.0))
@@ -787,8 +792,7 @@ class ControlLoc(object):
         ControlLoc.total += 1
 
     def copy(self):
-        return ControlLoc(False, self.latlon, self.alt,
-               self.rate, self.area)
+        return ControlLoc(False, self.latlon, self.alt, self.rate, self.area)
 
     def definition(self, line):
         """
@@ -799,23 +803,23 @@ class ControlLoc(object):
         temp = line.split()
         try:
             self.lat = float(temp[0])
-        except BaseException:
+        except ValueError:
             self.lat = -1
         try:
             self.lon = float(temp[1])
-        except BaseException:
+        except ValueError:
             self.lon = -1
         try:
             self.alt = float(temp[2])
-        except BaseException:
+        except ValueError:
             self.alt = 10.0
         try:
             self.rate = float(temp[3])
-        except BaseException:
-            self.rate = False
+        except ValueError:
+            self.rate = -999
         try:
             self.area = float(temp[4])
-        except BaseException:
+        except ValueError:
             self.area = False
         self.latlon = (self.lat, self.lon)
 
@@ -829,26 +833,22 @@ class ControlLoc(object):
         returnstr += "{:.4f}".format(self.latlon[1])
         returnstr += spc
         returnstr += "{:.1f}".format(self.alt)
-        if self.rate != -999 and self.rate != False:
-                returnstr += spc
-                returnstr += "{:.0f}".format(self.rate)
-        if self.rate != -999 and self.area != -999 and self.rate != False:
+        if self.rate != -999:
+            returnstr += spc
+            returnstr += "{:.0f}".format(self.rate)
+        if self.rate != -999 and self.area != -999:
             returnstr += spc
             returnstr += "{:.2E}".format(self.area)
         return returnstr
 
 
-class HycsControl(object):
+class HycsControl:
     """
        class which represents the HYSPLIT
        control file and all the information in it
     """
 
-    def __init__(
-            self,
-            fname="CONTROL",
-            working_directory="./",
-            rtype="dispersion"):
+    def __init__(self, fname="CONTROL", working_directory="./", rtype="dispersion"):
         self.fname = fname
         if working_directory[-1] != "/":
             working_directory += "/"
@@ -907,18 +907,9 @@ class HycsControl(object):
     def add_dummy_location(self):
         newloc = self.locs[0].copy()
         self.locs.append(newloc)
-        self.nlocs += 1 
-        
+        self.nlocs += 1
 
-    def add_location(
-            self,
-            line=False,
-            latlon=(
-                0,
-                0),
-            alt=10.0,
-            rate=False,
-            area=False):
+    def add_location(self, line=False, latlon=(0, 0), alt=10.0, rate=False, area=False):
         """add new emission location
            line: boolean
            latlon : tuple of floats
@@ -985,7 +976,9 @@ class HycsControl(object):
         """will replace the duration if already exists"""
         self.run_duration = duration
 
-    def write(self, annotate=False, metgrid=False, verbose=False, overwrite=True, query=False):
+    def write(
+        self, annnotate=False, metgrid=False, verbose=False, overwrite=True, query=False
+    ):
         """writes CONTROL file to text file
            self.wdir + self.fname
            metgrid option will write a 1 before the number of met files.
@@ -994,23 +987,21 @@ class HycsControl(object):
         """
         note = ""
         sp28 = " " * 28
- 
-        rval = writeover(self.wdir + self.fname, overwrite, query,
-                         verbose=verbose)
-        if rval==-1:
-           return rval
-                     
 
-        with open(path.join(self.wdir,self.fname), "w") as fid:
+        rval = writeover(self.wdir + self.fname, overwrite, query, verbose=verbose)
+        if rval == -1:
+            return rval
+
+        with open(path.join(self.wdir, self.fname), "w") as fid:
             fid.write(self.date.strftime("%y %m %d %H %M"))
-            if annotate:
+            if annnotate:
                 note = " " * 18 + "#Start date of simulation"
             fid.write(note + "\n")
-            if annotate:
+            if annnotate:
                 note = " " * 28 + "#Number of source locations"
             fid.write(str(self.nlocs) + note + "\n")
             iii = 0
-            if annotate:
+            if annnotate:
                 note = " " * 15 + "#Lat Lon Altitude"
             for source in self.locs:
                 fid.write(str(source))
@@ -1020,29 +1011,29 @@ class HycsControl(object):
                 iii += 1
                 fid.write("\n")
 
-            if annotate:
+            if annnotate:
                 note = sp28 + "#Duration of run"
             fid.write(str(int(self.run_duration)) + note + "\n")
-            if annotate:
+            if annnotate:
                 note = sp28 + "#Vertical Motion"
             fid.write(str(self.vertical_motion) + note + "\n")
-            if annotate:
+            if annnotate:
                 note = sp28 + "#Top of Model Domain"
             fid.write(str(self.ztop) + note + "\n")
-            if annotate:
+            if annnotate:
                 note = sp28 + "#Number of Meteorological Data Files"
             if metgrid:
-               fid.write('1 ')
+                fid.write("1 ")
             fid.write(str(self.num_met) + note + "\n")
             iii = 0
             for met in self.metfiles:
-                if annotate:
+                if annnotate:
                     note = "  #Meteorological Data Directory"
                 if iii > 0:
                     note = ""
                 fid.write(self.metdirs[iii])
                 fid.write(note + "\n")
-                if annotate:
+                if annnotate:
                     note = "  #Meteorological Data Filename"
                 if iii > 0:
                     note = ""
@@ -1051,39 +1042,39 @@ class HycsControl(object):
                 iii += 1
 
             # done writing if using for vmixing.
-            if self.rtype == 'vmixing':
-               return False
+            if self.rtype == "vmixing":
+                return False
 
             if self.rtype == "trajectory":
                 fid.write(self.outdir + "\n")
                 fid.write(self.outfile)
                 return False
 
-            if annotate:
+            if annnotate:
                 note = sp28 + "#Number of Pollutant Species"
             fid.write(str(self.num_sp) + note + "\n")
             iii = 0
             for sp in self.species:
-                if iii == 0 and annotate:
-                    fid.write(sp.strpollutant(annotate=True))
+                if iii == 0 and annnotate:
+                    fid.write(sp.strpollutant(annnotate=True))
                 else:
-                    fid.write(sp.strpollutant(annotate=False))
+                    fid.write(sp.strpollutant(annnotate=False))
                 iii += 1
             fid.write(str(self.num_grids) + "\n")
             for cg in self.concgrids:
-                if annotate:
-                    cg.set_annotate()
+                if annnotate:
+                    cg.set_annnotate()
                 fid.write(str(cg))
 
-            if annotate:
+            if annnotate:
                 note = sp28 + "#Number of Pollutant Species"
             fid.write(str(self.num_sp) + note + "\n")
             iii = 0
             for sp in self.species:
                 if iii == 0:
-                    fid.write(sp.strdep(annotate=annotate))
+                    fid.write(sp.strdep(annnotate=annnotate))
                 else:
-                    fid.write(sp.strdep(annotate=False))
+                    fid.write(sp.strdep(annnotate=False))
                 iii += 1
 
         return False
@@ -1110,15 +1101,14 @@ class HycsControl(object):
     #            self.locs.append(line.strip())
     #            self.nlocs += 1
 
-
-
-    def parse_num_met(self, line):
+    @staticmethod
+    def parse_num_met(line):
         temp = line.split()
         num1 = int(temp[0])
         try:
-           num2 = int(temp[1])
-        except: 
-           num2 = 1
+            num2 = int(temp[1])
+        except:
+            num2 = 1
         return num2 * num1
 
     def read(self, verbose=False):
@@ -1126,52 +1116,50 @@ class HycsControl(object):
         Read in control file.
         """
         with open(self.wdir + self.fname, "r") as fid:
-            contentA = fid.readlines()
+            contenta = fid.readlines()
             content = []
-            for ln in contentA:
+            for ln in contenta:
                 content.append(ln.split("#")[0])
             try:
                 self.date = datetime.datetime.strptime(
                     content[0].strip(), "%y %m %d %H"
                 )
-            except BaseException:
+            except ValueError:
                 self.date = datetime.datetime.strptime(
                     content[0].strip(), "%y %m %d %H %M"
                 )
             self.nlocs = int(content[1].strip())
-            zz = 2
-            for ii in range(zz, zz + self.nlocs):
+            zzz = 2
+            for ii in range(zzz, zzz + self.nlocs):
                 temploc = content[ii].strip()
                 self.locs.append(ControlLoc(line=temploc))
-            zz += self.nlocs
-            self.run_duration = content[zz].strip()
-            self.vertical_motion = content[zz + 1].strip()
-            self.ztop = content[zz + 2].strip()
+            zzz += self.nlocs
+            self.run_duration = content[zzz].strip()
+            self.vertical_motion = content[zzz + 1].strip()
+            self.ztop = content[zzz + 2].strip()
 
-            num_met = content[zz+3].strip()
-            self.num_met = self.parse_num_met(num_met) 
-            #self.num_met = int(content[zz + 3].strip())
+            num_met = content[zzz + 3].strip()
+            self.num_met = self.parse_num_met(num_met)
+            # self.num_met = int(content[zzz + 3].strip())
 
-
-
-            zz = zz + 4
-            for ii in range(zz, zz + 2 * self.num_met, 2):
+            zzz = zzz + 4
+            for ii in range(zzz, zzz + 2 * self.num_met, 2):
                 self.metdirs.append(content[ii].strip())
                 self.metfiles.append(content[ii + 1].strip())
-            zz = zz + 2 * self.num_met
+            zzz = zzz + 2 * self.num_met
             # if it is a trajectory control file then just
             # two more lines
-            if self.rtype == 'vmixing': 
+            if self.rtype == "vmixing":
                 return "Vmixing"
             if self.rtype == "trajectory":
-                self.outdir = content[zz]
-                self.outfile = content[zz + 1]
+                self.outdir = content[zzz]
+                self.outfile = content[zzz + 1]
                 return "Traj"
             # this is end of trajectory file
 
-            self.num_sp = int(content[zz])
-            zz += 1
-            for ii in range(zz, zz + 4 * self.num_sp, 4):
+            self.num_sp = int(content[zzz])
+            zzz += 1
+            for ii in range(zzz, zzz + 4 * self.num_sp, 4):
                 lines = []
                 spname = content[ii].strip()
                 lines.append(content[ii + 1])
@@ -1180,32 +1168,32 @@ class HycsControl(object):
                 sptemp = Species(spname)
                 if sptemp.definition(lines):
                     self.species.append(sptemp)
-            zz += 4 * self.num_sp
-            self.num_grids = int(content[zz].strip())
+            zzz += 4 * self.num_sp
+            self.num_grids = int(content[zzz].strip())
             self.concgrids = []
-            for ii in range(zz, zz + 10 * self.num_grids, 10):
+            for ii in range(zzz, zzz + 10 * self.num_grids, 10):
                 lines = []
                 spname = content[ii].strip()
-                for kk in range(1, 11):
-                    lines.append(content[ii + kk])
+                for jjj in range(1, 11):
+                    lines.append(content[ii + jjj])
                 sptemp = ConcGrid(spname)
                 if sptemp.definition(lines):
                     self.concgrids.append(sptemp)
-            zz += 10 * self.num_grids
-            zz += 1
-            temp = int(content[zz].strip())
+            zzz += 10 * self.num_grids
+            zzz += 1
+            temp = int(content[zzz].strip())
             if temp != self.num_sp:
                 print(
                     "warning: number of species for deposition",
                     " not equal to number of species",
                 )
-            nn = 0
-            for ii in range(zz, zz + 5 * self.num_sp, 5):
+            nnn = 0
+            for ii in range(zzz, zzz + 5 * self.num_sp, 5):
                 lines = []
-                for kk in range(1, 6):
-                    lines.append(content[ii + kk])
-                self.species[nn].define_dep(lines)
-                nn += 1
+                for jjj in range(1, 6):
+                    lines.append(content[ii + jjj])
+                self.species[nnn].define_dep(lines)
+                nnn += 1
             if verbose:
                 print("---------------------------")
                 print("CONTROL FILE")
@@ -1218,18 +1206,18 @@ class HycsControl(object):
                 print("Met directories ", self.metdirs)
                 print("Met files ", self.metfiles)
                 print("Num of species ", self.num_sp)
-                kk = 1
+                jjj = 1
                 for sp in self.species:
-                    print("-----Species ", str(kk), "---------")
+                    print("-----Species ", str(jjj), "---------")
                     print(sp.strpollutant())
                     print(sp.strdep())
-                    kk += 1
+                    jjj += 1
                     print("--------------")
-                kk = 1
+                jjj = 1
                 for grid in self.concgrids:
-                    print("-----Concentration Grid ", str(kk), "---------")
+                    print("-----Concentration Grid ", str(jjj), "---------")
                     print(grid)
-                    kk += 1
+                    jjj += 1
                     print("--------------")
                 print("---------------------------")
         return True
@@ -1241,12 +1229,8 @@ def roundtime(dto):
 
 
 def getmetfiles(
-        sdate,
-        runtime,
-        mfmt,
-        warn_file="MetFileWarning.txt",
-        mdir="./",
-        ):
+    sdate, runtime, mfmt, warn_file="MetFileWarning.txt", mdir="./",
+):
     """
        INPUTS:
        sdate : start date (datetime object)
@@ -1258,8 +1242,7 @@ def getmetfiles(
        mfiles : list strings
        names of files that cover the time from sdate to sdate + runtime.
     """
-    dt = datetime.timedelta(
-        days=1)  # step throgh file names one day at a time.
+    dt = datetime.timedelta(days=1)  # step throgh file names one day at a time.
     mfiles = []
     edate = sdate
     end_date = sdate + datetime.timedelta(hours=runtime)
@@ -1271,10 +1254,8 @@ def getmetfiles(
         if not path.isfile(mdir + temp):
             with open(warn_file, "a") as fid:
                 fid.write(
-                    "WARNING " +
-                    mdir +
-                    temp +
-                    " meteorological file does not exist\n")
+                    "WARNING " + mdir + temp + " meteorological file does not exist\n"
+                )
         else:
             mfiles.append(temp)
         edate = edate + dt

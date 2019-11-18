@@ -26,7 +26,7 @@ make_map
 make_hexbin
 
 """
-def test(options, d1, d2, area, source_chunks, 
+def autocorr(options, d1, d2, area, source_chunks, 
                      run_duration, logfile, rfignum):
     obs = create_obs(options, d1, d2, area, rfignum)
     obs.autocorr()
@@ -120,6 +120,11 @@ def options_obs_main(options, d1, d2, area, source_chunks,
 
     # create a MetObs object which specifically has the met data from the obs.
     meto = create_metobs(obs, options)
+    #meto.clustering_csv(options.tdir)
+
+    # plot histogram of wind speeds at two sites. 
+    #meto.plot_all_winds()
+    #sys.exit()
 
     # create map with obs and power plants (if source_summary file available)
     make_map(options, obs, d1, d2, area)
@@ -131,6 +136,7 @@ def options_obs_main(options, d1, d2, area, source_chunks,
          nei.load(options.tdir + 'neifiles/' + options.neiconfig)
          meto.add_nei_data(nei.df)
 
+    # plot 2d histograms of SO2 measurements and measured wind speeds. 
     make_hexbin(options, meto)
     plt.show()
 
@@ -140,25 +146,30 @@ def options_obs_main(options, d1, d2, area, source_chunks,
     return meto, obs
 
 
+#def make_map_nice(options, obs, d1, d2, area):
+    
+
+
 
     
 def make_map(options, obs, d1, d2, area):
     ################################################################################ 
     # Now create a geographic map.
+    txt=True
     fignum = obs.fignum
     if options.quiet == 1:
         plt.close("all")
         fignum = 1
-    figmap, axmap = create_map(fignum)
+    figmap, axmap, gl = create_map(fignum)
     figmap.set_size_inches(15,15)
     # put the obs data on the map
-    obs.map(axmap)
+    obs.map(axmap, txt=txt)
     print("map fig number  " + str(fignum))
     # put the cems data on the map if the source_summary file exists..
     if os.path.isfile(options.tdir + options.tag + ".source_summary.csv"):
         cemsum = SourceSummary(options.tdir, options.tag + ".source_summary.csv")
         #if not cemsum.sumdf.empty:
-        cemsum.map(axmap)
+        cemsum.map(axmap, txt=txt)
     # put the ISH sites on the map. 
     if options.ish > 0:
         #with open(logfile, 'a') as fid:
@@ -172,11 +183,15 @@ def make_map(options, obs, d1, d2, area):
         ishdata.print_summary('ISH_SUMMARY.csv')
 
     # Add NEI data
-    nei = NeiData(options.ndir)
+    if options.neiconfig:
+        nei = NeiSummary(options.tdir + 'neifiles/' + options.neiconfig)
+    else:
+        nei = NeiData(options.ndir)
     nei.load()
-    nei.filter(area)
+    if not options.neiconfig:
+        nei.filter(area)
+        nei.write_summary(options.tdir, options.tag + '.nei.csv')
     nei.map(axmap)
-    nei.write_summary(options.tdir, options.tag + '.nei.csv')
     plt.sca(axmap)
     plt.savefig(options.tdir + "map.jpg")
     if options.quiet < 2:

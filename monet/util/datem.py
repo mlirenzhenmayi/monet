@@ -116,6 +116,69 @@ def writedatem_sh(
     return outfile_list
 
 
+def frame2datem2(
+    dfile,
+    df,
+    fillval=-999,
+    header_str="Header",
+    writeover=True,
+    cnames=["date", "duration", "lat", "lon", "obs", "vals", "sid", "altitude"],
+):
+    """converts a pandas dataframe with columns names by cnames (date, duration, lat, lon, obs, vals, sid, altitude)
+       to a text file in datem format.
+       date should be a datetime object.
+       duration should be a string format HHMM (TODO- make this more flexible?)
+       lat - latitude, float
+       lon - longitude, float
+       obs - value of observation, float
+       vals - modeled value, float
+       sid  - station id, int or string
+       altitude - float 
+       extra columns can be written.
+
+    """
+    dlen = len(cnames)
+    blen = 8
+    iii = 0
+    df = df.fillna(fillval)
+    if writeover:
+        with open(dfile, "w") as fid:
+            fid.write(header_str + " (obs then model) " + "\n")
+            fid.write(
+                "Num Site Lat Lon  Yr Mo Da Hr Meas Calc "
+            )
+            #for iii in np.arange(blen,blen+(dlen-blen)):
+            #    fid.write(cnames[iii] +  '  ')
+            fid.write('\n')
+    iii=0 
+    with open(dfile, "a") as fid:
+        for index, row in df.iterrows():
+            fid.write(str(iii) + ' ')
+            write_site(row[cnames[6]], fid)
+            fid.write("%8.3f  %8.3f" % (row[cnames[2]], row[cnames[3]]))
+            fid.write(row[cnames[0]].strftime(" " + "%Y %m %d %H%M") + " ")
+            fid.write("%8.4f  %8.4f " % (row[cnames[4]], row[cnames[5]]))
+            iii+=1
+            fid.write('\n')
+
+def write_vals(val, fid):
+        if isinstance(row[cnames[iii]], int):
+            fid.write("%12i" % (row[cnames[iii]]))
+        elif isinstance(row[cnames[iii]], float):
+            fid.write("%12.2f" % (row[cnames[iii]]))
+        elif isinstance(row[cnames[6]], str):
+            fid.write("%12s  " % (row[cnames[iii]]))
+
+def write_site(site, fid):
+        if isinstance(site,  int):
+            fid.write("%12i" % site)
+        elif isinstance(site, float):
+            fid.write("%12i" % site)
+        elif isinstance(site, str):
+            fid.write("%12s  " % site)
+        else:
+            print("WARNING frame2datem function: not printing station id")
+        fid.write(" ")
 
 def frame2datem(
     dfile,
@@ -245,6 +308,8 @@ def read_dataA(fname):
             print(datem[0:10])
             sys.exit()
         datem.drop(["year", "month", "day", "hour", "minute"], axis=1, inplace=True)
+    #print('DATEM FILE loaded:', fname)
+    #print(datem[0:2])
     return datem
 
 

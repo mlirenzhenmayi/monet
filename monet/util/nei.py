@@ -139,7 +139,7 @@ class NeiSummary:
         return rstr
     
     def map(self, ax):
-        nei_map(ax, self.df, self.tons2kg)
+        nei_map(self.df, ax, self.tons2kg)
 
 
 class NeiData:

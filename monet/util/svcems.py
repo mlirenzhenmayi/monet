@@ -4,7 +4,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 import matplotlib
-matplotlib.use("TkAgg")
+#matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import datetime
 import seaborn as sns
@@ -54,9 +54,9 @@ def determine_color(mass, unit='lbs'):
     else:
         kg = mass 
     if kg  < 0.05: ms = 'g'
-    elif kg  < 1: ms = 'r'
-    elif kg  < 10: ms= 'c'
-    else: ms = 'b'
+    elif kg  < 1: ms = 'g'
+    elif kg  < 10: ms= 'r'
+    else: ms = 'r'
     return ms
 
 def determine_size(mass, unit='lbs'):
@@ -214,7 +214,7 @@ class CEMScsv:
             try:
                 val3 = " U" + str(hd[5])
             except:
-                val2 = ' Uall'
+                val3 = ' Uall'
             try:
                 cstr = hd[0] + " P" + str(hd[4])
             except:
@@ -268,7 +268,7 @@ class SourceSummary:
         self.tdir = tdir
         self.fname = fname
 
-    def map(self, ax):
+    def map(self, ax, txt=True):
         """plot location of emission sources"""
         # if self.cems.df.empty:
         #    self.find()
@@ -307,7 +307,8 @@ class SourceSummary:
                 #if loc in self.goodoris:
                 print('pl ' + str(loc) + ' ' + str(tothash[loc]) + ' ' + str(ms))
                 ax.plot(lon, lat, "ko", markersize=ms, linewidth=2, mew=1)
-                plt.text(lon, lat, (str(loc)), fontsize=12, color="red")
+                if txt:
+                    plt.text(lon+0.05, lat-0.05, (str(loc)), fontsize=15, color="b")
                 #else:
                 #    ax.text(lon, lat, str(int(loc)), fontsize=8, color="k")
 
@@ -837,7 +838,7 @@ class SEmissions(object):
         df = self.get_so2_sources(unit=unit)
         # unit in csv file is kg
         #print("CREATE CSV FILE ")
-        #self.make_csv(df.copy())
+        self.make_csv(df.copy())
         print("CREATE EMITIMES in SVCEMS ", tdir, ' Use day chunks ' +  str(schunks/24))
         # placeholder. Will later add routine to get heat for plume rise
         # calculation.
@@ -886,7 +887,7 @@ class SEmissions(object):
                 sys.exit()
             if d1 > self.d2:
                 done = True
-
+ 
     def emit_subroutine(
         self,
         df,
@@ -1105,6 +1106,7 @@ class SEmissions(object):
     def nowarning_plot(self, save=True, quiet=True, maxfig=10):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
+            print('PLOTTING CEMS')
             self.plot(save, quiet, maxfig)
 
 
@@ -1122,7 +1124,7 @@ class SEmissions(object):
             self.fignum +=1
  
             yearstr=sdate.strftime("%Y ")
-            plt.title(yearstr + 'Total for ' + str(oris) + " " + namehash[oris])
+            #plt.title(yearstr + 'Total for ' + str(oris) + " " + namehash[oris])
             plt.tight_layout()
             if save:
                 figname = self.tdir + "/cems." + str(oris) + ".jpg"
@@ -1189,6 +1191,8 @@ class SEmissions(object):
                 self.fignum += 1
                 jjj = 0
             fig = plt.figure(self.fignum)
+            sns.set()
+            sns.set_style('whitegrid')
             fig.set_size_inches(9,5)
             ax = fig.add_subplot(2, 1, 1)
             ax2 = fig.add_subplot(2, 1, 2)
@@ -1202,7 +1206,7 @@ class SEmissions(object):
                 print('Problem with plotting so2modc: ', ky)
                 md2 = False
  
-            ax.set_ylabel("SO2 mass kg")
+            ax.set_ylabel("SO2 mass released in one hour (kg)")
             ax2.set_ylabel("SO2 MODC value")
             plt.sca(ax)
             d1 = data.index.tolist()
@@ -1230,7 +1234,7 @@ class SEmissions(object):
                 locstr = str(loc) + "." + str(unit).strip()
             else:
                 locstr = str(loc)
-            plt.title(yearstr + locstr + " " + namehash[loc])
+            #plt.title(yearstr + locstr + " " + namehash[loc])
              
             if save:
                 locstr = locstr.replace('*','a')
@@ -1250,7 +1254,7 @@ class SEmissions(object):
 
 
 
-    def map(self, ax):
+    def map(self, ax, txt=True):
         """plot location of emission sources"""
         # if self.cems.df.empty:
         #    self.find()

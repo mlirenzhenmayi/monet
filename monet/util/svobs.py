@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import pickle as pickle
 import matplotlib
-matplotlib.use("TkAgg")
+#matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import datetime
 import sys
@@ -59,11 +59,14 @@ def find_obs_files(tdirpath, sdate, edate, ftype='obs', tag=None):
         for item in os.listdir(tdirpath):
             #if os.path.isfile(os.path.join(tdirpath,item)):
                if item[0:3] == ftype:
+                  
                   temp = item.split('.')
-                  file_start = datetime.datetime.strptime(temp[0],ftype+"%Y%m%d")
+                  try:
+                      file_start = datetime.datetime.strptime(temp[0],ftype+"%Y%m%d")
+                  except:
+                      continue
                   file_end = datetime.datetime.strptime(temp[1],"%Y%m%d")
                   file_end += datetime.timedelta(hours=23)
-
                   if sdate >=file_start and edate <=file_end:
                      fnamelist.append(item)
     return fnamelist
@@ -88,8 +91,8 @@ def generate_obs(siteidlist, obsfile):
     if not os.path.isfile(obsfile):
        print(obsfile + ' does not exist')
     odf = read_csv(obsfile, hdrs=[0])
-    print('HERE', odf[0:1])
-    print(odf.columns)
+    #print('HERE', odf[0:1])
+    #print(odf.columns)
     odf = odf[odf["variable"] == "SO2"]
     for sid in siteidlist:
         # gets a time series of observations at sid.
@@ -307,12 +310,19 @@ class SObs(object):
             # plt.title(str(sid) + '  (' + str(nickname) + ')' )
             plt.title(str(sid))
             ax.set_xlim(self.d1, self.d2)
-            ts.plot()
-            ms.plot()
+            ts2 = ts.sort_index()
+            ts2 = ts2.resample("H").asfreq(fill_value=-9)
+            ax.plot(ts2.index.tolist(), ts2.values, '-b.')
+            ax.plot(ms.index.tolist(), ms.values, '-r')
             if save:
                 figname = self.tdir + "/so2." + str(sid) + ".jpg"
                 plt.savefig(figname)
             if self.fignum > maxfig:
+                if not quiet:
+                    plt.show()
+                plt.close("all")
+                self.fignum = 0
+            else:
                 if not quiet:
                     plt.show()
                 plt.close("all")
@@ -439,6 +449,8 @@ class SObs(object):
     #    meto.from_obs(self.dfall)
     #    return meto
 
+
+
     def bysiteid(self, siteidlist):
         obs = self.obs[self.obs["siteid"].isin(siteidlist)]
         return obs         
@@ -467,9 +479,9 @@ class SObs(object):
             d3 = d1 + datetime.timedelta(hours=oe - 1)
             odir = date2dir(tdir, d1, dhour=oc, chkdir=True)
             dname = odir + "datem.txt"
-
             obs_util.write_datem(
-                self.obs, sitename="siteid", drange=[d1, d3], dname=dname
+                self.obs, sitename="siteid", drange=[d1, d3], dname=dname,
+                fillhours=1
             )
             d1 = d2 + datetime.timedelta(hours=1)
             iii += 1
@@ -501,7 +513,7 @@ class SObs(object):
     #        ar = ARtest(ts1, ts2)
              
 
-    def map(self, ax):
+    def map(self, ax, txt=True):
         """
         ax : map axes object?
         """
@@ -509,8 +521,21 @@ class SObs(object):
         plt.sca(ax)
         clr = sns.xkcd_rgb["cerulean"]
         # sns.set()
+        latmin = 90
+        lonmin = 180
+        latmax = 0
+        lonmax = 0
         for key in ohash:
             latlon = ohash[key]
-            plt.text(latlon[1], latlon[0], str(key), fontsize=7, color="red")
+            if latlon[1] < lonmin: lonmin = latlon[1]
+            if latlon[1] > lonmax: lonmax = latlon[1]
+            if latlon[0] < latmin: latmin = latlon[0]
+            if latlon[0] > latmax: latmax = latlon[0]
+            if txt: plt.text(latlon[1], latlon[0], str(key), fontsize=7, color="red")
             plt.plot(latlon[1], latlon[0], color=clr, marker="*")
-        return 1
+            with open('obs.csv', 'a') as fid:
+                 rstr = str(key) + ','
+                 rstr += str(latlon[1]) + ',' + str(latlon[0]) 
+                 rstr += '\n'
+                 fid.write(rstr)
+        return [latmin, latmax, lonmin, lonmax]

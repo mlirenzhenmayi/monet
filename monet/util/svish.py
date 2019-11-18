@@ -169,11 +169,12 @@ class Mverify(object):
 
     def map(self, ax):
         clr = sns.xkcd_rgb['royal blue'] 
+        clr = sns.xkcd_rgb['green'] 
         latlons = self.df['latlon'].unique()
         for loc in latlons:
             lat = loc[0]
             lon = loc[1]
-            ax.plot(lon, lat, color=clr, marker='+', markersize=3)
+            ax.plot(lon, lat, color=clr, marker='d', markersize=10, linewidth=10)
 
 
 

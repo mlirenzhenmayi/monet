@@ -192,3 +192,12 @@ def create_member_list_sref():
     return memberlist
 
 
+def create_member_list_srefA():
+    memberlist = []
+    for zzz in ['nmb','arw']:
+        for iii in range(1,7):
+            memberlist.append(zzz + '_n' + str(iii))
+            memberlist.append(zzz + '_p' + str(iii))
+        memberlist.append(zzz + '_ctl')
+    return memberlist
+

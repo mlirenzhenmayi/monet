@@ -57,8 +57,7 @@ def options_cems_main(options, d1, d2, area, source_chunks, logfile,
             heat=options.heat,
             emit_area=options.emit_area,
         )
-        return ef, rfignum
-
+        #return ef, rfignum
     # create plots of emissions
     if options.quiet == 0:
         ef.nowarning_plot(save=True, quiet=False)

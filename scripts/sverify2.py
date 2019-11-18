@@ -214,8 +214,8 @@ if oldrunlist:
        sss = SourceSummary(fname = options.tag + '.source_summary.csv')
        
        neidf = ns.load(fname = options.tdir + '/neifiles/' + options.neiconfig) 
-       ns.remove_cems(sss.sumdf)
-       ns.print(fname = options.tdir + '/neifiles/CONFIG.NEWNEI')
+       #ns.remove_cems(sss.sumdf)
+       #ns.print(fname = options.tdir + '/neifiles/CONFIG.NEWNEI')
        neidf = ns.df
        nei_runlist = nei_controls(options.tdir, options.hdir, neidf, d1, d2, source_chunks, options.metfmt,
                     units = options.cunits, tcm=tcmrun)
@@ -332,9 +332,12 @@ if options.vmix==1:
 if options.results:
     from monet.util import options_model
     from monet.util import nei
+    print('OPTIONS RESULTS')
     if not options.vmix==1: 
-        vmet = options_vmix.get_vmet(options, d1, d2, area, source_chunks,
-                                      logfile)
+        #vmet = meto
+        vmet = options_vmix.get_vmet(options, d1, d2, area,
+                                     source_chunks,logfile)
+        print('VMET', vmet)
         vmet.set_geoname(options.tag + '.geometry.csv')
         if options.neiconfig:
           ns = nei.NeiSummary()
@@ -373,4 +376,15 @@ if options.results:
 # So 1 particle in a 0.05 x 0.05 degree area is 0.067 ug/m3.
 # Need a 100 particles to get to 6.7 ug/m3.
 # This seems reasonable.
+
+
+# 0.01 x 0.01 degre area is about 1.23 km^2. 1.23e6m^2
+# 50 meter in the vertical gives 6.16e7 m^3.
+# Emissions are about 3000 lbs/hour (1360 kg)
+# 24,000 particles = 1360 kg
+# each particle is 0.056 kg or 56 g.
+# 1 particle in a grid square is about 1 ug/m3.
+# that doesn't seem great.
+# maybe with the hour averaging it is ok?
+
 

@@ -14,12 +14,14 @@ def options_run_main(options, d1,d2, source_chunks, tcmrun):
         metfmt = options.metfmt.replace('ENS', '')
         runlist = create_ensemble_controls(options.tdir, options.hdir,  d1, d2, source_chunks, metfmt,
                     units = options.cunits, tcm=tcmrun, orislist=None)
+    else:
+        runlist = options_deterministic(options, d1, d2, source_chunks, tcmrun) 
 
-
-def options_deterministic(options, d1, d2, source_chunks, tcmrun=False):
+def options_deterministic(options, d1, d2, source_chunks, tcmrun=False,
+                          main=True, vmix=False):
     runlist = []
-    with open(logfile, 'a') as fid:
-         fid.write('creating CONTROL files\n')
+    #with open(logfile, 'a') as fid:
+    #     fid.write('creating CONTROL files\n')
 
     if options.neiconfig:
        from monet.util import nei
@@ -46,33 +48,36 @@ def options_deterministic(options, d1, d2, source_chunks, tcmrun=False):
        #   options.tag + "_nei_datem.sh", nei_runlist, options.tdir, options.cunits, poll=1
        #   )
 
-    print('Creating CONTROL files')
-    runlist = create_controls(
-        options.tdir,
-        options.hdir,
-        d1,
-        d2,
-        source_chunks,
-        options.metfmt,
-        units = options.cunits,
-        tcm = tcmrun
-    )
-    if not runlist: 
-        print('No  CONTROL files created') 
-        print('Check if EMITIMES files have been created')
-    #else:
-    #    print('Creating batch script for HYSPLIT runs')
-    #    rs = RunScript(options.tag + ".sh", runlist, options.tdir)
-    #sys.exit()
-    print('Creating CONTROL files for vmixing')
-    runlist = create_vmix_controls(
-        options.tdir,
-        options.hdir,
+    if main:
+        print('Creating CONTROL files')
+        runlist = create_controls(
+            options.tdir,
+            options.hdir,
             d1,
             d2,
             source_chunks,
             options.metfmt,
+            units = options.cunits,
+            tcm = tcmrun
         )
-    if not runlist: 
-            print('No vmixing CONTROL files created. Check if datem.txt files exist')
+        if not runlist: 
+            print('No  CONTROL files created') 
+            print('Check if EMITIMES files have been created')
+    #else:
+    #    print('Creating batch script for HYSPLIT runs')
+    #    rs = RunScript(options.tag + ".sh", runlist, options.tdir)
+    #sys.exit()
+    vmix=False
+    if vmix:
+        print('Creating CONTROL files for vmixing')
+        runlist = create_vmix_controls(
+            options.tdir,
+            options.hdir,
+                d1,
+                d2,
+                source_chunks,
+                options.metfmt,
+            )
+        if not runlist: 
+                print('No vmixing CONTROL files created. Check if datem.txt files exist')
     return runlist

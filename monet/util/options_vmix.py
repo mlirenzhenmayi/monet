@@ -5,7 +5,7 @@ from monet.util.svobs import SObs
 from monet.util.svmet import vmixing2metobs
 from monet.util.svmet import metobs2matched
 from monet.util.svcems import CEMScsv
-
+import sys
 ##------------------------------------------------------##
 #vmet is a MetObs object.
 #vmetdf is the dataframe associated with that.
@@ -28,6 +28,7 @@ def get_vmet(options, d1, d2, area, source_chunks,
       vmet = vmixing2metobs(df,obs.obs)
    else:
       print('No vmixing data available')
+      sys.exit()
       vmet = vmixing2metobs(df, pd.DataFrame())
    return vmet
 
@@ -59,7 +60,7 @@ def options_vmix_main(options, d1, d2, area, source_chunks,
       if options.quiet < 2:
           quiet=False
       #vmet.plot_ts(quiet=quiet, save=True) 
-      #vmet.nowarning_plothexbin(quiet=quiet, save=True) 
+      vmet.nowarning_plothexbin(quiet=quiet, save=True) 
       if options.neiconfig:
           nei = NeiSummary()
           nei.load(options.tdir + 'neifiles/' + options.neiconfig)
@@ -71,7 +72,7 @@ def options_vmix_main(options, d1, d2, area, source_chunks,
          #vmet.conditionalA()         
       #sys.exit()
       vmet.conditional(quiet=quiet, save=True, varlist=['SO2']) 
-      #vmet.conditionalB(quiet=quiet, save=True) 
+      vmet.conditionalB(quiet=quiet, save=True) 
       vmet.to_csv(options.vdir, csvfile = options.tag + '.vmixing.'  + '.csv')
       #vmetdf = vmet.df
    else:

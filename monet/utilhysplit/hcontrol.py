@@ -24,6 +24,20 @@ FUNCTIONS
 """
 
 def writeover(name, overwrite, query, verbose=False):
+    """
+    checks if file already exits.
+    Inputs
+    name : str
+           filename
+    overwrite: boolean  
+           if True then will overwrite file if it exists.
+    query : boolean
+           if True then will ask for user input before overwriting a file
+    verbose : boolean  
+           if True will write messages
+    Outputs
+    rval : int
+    """
     rval = 1
     if path.isfile(name):
           print('file already exists ' +  name)
@@ -59,7 +73,7 @@ def writelanduse(landusedir, working_directory="./", overwrite=True,
     """
     rval = writeover(working_directory + 'ASCDATA.CFG', overwrite, query,
                          verbose=silent)
-    with open(working_directory + "ASCDATA.CFG", "w") as fid:
+    with open(path.join(working_directory,"ASCDATA.CFG"), "w") as fid:
         fid.write("-90.0  -180.0 \n")
         fid.write("1.0    1.0    \n")
         fid.write("180    360    \n")
@@ -725,7 +739,7 @@ class NameList:
             order = []
         if verbose:
             print("WRITING SETUP FILE", self.wdir + self.fname)
-        with open(self.wdir + self.fname, "w") as fid:
+        with open(path.join(self.wdir,self.fname), "w") as fid:
             if gem:
                 fid.write("&GEMPARM \n")
             else:
@@ -987,7 +1001,7 @@ class HycsControl(object):
            return rval
                      
 
-        with open(self.wdir + self.fname, "w") as fid:
+        with open(path.join(self.wdir,self.fname), "w") as fid:
             fid.write(self.date.strftime("%y %m %d %H %M"))
             if annotate:
                 note = " " * 18 + "#Start date of simulation"

@@ -292,6 +292,7 @@ def read_vmix(tdirpath, sdate, edate, timechunks, sid=None, verbose=False):
     for dirpath in dtree:
         for (d1, dirnames, filenames) in walk(dirpath):
              for fl in filenames:
+                 print(d1, fl)
                  test=True
                  if 'STABILITY' in fl:
                      if not sid or str(sid) in fl:
@@ -575,7 +576,6 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
        hdirpath += '/'
     hysplitdir = hdirpath + "exec/"
     landusedir = hdirpath + "bdyfiles/"
-    print('LANDUSEDIR', landusedir, hdirpath)
     dtree = dirtree(tdirpath, sdate, edate, chkdir=False, dhour=timechunks)
     iii = 0
     # for (dirpath, dirnames, filenames) in walk(tdirpath):
@@ -600,8 +600,6 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                 if make:
                     suffix = fl[4:8]
                     temp = fl.split(".")
-                    # print(temp)
-                    # print('************')
                     if temp[1] != "txt":
                         suffix += "." + temp[1]
                     else:
@@ -609,7 +607,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     wdir = dirpath
                     # read emitfile and modify number of locations
                     et = emitimes.EmiTimes(filename=dirpath + "/" + fl)
-                    print(dirpath, fl)
+                    #print(dirpath, fl)
                     et_not_empty = et.read_file()
                     # if the emittimes file not empty then
                     if et_not_empty: 
@@ -691,7 +689,7 @@ def create_controls(tdirpath, hdirpath, sdate, edate, timechunks, metfmt, units=
                     metchunks = timechunks + moffset
                     #mfiles = met_files.get_files(control.date, timechunks)
                     mfiles = met_files.get_files(mdate, metchunks)
-                    print(mfiles)
+                    #print(mfiles)
                     print(mdate, metchunks)
                     print(control.date, timechunks)
                     for mf in mfiles:
@@ -844,7 +842,7 @@ class RunScriptClass:
 class VmixScript(RunScriptClass):
 
     def mstr(self, run):
-        rstr= '$MDL/vmixing -a2 -p' + run.suffix
+        rstr= '$MDL/vmixing -a2 -p' + run.suffix + ' &' 
         rstr += '\n'
         return rstr
 

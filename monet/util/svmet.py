@@ -1,19 +1,22 @@
 import pandas as pd
 import numpy as np
 import matplotlib
-matplotlib.use("TkAgg")
+#matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import datetime
 #import sys
 import seaborn as sns
 import warnings
 from monet.utilhysplit import statmain
-
+import pylab as pl
 # from arlhysplit.models.datem import mk_datem_pkl
 #from monet.obs.epa_util import convert_epa_unit
 from monet.util import tools
 from monet.util import ptools
 from monet.util.svan1 import geometry2hash
+from matplotlib.ticker import MultipleLocator
+import matplotlib.colors as colors
+
 
 """
 FUNCTIONS
@@ -26,6 +29,7 @@ CLASSES
 MetObs
 
 """
+
 
 
 def obs2metobs(obsobject):
@@ -52,13 +56,20 @@ def vmixing2metobs(vmix, obs):
         print(obs['sid'].unique())
         print(vmix['sid'].unique())
 
+        # we are mergint this left onto the obs.
+        # what happens if the obs are missing?
+        # seems like we should fill in missing values for the obs.
+
+        # use an outer join because vmix will have data for every hour.
+        # this should put Nan values in missing obs sites.
         dfnew = pd.merge(obs,
                          vmix,
-                         how='left',
+                         how='outer',
                          left_on=['date','sid'],
                          right_on=['date','sid']
                          )
         dfnew = dfnew.drop_duplicates()
+        dfnew.fillna({'so2':-9}, inplace=True)
         print('vmix2obs---', dfnew[-10:])
         met.from_vmix(dfnew)
     return met
@@ -67,12 +78,43 @@ def heatmap(x,y, ax, bins=(50,50)):
     heatmap, xedges, yedges = np.histogram2d(x,y, bins=(bins[0],bins[1]))
     extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
     cb = ax.imshow(heatmap, extent=extent)
+
+def hexbin(x,y,ax,sz=[23,15],mincnt=1, cbar=True):
+    #cm='Paired'
+    x = list(x) 
+    y = list(y) 
+    print('TYPE', type(x), '---', type(y))
+    cm=sns.cubehelix_palette(8, start=0.5, rot=-0.75, as_cmap=True,
+                             reverse=False, light=0.70)
+    #cm = sns.color_palette("Blues")
+  
+    print('max', np.max(x)) 
+    print('min', np.min(x)) 
+    r1 = [0,360]
+    r2 = [0,15]
+    r3 = [0,24]
+ 
+    cb = ax.hist2d(x,y, norm=colors.LogNorm(), cmap=cm, bins=[23,15], 
+                                              range=[r3, [-2,200]])
+    #heatmap, xedges, yedges = np.histogram2d(x,y, bins=(sz[0],sz[1]),
+    #                                          range=[[0,360], [-2,200]])
+    #extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+    #cb = ax.imshow(heatmap, extent=extent)
+    #cb = ax.hist2d(x,y, cmap=cm)
+    if cbar: 
+       bar = plt.colorbar(cb[3], ax=ax)
+       bar.ax.tick_params(labelsize=15)    
+
     
-def hexbin(x,y,ax,sz=50,mincnt=1, cbar=True):
-    cm='Paired'
-    cm=sns.cubehelix_palette(8, start=0, rot=0.5, as_cmap=True, reverse=False)
-    cb = ax.hexbin(x,y, gridsize=sz, cmap=cm, mincnt=mincnt)
-    if cbar: plt.colorbar(cb)
+def hexbinb(x,y,ax,sz=[23,15],mincnt=1, cbar=True):
+    #cm='Paired'
+    cm=sns.cubehelix_palette(8, start=0.5, rot=-0.75, as_cmap=True,
+                             reverse=False, light=0.70)
+    #cm = sns.color_palette("Blues")
+    cb = ax.hexbin(x,y, gridsize=sz, bins='log', cmap=cm, mincnt=mincnt)
+    if cbar: 
+       bar = plt.colorbar(cb, ax=ax)
+       bar.ax.tick_params(labelsize=15)    
 
 def myhistA(hhh, ax, bins=None, label=None):
     # same as myhist except use snsdistplot
@@ -101,15 +143,21 @@ def get_line_width(eis, neidf ):
     # using under options_obs.csv.
     # So if the CONFIG.NEI file changes between when that was done and here,
     # values may not match.
-
+       #return 1, 'r', 'unknown'
+    return 3, sns.xkcd_rgb['magenta'], 'unknown'
     if neidf.empty:
-       return 1, 'r', 'unknown'
+       #return 1, 'r', 'unknown'
+       return 4, sns.xkcd_rgb['magenta'], 'unknown'
     df = neidf[neidf['EIS_ID'].str.contains(eis.replace('EIS',''))]  
     if df.empty:
        #print(eis, ' empty')
        return 1, '-c', 'unknown'
     tp = df.iloc[0]['naics']
     facility=df.iloc[0]['facility']
+    return 4, sns.xkcd_rgb['magenta'], facility
+
+
+
     if tp.strip() == '221112':
         clr = 'm'
     elif 'LLC' in tp:
@@ -200,12 +248,12 @@ def addplants(site, ax, ymax=20, dthresh=150, add_text=True,
               geoname='geometry.csv', neidf=pd.DataFrame()):
     # add vertical lines with direction to power plants to the
     # 2d histogram of so2 concentration vs. wind speed.
-    add_text=True 
+    #add_text=True 
     # tlist is list of tuples with information on each source.
     tlist, nlen = addplants_subA(site, geoname, dthresh)
     orislist, textra = addplants_subB(tlist, ymax, neidf, dthresh)
     for  val in textra:     
-         #print(val)
+         print(val)
          ax.plot([val[0], val[0]], [0,val[1]], linewidth=val[4], color=val[5])
          if add_text:
              ax.text(val[0]+1, val[1], val[2],fontsize=8, color="blue")
@@ -343,6 +391,81 @@ def metobs2matched(met1, met2):
             #print('-*-*-*-*')
     return mdlist 
   
+class Reliability(object):
+
+    def __init__(self, num_models):
+        return -1   
+
+    def reliability_init(self):
+        num = self.get_num_models()
+        self.binlist = list(np.arange(0,1, 1.0/num) + 1.0/(num*10))
+        self.binlist.append(1)
+        print('BINLIST', self.binlist)
+        #self.binlist = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+        self.yeshash = {}
+        self.nohash = {}
+        for binval in self.binlist:
+            self.yeshash[binval] = 0
+            self.nohash[binval] = 0
+        self.thresh = 2.5
+
+    def reliability_add(self, obs, prob):
+        df = pd.concat([obs, prob], axis=1)
+        df.dropna(axis=0, inplace=True)
+        cols = ['obs','prob']
+        df.columns = cols
+        #print(type(df))
+        #print(df[0:10])
+        for index, row in df.iterrows():
+            prob = row['prob'] 
+            for pbin in self.binlist:
+                #print(prob, pbin)
+                if prob <= pbin: 
+                   binval = pbin
+                   print('break', binval, prob)
+                   break 
+            if row['obs'] >= self.thresh:
+               self.yeshash[binval] += 1
+            else:
+               self.nohash[binval] += 1
+
+    def reliability_plot(self):
+        xxx = []
+        yyy = []
+        nnn = []
+        yesval = []
+        noval = []
+        for binval in self.binlist:
+            x = binval
+            # total number of counts.
+            n = self.yeshash[binval] + self.nohash[binval]
+            if n != 0:
+                noval.append(self.nohash[binval])
+                yesval.append(self.yeshash[binval])
+                y = self.yeshash[binval] / n
+                xxx.append(x)
+                yyy.append(y)
+                nnn.append(n)
+        fig = plt.figure(1)
+        ax1 = fig.add_subplot(2,1,1)
+        ax2 = fig.add_subplot(2,1,2)   
+        ax1.plot(xxx,yyy, '-g.')
+        ax1.plot([0,1], [0,1], '-k')
+        ax2.plot(xxx, nnn, '-b.')
+        ax2.set_yscale('log')
+        #ax1.set_ylim(bottom=1)  
+        plt.savefig('reliability.jpg')
+ 
+        fig2 = plt.figure(2)
+        ax3 = fig2.add_subplot(1,1,1)
+        print('MEAS > thresh', yesval)
+        print('MEAS < thresh', noval)
+        plt.plot(xxx, yesval, '-g.')
+        plt.plot(xxx, noval, '-r.')
+        plt.show()
+
+    
+
 
 class MetObs(object):
     """
@@ -520,6 +643,13 @@ class MetObs(object):
         self.columns_original = self.df.columns.values
         self.rename_columns()
         self.isempty()      
+
+
+    def add_obs(self, obs):
+        df = tools.long_to_wideB(obs)
+        self.rename_columns()
+        testcols = ['WD','RH','TEMP','WS']
+        overlap = [x for x in testcols if x in self.df.columns.values]
  
     def from_obs(self, obs):
         # Currenlty this overwrites anything that used to be in self.df
@@ -549,7 +679,11 @@ class MetObs(object):
                 df = df.drop([val], axis=1)
         print(self.columns_original)
         print(df.columns.values)
-        df.columns = self.columns_original
+        try:
+            df.columns = self.columns_original
+        except:
+            print('WARNING columns not matching', df.columns.values,
+                   self.columns_original)
         df.to_csv(tdir + "met" + csvfile, header=True, float_format="%g")
           
  
@@ -568,7 +702,8 @@ class MetObs(object):
         if self.df.empty: return []
         return self.df['siteid'].unique()
    
-    def rename_columns(self):
+    def rename_columns(self, df=pd.DataFrame()):
+        #if df.empty
         newc = []
         for col in self.df.columns.values:
             if isinstance(col, tuple):
@@ -593,19 +728,33 @@ class MetObs(object):
             warnings.simplefilter("ignore")
             self.plot_ts(save, quiet)
 
+    def get_num_models(self):
+        model_list = self.model.keys()
+        return len(model_list)      
 
-    def add_model_ts(self, sid, tp='ORIS', model_list=None ):
+    def add_model_ts(self, sid, tp='ORIS', model_list=None, levlist=None ):
         if not model_list:
            model_list = self.model.keys()
         for mmm in model_list:
             model = self.model[mmm]
             elist, slist = model.sourcelist()
-            model_ts = model.group(sid, stypelist=[tp])
+            model_ts = model.group(sid, stypelist=[tp], levlist=levlist)
             model_ts.set_index('date', inplace=True)
-            yield mmm, model_ts['model']
+            rval = model_ts['model']
+            # the dataA files don't include 0,0 pairs so fill in missing with 0.
+            rval = rval.resample("H").asfreq(fill_value=0)
+            yield mmm, rval
 
+    def clustering_csv(self,tdir):
+        slist = self.get_sites()
+        for site in slist:
+            df = self.df[self.df['siteid'] == site]
+            df = df[['time','SO2','WDIR','WS']]
+            df = df.set_index('time')
+            df.to_csv(tdir + str(site) + "met.csv",  header=True, float_format="%g")
 
-    def plot_ts(self, save=True, quiet=False):
+    def plot_cdf(self, levlist=None, save=True, quiet=False, thresh=2.5):
+        from monet.utilhysplit import statmain
         if self.df.empty: return -1
         sns.set()
         sns.set_style('whitegrid')
@@ -615,24 +764,570 @@ class MetObs(object):
             fig.set_size_inches(15,5)
             # re-using these axis produces a warning.
             ax1 = fig.add_subplot(1,1,1)
+            #ax2 = ax1.twinx()
+            df = self.df[self.df['siteid'] == site]
+            df = df.set_index('time')
+            so2 = df['SO2']
+           
+            iii=0
+            jjj=0
+            clrs = ['-g','-m', '-r','-c','-b','-y'] 
+            #df = pd.DataFrame()
+            #cols=[]
+            ktest = []
+            for lev in levlist:
+                df = pd.DataFrame()
+                cols=[]
+                for name, oris_ts in self.add_model_ts(site, tp='ORIS',
+                                                        levlist=lev):
+                    print(type(oris_ts))
+                    mcdf,y = statmain.cdf(oris_ts)
+                    ax1.step(mcdf, y, '-r')
+                    ktest.append(statmain.kstest_answer(so2, oris_ts))
+            obs_cdf, obsy = statmain.cdf(so2)
+            ax1.step(obs_cdf, obsy, '-k')
+            ax1.set_xscale('log')
+            ax1.set_xlim(left=1)
+            plt.title(str(site))
+            plt.show()
+            plt.plot(ktest, 'b.')
+            plt.show()
+
+
+    def plot_spag(self, levlist=None, save=True, quiet=False, thresh=2.5):
+        if self.df.empty: return -1
+        sns.set()
+        sns.set_style('whitegrid')
+        slist = self.get_sites()
+        for site in slist:
+            fig = plt.figure(self.fignum)
+            fig.set_size_inches(15,5)
+            # re-using these axis produces a warning.
+            ax1 = fig.add_subplot(1,1,1)
+            #ax2 = ax1.twinx()
+            df = self.df[self.df['siteid'] == site]
+            df = df.set_index('time')
+            so2 = df['SO2']
+            iii=0
+            jjj=0
+            clrs = ['-g','-m', '-r','-c','-b','-y'] 
+            #df = pd.DataFrame()
+            #cols=[]
+            for lev in levlist:
+                df = pd.DataFrame()
+                cols=[]
+                for name, oris_ts in self.add_model_ts(site, tp='ORIS',
+                                                        levlist=lev):
+                    #ocolor = sns.xkcd_rgb['grey']
+                    #ax1.plot(oris_ts, ocolor, linewidth=1 )  
+                    if jjj==0: 
+                       df = pd.DataFrame(oris_ts)
+                    else:
+                       df = pd.concat([df, oris_ts], axis=1) 
+                    jjj+=1
+                    cols.append(name)
+                print(df[0:5])
+                print(cols)
+                df.columns = cols
+                df2 = df.copy()
+                df['mean'] = df.mean(axis=1)
+                df['max'] = df.max(axis=1) 
+                df['min'] = df.min(axis=1) 
+                df2 = df2.T
+                vals = (df2[df2 > thresh].count()) /len(cols)
+                print('PROBS', len(cols), vals)
+                #ax2.plot(vals, clrs[iii], linewidth=1) 
+                yval = df['mean'].values 
+                xval = df.index.tolist()
+                maxval = df['max'].values
+                minval = df['min'].values
+                ocolor = sns.xkcd_rgb['magenta']
+                ocolor = sns.xkcd_rgb['cerulean']
+                ocolor = sns.xkcd_rgb['ocean blue']
+                #ocolor = sns.xkcd_rgb['darker pink']
+                ax1.plot(xval, yval, ocolor, linewidth=3)
+                ax1.set_yscale('log')
+                ax1.set_ylim(bottom=1)
+                ax1.fill_between(xval, minval, maxval, alpha=0.4,\
+                                 #facecolor=clrs[iii].replace('-','')) 
+                                 facecolor=ocolor) 
+                iii+=1
+            ax1.plot(so2.sort_index(), '-k', linewidth=2)
+            ax1.set_ylabel('so2 (ppb)')
+            #ax2.set_ylabel('Wind direction (degrees)')
+            #ax2.grid(False, which='both')
+            ptools.set_date_ticksB(ax1)
+            ax1.grid(True, which='both')
+            plt.title(str(site))
+            fig.autofmt_xdate()
+            tag = self.tag
+            if not tag: tag = ''
+            plt.savefig(tag + str(site) + '.spag.jpg')
+            plt.show()
+
+    def plot_hist(self, levlist, save=True, quiet=False, thresh=2.5):
+        model_list = self.model.keys()
+        if self.df.empty: return -1
+        sns.set()
+        sns.set_style('whitegrid')
+        slist = self.get_sites()
+        self.date2hour()
+
+        self.reliability_init(thresh=thresh)
+        for model in model_list:
+          for site in slist:
+            fig = plt.figure(self.fignum)
+            fig.set_size_inches(15,5)
+            # re-using these axis produces a warning.
+            ax1 = fig.add_subplot(1,1,1)
             ax2 = ax1.twinx()
+            #ax3 = fig.add_subplot(2,1,2)
+            #ax3 = ax1.twinx()
+            df = self.df[self.df['siteid'] == site]
+
+            #df = df[df['hour'] <= 21]
+            #df = df[df['hour'] >= 12]
+            df = df[df['WS'] < 5]
+            df = df[df['WS'] >= 2]
+            df = df.set_index('time')
+            so2 = df['SO2']
+            print(df.columns.values)
+            mval = 'MixHgt'
+            wdir = df[mval]
+            #ax2.plot(wdir, 'b.', markersize=4)
+            #ax1.plot(so2, '-k')
+            #print('MODEL LIST', self.model_list)
+            iii=0
+            jjj=0
+            clrs = ['-g','-m', '-r','-c','-b','-y'] 
+            clrs = [sns.xkcd_rgb['brownish yellow']]
+            for name, oris_ts in self.add_model_ts(site, tp='ORIS',
+                                                        levlist=lev):
+                    if jjj==0: 
+                       df = pd.DataFrame(oris_ts)
+                    else:
+                       df = pd.concat([df, oris_ts], axis=1) 
+                    jjj+=1
+                    cols.append(name)
+        
+
+
+    def plot_prob(self, levlist=None, save=True, quiet=False, thresh=2.5):
+        if self.df.empty: return -1
+        sns.set()
+        sns.set_style('whitegrid')
+        slist = self.get_sites()
+        self.date2hour()
+
+        for site in slist:
+            fig = plt.figure(self.fignum)
+            fig.set_size_inches(15,5)
+            # re-using these axis produces a warning.
+            ax1 = fig.add_subplot(1,1,1)
+            ax2 = ax1.twinx()
+            #ax3 = fig.add_subplot(2,1,2)
+            #ax3 = ax1.twinx()
+            df = self.df[self.df['siteid'] == site]
+
+            #df = df[df['hour'] <= 21]
+            #df = df[df['hour'] >= 12]
+            #df = df[df['WS'] < 5]
+            #df = df[df['WS'] < 2]
+            df = df.set_index('time')
+            so2 = df['SO2']
+            vpi = so2==-9
+            so2[vpi] = float('Nan') 
+            print(df.columns.values)
+            mval = 'MixHgt'
+            wdir = df[mval]
+            #ax2.plot(wdir, 'b.', markersize=4)
+            #ax1.plot(so2, '-k')
+            #print('MODEL LIST', self.model_list)
+            iii=0
+            jjj=0
+            clrs = ['-g','-m', '-r','-c','-b','-y'] 
+            clrs = [sns.xkcd_rgb['grass green']]
+            #df = pd.DataFrame()
+            #cols=[]
+            self.reliability_init(thresh=thresh)
+            for lev in levlist:
+                df = pd.DataFrame()
+                cols=[]
+                for name, oris_ts in self.add_model_ts(site, tp='ORIS',
+                                                        levlist=lev):
+                    if jjj==0: 
+                       df = pd.DataFrame(oris_ts)
+                    else:
+                       df = pd.concat([df, oris_ts], axis=1) 
+                    jjj+=1
+                    cols.append(name)
+                print(df[0:5])
+                print(cols)
+                df.columns = cols
+                df2 = df.copy()
+                df['mean'] = df.mean(axis=1)
+                df['max'] = df.max(axis=1) 
+                df['min'] = df.min(axis=1) 
+                df2 = df2.T
+                vals = (df2[df2 > thresh].count()) /len(cols)
+                #ax1.plot(oris_ts, clrs[iii], label=name)  
+                ax2.plot(vals, clrs[iii], linewidth=2, alpha=0.7) 
+                ax2.set_yticks([0,0.2,0.4,0.6,0.8,1.0])
+                ax2.set_yticklabels(['0','1','2','3','4','5'])
+                ax2.tick_params(axis='y', which='major', labelsize=20)
+                ax2.grid(b=None, which='major', axis='y')
+                yval = df['mean'].values 
+                xval = df.index.tolist()
+                maxval = df['max'].values
+                minval = df['min'].values
+                #ax1.plot(xval, yval, clrs[iii], linewidth=2)
+                #ax1.fill_between(xval, minval, maxval, alpha=0.4,\
+                #                 facecolor=clrs[iii].replace('-','')) 
+                iii+=1
+            #for name, eis_ts in self.add_model_ts(site, tp='NEI'):
+            #    ax1.plot(eis_ts, '-g.', label=name)  
+            ax1.plot(so2.sort_index(), '-k', linewidth=2)
+            #ax1.set_ylabel('SO2 (ppb)')
+            #ax2.set_ylabel('Wind direction (degrees)')
+            #ax2.set_ylabel('Probability of C > 2.5 ppb')
+            #ax2.grid(False, which='both')
+
+            xdata = so2.index.tolist()
+            dt = datetime.timedelta(hours=5*24)
+            right = xdata[-1] -dt
+            right = datetime.datetime(2018,6,10,0)
+            #ax2.set_xlim(left = xdata[0], right=right)  
+            ptools.set_date_ticksC(ax1)
+            #ax1.set_xlim(left = xdata[0], right=right)  
+            ax1.grid(True, which='both')
+            #plt.title(str(site))
+            fig.autofmt_xdate()
+            tag = self.tag
+            if not tag: tag = ''
+            plt.savefig(tag + str(site) + '.prob.jpg')
+            plt.show()
+            plt.close()
+            self.reliability_add(so2, vals)
+        self.reliability_plot()
+
+            
+    def reliability_init(self, thresh):
+        num = self.get_num_models()
+        self.binlist = list(np.arange(0,1, 1.0/num) + 1.0/(num*10))
+        self.binlist.append(1)
+        #self.binlist = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+        self.yeshash = {}
+        self.nohash = {}
+        for binval in self.binlist:
+            self.yeshash[binval] = 0
+            self.nohash[binval] = 0
+        self.thresh = thresh
+
+    def reliability_add(self, obs, prob):
+        df = pd.concat([obs, prob], axis=1)
+        df.dropna(axis=0, inplace=True)
+        cols = ['obs','prob']
+        df.columns = cols
+        #print(type(df))
+        #print(df[0:10])
+        for index, row in df.iterrows():
+            prob = row['prob'] 
+            for pbin in self.binlist:
+                if prob <= pbin: 
+                   binval = pbin
+                   #print('break', binval)
+                   break 
+            if row['obs'] >= self.thresh:
+               self.yeshash[binval] += 1
+            else:
+               self.nohash[binval] += 1
+
+    def reliability_plot(self):
+        xxx = []
+        yyy = []
+        nnn = []
+        yesval = []
+        noval = []
+        for binval in self.binlist:
+            x = binval
+            n = self.yeshash[binval] + self.nohash[binval]
+            if n != 0:
+                noval.append(self.nohash[binval])
+                yesval.append(self.yeshash[binval])
+                y = self.yeshash[binval] / n
+                xxx.append(x)
+                yyy.append(y)
+                nnn.append(n)
+        fig = plt.figure(1)
+        ax1 = fig.add_subplot(2,1,1)
+        ax2 = fig.add_subplot(2,1,2)   
+        ax1.plot(xxx,yyy, '-g.')
+        ax1.plot([0,1], [0,1], '-k')
+        ax2.plot(xxx, nnn)
+        ax2.set_yscale('log')
+        plt.savefig('reliability.jpg')
+        fig2 = plt.figure(2)
+        ax3 = fig2.add_subplot(1,1,1)
+        #with open('reliability.txt', 'w') as fid:
+        #    fid.write(yesval)
+        #    print(noval)
+        print('meas > thresh', yesval)
+        print('meas < thresh', noval)
+        plt.plot(xxx, yesval, '-g.')
+        plt.plot(xxx, noval, '-r.')
+        plt.show()
+        plt.show()
+
+    def plot_all_winds(self):
+        # check the relationship  between winds at different sites
+        if self.df.empty: return -1
+        sns.set()
+        sns.set_style('whitegrid')
+        slist = self.get_sites()
+        self.date2hour()
+        fig2 = plt.figure(self.fignum+1)
+        fig2.set_size_inches(20,5)
+        axh1 = fig2.add_subplot(1,3,1)
+        wlist = {}
+
+        df = self.df.copy()
+        print(df[0:10])
+        #df = df[df['hour'] > 12]
+        #df = df[df['hour'] > 21]
+        #df = df[df['WS'] >=  2 ]
+        # this would result in looking only at times they both had
+        # concentrations greater than this.
+        #df = df[df['SO2'] >=  2.5 ]
+        print(df[0:10])
+        df = pd.pivot_table(df, values=['WDIR'], columns=['siteid'],
+                            index='time')
+        df.dropna(axis=0, inplace=True)
+
+        a = sns.PairGrid(df)
+        a.map_diag(sns.distplot)
+        a.map_offdiag(sns.jointplot, kind='hex')
+        plt.show()
+        #c = df.columns.values
+        #df['diff'] = df.apply(lambda row: degdiff(row[c[0]], row[c 
+
+
+    def plot_model_hex(self, levlist=None, save=True, quiet=False, tag=None):
+
+        if self.df.empty: return -1
+        sns.set()
+        sns.set_style('whitegrid')
+        slist = self.get_sites()
+        self.date2hour()
+        for site in slist:
+
+            fig2 = plt.figure(self.fignum+1)
+            fig2.set_size_inches(20,5)
+            axh1 = fig2.add_subplot(1,3,1)
+            axh2 = fig2.add_subplot(1,3,2)
+            axh3 = fig2.add_subplot(1,3,3)
+
+            df = self.df[self.df['siteid'] == site]
+            df = df.set_index('time')
+            so2 = df['SO2']
+            mval = 'WDIR'
+            print(df.columns.values)
+            wdir = df['WDIR']
+            wspd = df['WS']
+            hour = df['hour']
+
+
+            iii=0
+            for lev in levlist:
+                for name, oris_ts in self.add_model_ts(site, tp='ORIS',
+                                                     levlist=lev):
+
+                    cat = pd.concat([oris_ts, wdir], axis=1) 
+                    cat = cat.dropna(axis=0)
+                    print(cat[0:10])
+                    hexbin(cat['WDIR'], cat['model'], axh1)            
+                    cat = pd.concat([oris_ts, wspd], axis=1) 
+                    hexbin(cat['WS'], cat['model'], axh2)            
+                    cat = pd.concat([oris_ts, hour], axis=1) 
+                    hexbin(cat['hour'], cat['model'], axh3)            
+                    #hexbin(wspd,so2, axh2)            
+                    #hexbin(hour,so2, axh3)       
+                    ymax = np.max(cat['model'])   
+                    ymax = 90
+                    orislist = addplants(site, axh1, ymax=ymax,
+                                 geoname=self.geoname, add_text=False)
+                    axh1.set_xticks([0,45,90,135, 180,225,270,315])
+                    axh1.set_xticklabels(['0','','90','', '180','','270',''],fontsize=15)
+                    axh2.set_xticks([0,2.5,5,7.5,10])
+                    axh2.set_xticklabels(['0','','5','', '10'],fontsize=15)
+                    axh3.set_xticks([0,3,6,9,12,15,18,21])
+                    axh3.set_xticklabels(['0','','6','', '12','','18',''],fontsize=15)
+                    axh1.yaxis.set_major_locator(MultipleLocator(20))
+                    axh1.yaxis.set_minor_locator(MultipleLocator(10))
+                    axh1.set_ylim(0,ymax+2)  
+                    axh1.tick_params(labelsize=15, which='both')
+                    axh2.yaxis.set_major_locator(MultipleLocator(20))
+                    axh2.yaxis.set_minor_locator(MultipleLocator(10))
+                    #axh2.set_xlim(0,15)  
+                    axh2.set_ylim(0,ymax+2)  
+                    axh2.tick_params(labelsize=15, which='both')
+                    axh3.yaxis.set_major_locator(MultipleLocator(20))
+                    axh3.yaxis.set_minor_locator(MultipleLocator(10))
+                    axh3.set_ylim(0,ymax+2)  
+                    axh3.tick_params(labelsize=15,which='both')
+                    plt.tight_layout() 
+                    if not tag: tag = self.tag
+                    plt.savefig(tag + str(site) + '.model_hex.jpg')
+                    plt.show() 
+                    iii+=1
+
+
+    def plot_autocorr(self, levlist=None, save=True, quiet=False):
+         
+        sns.set()
+        sns.set_style('whitegrid')
+        slist = self.get_sites()
+        print('SLIST', slist)
+        #self.date2hour()
+        for site in slist:
+            fig = plt.figure(self.fignum)
+            fig.set_size_inches(15,5)
+
+
+            # re-using these axis produces a warning.
+            ax1 = fig.add_subplot(1,1,1)
+            #ax2 = ax1.twinx()
             #ax3 = fig.add_subplot(2,1,2)
             #ax3 = ax1.twinx()
 
             df = self.df[self.df['siteid'] == site]
             df = df.set_index('time')
             so2 = df['SO2']
+            mval = 'WDIR'
             wdir = df['WDIR']
-            ax2.plot(wdir, 'b.', markersize=2)
-            ax1.plot(so2, '-k')
+            wspd = df['WS']
+            #hour = df['hour']
+            nlist = np.arange(0,72) 
+            wdir_auto = statmain.autocorr(wdir, nlist)
+            wspd_auto = statmain.autocorr(wspd, nlist)
+ 
+            wdir.to_csv(str(site) + '.wdir.csv', header=True)
+            vpi = so2==-9
+            so2[vpi] = float('Nan') 
+            #so2_auto = statmain.autocorr(so2, nlist)
+            vpi = so2<1
+            so2[vpi] =  0
+            so2_auto = statmain.autocorr(so2, nlist)
+
+            #ax2.plot(wdir, 'b.', markersize=2)
+            #ax2.plot(wdir, '--b.', markersize=2)
+            iii=0
+            for lev in levlist:
+                for name, oris_ts in self.add_model_ts(site, tp='ORIS',
+                                                     levlist=lev):
+                    acorr = statmain.autocorr(oris_ts, nlist)
+                    ax1.plot(nlist, acorr, '-b')
+                    iii+=1
+            ax1.plot(nlist, so2_auto, '-ko')
+            ax1.plot(nlist, wdir_auto, '--r')
+            ax1.plot(nlist, wspd_auto, '--g')
+            plt.title(str(site))
+            plt.savefig(str(site) + 'autocorr.jpg')
+            plt.show() 
+
+    def plot_ts(self, levlist=None, save=True, quiet=False):
+
+        # levlist should be a list of lists.
+        # for instance [[1],[2],[3]]
+        # will plot levels 1,2,3 seperately.
+        # [[1,2],[3]]
+        # will plot levels 1&2 averaged together and then 3 separately. 
+        print('PLOT TS')
+        if self.df.empty: return -1
+        sns.set()
+        sns.set_style('whitegrid')
+        slist = self.get_sites()
+        self.date2hour()
+        for site in slist:
+            fig = plt.figure(self.fignum)
+            fig.set_size_inches(15,5)
+
+
+            # re-using these axis produces a warning.
+            ax1 = fig.add_subplot(1,1,1)
+            #ax2 = ax1.twinx()
+            #ax3 = fig.add_subplot(2,1,2)
+            #ax3 = ax1.twinx()
+
+            df = self.df[self.df['siteid'] == site]
+            df = df.set_index('time')
+            so2 = df['SO2']
+            mval = 'WDIR'
+            wdir = df['WDIR']
+            wspd = df['WS']
+            hour = df['hour']
+            
+            wdir.to_csv(str(site) + '.wdir.csv', header=True)
+            vpi = so2==-9
+            so2[vpi] = float('Nan') 
+
+            #ax2.plot(wdir, 'b.', markersize=2)
+            #ax2.plot(wdir, '--b.', markersize=2)
+            ax1.plot(so2.sort_index(), '-k', linewidth=3)
             #print('MODEL LIST', self.model_list)
             iii=0
-            clrs = ['-m.', '-r.','-c.','-b.','-y'] 
-            for name, oris_ts in self.add_model_ts(site, tp='ORIS'):
-                ax1.plot(oris_ts, clrs[iii], label=name)  
-                iii+=1
-            for name, eis_ts in self.add_model_ts(site, tp='NEI'):
-                ax1.plot(eis_ts, '-g.', label=name)  
+            plume='hrrr'
+            plume='hrrrA'
+            if plume == 'nam':
+                #clrs = [sns.xkcd_rgb['magenta']]
+                #clrs.append(sns.xkcd_rgb['rose'])
+                #clrs.append(sns.xkcd_rgb['pink'])
+                clrs = [sns.xkcd_rgb['scarlet']]
+                clrs.append(sns.xkcd_rgb['pale red'])
+                clrs.append(sns.xkcd_rgb['salmon'])
+                clrs.append(sns.xkcd_rgb['grey'])
+                clrs.append(sns.xkcd_rgb['grey'])
+                alpha = [1,0.5,0.5,0.5,0.5]
+            elif plume == 'hrrr':
+                clrs = [sns.xkcd_rgb['grey']]
+                clrs.append(sns.xkcd_rgb['grey'])
+                clrs.append(sns.xkcd_rgb['grey'])
+                clrs.append(sns.xkcd_rgb['bright blue'])
+                clrs.append(sns.xkcd_rgb['grey'])
+                alpha = [0.5,0.5,0.5,1.0,0.5]
+            elif plume == 'hrrrA':
+                clrs = [sns.xkcd_rgb['bright blue']]
+                clrs.append(sns.xkcd_rgb['grey'])
+                clrs.append(sns.xkcd_rgb['light grey'])
+                clrs.append(sns.xkcd_rgb['grey'])
+                clrs.append(sns.xkcd_rgb['grey'])
+                clrs.append(sns.xkcd_rgb['grey'])
+                alpha = [0.8,0.4,0.4,0.4,0.4]
+            elif plume == 'wrf':
+                clrs = [sns.xkcd_rgb['grey']]
+                clrs.append(sns.xkcd_rgb['grey'])
+                clrs.append(sns.xkcd_rgb['grey'])
+                clrs.append(sns.xkcd_rgb['grey'])
+                clrs.append(sns.xkcd_rgb['kelly green'])
+                alpha = [0.5,0.5,0.5,0.5,1.0]
+            else:
+                clrs = [sns.xkcd_rgb['magenta']]
+                clrs.append(sns.xkcd_rgb['rose'])
+                clrs.append(sns.xkcd_rgb['pink'])
+                clrs.append(sns.xkcd_rgb['bright blue'])
+                clrs.append(sns.xkcd_rgb['kelly green'])
+                alpha = [0.5,0.5,0.5,0.5,0.5]
+
+
+            for lev in levlist:
+                for name, oris_ts in self.add_model_ts(site, tp='ORIS',
+                                                     levlist=lev):
+
+                    #ax1.plot(oris_ts, clrs[iii], label=name)  
+                    ax1.plot(oris_ts, clrs[iii],  label=name, linewidth=2,
+                             alpha=alpha[iii])  
+                    iii+=1
+            #for name, eis_ts in self.add_model_ts(site, tp='NEI'):
+            #    ax1.plot(eis_ts, '-g.', label=name)  
             #for model in self.model_list:
                 #if model[1] == site:
            #         print('PLOTTING', model)
@@ -642,29 +1337,39 @@ class MetObs(object):
             dlist = oris_ts.index.tolist()
             #daterange = (dlist[0], dlist[-1])
             #orislist = addplants_horizontal(site, ax2, daterange, geoname=self.geoname, neidf=self.neidf)
-            ax1.set_ylabel('so2 (ppb)')
-            ax2.set_ylabel('Wind direction (degrees)')
+            #ax1.set_ylabel('so2 (ppb)')
+            #ax1.set_yscale('log')
+            #ax1.set_ylim(bottom=0.1)  
+            ax1.set_ylim(top=60)  
+            #ax2.set_ylabel('Wind direction (degrees)')
+            #ax2.set_ylabel('Mixing Height')
             #for oris in self.cemslist:
             #    print('ORIS', oris, self.cemslist, df.columns.values)
             #    cems = df[oris]
             #    ax3.plot(cems, '-r.')
-
+            xdata = dlist
+            dt = datetime.timedelta(hours=5*24)
+            #ax2.set_xlim(left = xdata[0], right=xdata[-1]-dt)  
+            ax1.set_xlim(left = xdata[0], right=xdata[-1]-dt)  
+          
             #ax2.spines["right"].set_position(("axes", 1.1))
             #ptools.make_patch_spines_invisible(ax2)
             #ax2.spines["right"].set_visible(True)
-            ax2.grid(False, which='both')
-            ptools.set_date_ticksB(ax1)
+            #ax2.grid(False, which='both')
+            ptools.set_date_ticksD(ax1)
             ax1.grid(True, which='both')
-            plt.title(str(site))
+            #plt.title(str(site))
             fig.autofmt_xdate()
             ax = plt.gca()
             handles, labels = ax.get_legend_handles_labels()
-            ax.legend(handles, labels)
+            #ax.legend(handles, labels)
             plt.tight_layout() 
+            save=True
             if save:
                 tag = self.tag
                 if not tag: tag = ''
-                plt.savefig(tag + str(site) + '.met_ts.jpg')
+                print('SAVING', plume+str(site) + '.met_ts.jpg')
+                plt.savefig(plume + str(site) + '.met_ts.jpg')
             if not quiet:
                 plt.show()
             plt.close() 
@@ -816,7 +1521,6 @@ class MetObs(object):
 
 
     def conditionalA(self, distrange=5, roll=12):
-
         # roll gives how many hours of emission to take into account.
         # sums the previous roll (default 12)  hours.
 
@@ -925,42 +1629,62 @@ class MetObs(object):
         # 2d histogram of obs and wind direction.
         if self.df.empty: return -1
         slist = self.get_sites()
-        nnn=2
+        nnn=3
         aaa=1
-        sz=(10,5)
+        sz=(20,5)
+        sz1=(10,15)
         psqplot = self.PSQ2NUM()
+        self.date2hour()
         if psqplot: 
            nnn=2
            aaa=3
-           sz=(10,15)
-           self.date2hour()
+           bbb=1
+           sz=(15,10)
+           sz1=(10,15)
 
         for site in slist:
             sns.set()
             sns.set_style('whitegrid')
-            fig = plt.figure(self.fignum)
+            sns.set_context('talk', font_scale=1.2)
+            fig = plt.figure(1)
+            #fig1 = plt.figure(self.fignum+1)
+            #fig2 = plt.figure(self.fignum+1)
+            #axts = fig2.add_subplot(1,1,1)
+            #fig2 = plt.figure(self.fignum+1)
+            #fig3 = plt.figure(self.fignum+2)
+            #fig4 = plt.figure(self.fignum+3)
+            #fig5 = plt.figure(self.fignum+4)
+            #fig6 = plt.figure(self.fignum+5)
             fig.set_size_inches(sz[0],sz[1])
-            fig2 = plt.figure(self.fignum+1)
-            fig2.set_size_inches(sz[0],sz[1])
+            #fig1.set_size_inches(sz1[0],sz1[1])
+            #fig2 = plt.figure(self.fignum+1)
+            #fig2.set_size_inches(sz[0],sz[1])
             # re-using these axis produces a warning.
             ax1 = fig.add_subplot(aaa,nnn,1)
             ax2 = fig.add_subplot(aaa,nnn,2)
+            ax3 = fig.add_subplot(aaa,nnn,3)
             if psqplot:
-                ax3 = fig.add_subplot(aaa,nnn,3)
-                ax4 = fig.add_subplot(aaa,nnn,4)
-                ax5 = fig.add_subplot(aaa,nnn,5)
-                ax6 = fig.add_subplot(aaa,nnn,6)
+                #ax3 = fig.add_subplot(aaa,nnn,3)
+                ax5 = fig.add_subplot(aaa,nnn,4)
+                ax4 = fig1.add_subplot(aaa,bbb,1)
+                ax6 = fig1.add_subplot(aaa,bbb,2)
+                ax7 = fig1.add_subplot(aaa,bbb,3)
 
             df = self.df[self.df['siteid'] == site]
-            #print('HEXBIN for site ' , site) 
-            #print(df[0:10])
+            print('HEXBIN for site ' , site) 
+            print(df[0:10])
             #df.columns = self.met_header(df.columns)
             #print(df.columns.values)
             #xtest = df[("WD", "Degrees Compass")]
-       
+            # remove missing measurements.
+            df = df[df["SO2"] != -9]      
+            #df = df[df["SO2"] >= 1]      
+ 
             xtest = df["WDIR"]
             ytest = df["WS"]
             ztest = df["SO2"]
+            htest = df['hour']
+            #axts.plot(df['time'], xtest, '-b.') 
             if psqplot:
                # do not include Nans in the distributions.
                dftemp = df[df['psqnum']<8] 
@@ -973,6 +1697,7 @@ class MetObs(object):
                ztest = dftemp["SO2"]
                print(dftemp.columns.values) 
                pbl = dftemp['MixHgt']
+               print(dftemp[dftemp['MixHgt'] < 150])
  
             if np.isnan(xtest).all():
                 print('No data WDIR', site)
@@ -980,39 +1705,87 @@ class MetObs(object):
             if np.isnan(ztest).all():
                 print('No data so2', site)
                 continue
-            cbar=False 
+            cbar= True
             hexbin(xtest, ztest, ax1, cbar=cbar)  
             ymax = np.max(ztest)
-            addplants(site, ax1, ymax=ymax, geoname=self.geoname)
+            addplants(site, ax1, ymax=ymax, dthresh=50,  geoname=self.geoname,
+                      add_text=False)
+            #hexbin(htest, ztest, ax2, cbar=cbar) 
             hexbin(ytest, ztest, ax2, cbar=cbar) 
+            hexbin(htest, ztest, ax3, cbar=cbar)
             if psqplot:
-               hexbin(p2test, ztest, ax3, cbar=cbar)
-               hexbin(htest, p1test, ax4, cbar=cbar)
-               hexbin(ztest, pbl, ax5, cbar=cbar) 
+               hexbin(htest, p2test, ax4, cbar=cbar)
+               hexbin(p2test, ztest, ax7, cbar=cbar)
+               hexbin(pbl, ztest,  ax5, cbar=cbar) 
                hexbin(p2test,pbl,  ax6, cbar=cbar) 
-            ax1.set_xlabel('Wind Direction ')
-            ax2.set_xlabel('Wind Speed ')
-            ax1.set_ylabel('SO2 (ppb)')
+            #ax1.set_xlabel('Wind Direction ')
+            #ax2.set_xlabel('Wind Speed ')
+            #ax2.set_xlabel('Hour of day (UTC)')
+            #ax1.set_ylabel('SO2 (ppb)')
+            ax1.set_xticks([0,45,90,135, 180,225,270,315])
+            ax1.set_xticklabels(['0','','90','', '180','','270',''],fontsize=15)
+            ax2.set_xticks([0,2.5,5,7.5,10])
+            ax2.set_xticklabels(['0','','5','', '10'],fontsize=15)
+            ax3.set_xticks([0,3,6,9,12,15,18,21])
+            ax3.set_xticklabels(['0','','6','', '12','','18',''],fontsize=15)
+
+            ax1.yaxis.set_major_locator(MultipleLocator(10))
+            ax1.yaxis.set_minor_locator(MultipleLocator(5))
+            ax1.set_ylim(0,ymax+2)  
+            ax1.tick_params(labelsize=15, which='both')
+            ax2.yaxis.set_major_locator(MultipleLocator(10))
+            ax2.yaxis.set_minor_locator(MultipleLocator(5))
+            ax2.set_xlim(0,15)  
+            ax2.set_ylim(0,ymax+2)  
+            ax2.tick_params(labelsize=15, which='both')
+            ax3.yaxis.set_major_locator(MultipleLocator(10))
+            ax3.yaxis.set_minor_locator(MultipleLocator(5))
+            ax3.set_ylim(0,ymax+2)  
+            ax3.tick_params(labelsize=15,which='both')
+            #yt = np.arange(0,ymax,5)
+            #ax1.tick_params(labelsize=15)
+            #ax2.tick_params(labelsize=15)
+            #ax3.tick_params(labelsize=15)
+            #ax1.set_yticks(yt)
+            #ax2.set_yticks(yt)
+            #ax3.set_yticks(yt)
+
+            #ax1.set_ylim(0,ymax+2)  
+            #ax2.set_ylim(0,ymax+2)  
+            #ax3.set_ylim(0,ymax+2)  
+
+            plt.tight_layout() 
             if psqplot:
-               ax3.set_xlabel('PSQ')
+               ax7.set_xlabel('PSQ')
+               ax7.set_ylabel('SO2 (ppb)')
+               ax7.set_xticks([1,2,3,4,5,6,7])
+               ax7.set_xticklabels(['A','B','C','D','E','F','G'])
+
                ax4.set_xlabel('time')
                ax4.set_ylabel('PSQ')
-               ax5.set_ylabel('PBL height ')
-               ax5.set_xlabel('SO2')
+               ax4.set_yticks([1,2,3,4,5,6,7])
+               ax4.set_yticklabels(['A','B','C','D','E','F','G'])
+               ax5.set_xlabel('PBL height (m) ')
                ax6.set_ylabel('PBL height ')
                ax6.set_xlabel('Stability')
-            ax1.set_title(str(site))
+               ax6.set_xticks([1,2,3,4,5,6,7])
+               ax6.set_xticklabels(['A','B','C','D','E','F','G'])
+            #ax1.set_title(str(site))
             plt.tight_layout() 
             if save:
                 tag = self.tag
                 if not tag: tag = ''
-                plt.savefig(tag + str(site) + '.met_dist.jpg')
-            self.fignum +=1
-            #if not quiet:
-            #    plt.show()
+                plt.sca(ax1)
+                plt.savefig(tag + str(site) + '.met_distA.jpg')
+                if psqplot:
+                   plt.sca(ax4)
+                   plt.savefig(tag + str(site) + '.met_distB.jpg')
+            #self.fignum +=1
+            if not quiet:
+                plt.show()
             # clearing the axes does not
             # get rid of warning.
-            #plt.cla()
-            #plt.clf()
-            #plt.close()  
+            plt.cla()
+            plt.clf()
+            plt.close()  
 
